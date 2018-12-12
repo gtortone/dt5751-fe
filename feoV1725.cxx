@@ -123,9 +123,6 @@ $Id: feov1725.cxx 128 2011-05-12 06:26:34Z alex $
 #define NBCORES           8   //!< Number of cpu cores, for process/thread locking
 #endif
 
-#ifndef HWLOGDIR
-#define HWLOGDIR "/home/deap/pro/FrontEnd/v1725"
-#endif
 
 #define SLEEP_TIME_BETWEEN_CONNECTS 50 // in milliseconds
 
@@ -165,9 +162,6 @@ INT max_event_size = 32 * 222800;
 INT max_event_size_frag = 5 * 1024 * 1024;
 //! buffer size to hold events
 INT event_buffer_size = 30 * max_event_size + 10000;
-//! log of hardware status
-std::ofstream hwlog;
-std::string hwlog_filename;
 
 bool runInProgress = false; //!< run is in progress
 uint32_t timestamp_offset[NBLINKSPERFE*NB1725PERLINK]; //!< trigger time stamp offsets
@@ -295,8 +289,6 @@ INT frontend_init(){
 
   std::stringstream * ss = new std::stringstream();
   int feIndex = get_frontend_index();
-  *ss << HWLOGDIR << "/hwlog" << ((feIndex == -1) ? 0 : feIndex);
-  hwlog_filename = ss->str();
 
   set_equipment_status(equipment[0].name, "Initializing...", "#FFFF00");
   printf("<<< Begin of Init\n");
@@ -498,9 +490,6 @@ INT frontend_exit(){
  */
 INT begin_of_run(INT run_number, char *error){
 
-  hwlog.open(hwlog_filename.c_str(), std::ios::app);
-  hwlog << "========================================================= BOR: (RUN #: "<< run_number << " TIME = " << ss_time() << ") ===================================================" << std::endl;
-  hwlog.close();
 
   set_equipment_status(equipment[0].name, "Starting run...", "#FFFF00");
   cm_msg(MINFO,"BOR", "Start of begin_of_run");
@@ -689,9 +678,6 @@ void * link_thread(void * arg)
  */
 INT end_of_run(INT run_number, char *error)
 {
-  hwlog.open(hwlog_filename.c_str(), std::ios::app);
-  hwlog << "========================================================= EOR: (RUN #: "<< run_number << " TIME = " << ss_time() << ") ===================================================" << std::endl;
-  hwlog.close();
 
   set_equipment_status(equipment[0].name, "Ending run...", "#FFFF00");
   cm_msg(MINFO,"EOR", "Start of end_of_run");
@@ -755,9 +741,6 @@ INT end_of_run(INT run_number, char *error)
  */
 INT pause_run(INT run_number, char *error)
 {
-  hwlog.open(hwlog_filename.c_str(), std::ios::app);
-  hwlog << "========================================================= PAUSE: (RUN #: "<< run_number << " TIME = " << ss_time() << ") =================================================" << std::endl;
-  hwlog.close();
 
   cm_msg(MINFO,"PAUSE", "Beginning of pause_run");
   printf("<<< Beginning of pause_run \n");
@@ -817,10 +800,6 @@ INT pause_run(INT run_number, char *error)
 INT resume_run(INT run_number, char *error)
 {
 
-  hwlog.open(hwlog_filename.c_str(), std::ios::app);
-  hwlog << "========================================================= RESUME: (RUN #: "<< run_number << " TIME = " << ss_time() << ") ================================================" << std::endl;
-  hwlog.close();
-
   printf("<<< Beginning of resume_run \n");
 
   int rb_handle;
@@ -875,77 +854,6 @@ DWORD sn=0;
  */
 INT frontend_loop()
 {
-  if((prevtime == 0) || ((ss_time() - prevtime) > 2)){
-
-    hwlog.open(hwlog_filename.c_str(), std::ios::app);
-
-    // Header, print when frontend starts
-    if(prevtime == 0){
-      hwlog << "=================================================================================================================================================" << std::endl;
-      hwlog << "========================================================= FE START: (TIME = " << ss_time() << ") =========================================================" << std::endl;
-      hwlog << "=================================================================================================================================================" << std::endl;
-    }
-    // Subheader, print every 80 lines
-    if((numloops % 80) == 0){
-      hwlog << "\t   |  " << "Board 0" << "\t\t\t\t\t\t\t\t|  " << "Board 1" << std::endl;
-      hwlog << "TIME" << "\t   |  "
-            << "VME_STATUS " << "VME_CTL    " << "ACQ_STATUS " << "ACQ_CTL    " << "EV_STORED" << "  SN" << "         |  "
-            << "VME_STATUS " << "VME_CTL    " << "ACQ_STATUS " << "ACQ_CTL    " << "EV_STORED" << "  SN" << std::endl;
-    }
-
-    //Get previous time, pad it to 11 spaces and write to log file
-    prevtime = ss_time();
-    std::stringstream sstime;
-    sstime << prevtime;
-    for(int i=sstime.str().length(); i<11; ++i)
-      sstime << " ";
-    hwlog << sstime.str() << "|  ";
-
-    for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-      if (! itv1725->IsConnected()){ // Skip unconnected board
-        hwlog << std::endl;
-        continue;
-      }
-
-      DWORD vme_status, vme_ctl, acq_status, acq_ctl, ev_stored;
-      std::vector<std::unique_ptr<std::stringstream> > vss;
-
-      // Query info from hardware
-      itv1725->ReadReg(V1725_VME_STATUS, &vme_status);
-      vss.push_back(std::unique_ptr<std::stringstream>(new std::stringstream));
-      *vss.back() << "0x" << std::hex << vme_status;
-      itv1725->ReadReg(V1725_VME_CONTROL, &vme_ctl);
-      vss.push_back(std::unique_ptr<std::stringstream>(new std::stringstream));
-      *vss.back() << "0x" << std::hex << vme_ctl;
-      itv1725->ReadReg(V1725_ACQUISITION_STATUS, &acq_status);
-      vss.push_back(std::unique_ptr<std::stringstream>(new std::stringstream));
-      *vss.back() << "0x" << std::hex << acq_status;
-      itv1725->ReadReg(V1725_ACQUISITION_CONTROL, &acq_ctl);
-      vss.push_back(std::unique_ptr<std::stringstream>(new std::stringstream));
-      *vss.back() << "0x" << std::hex << acq_ctl;
-      itv1725->ReadReg(V1725_EVENT_STORED, &ev_stored);
-      vss.push_back(std::unique_ptr<std::stringstream>(new std::stringstream));
-      *vss.back() << std::dec << ev_stored;
-      vss.push_back(std::unique_ptr<std::stringstream>(new std::stringstream));
-      *vss.back() << std::dec << sn;
-
-      // Body
-      for(unsigned int i=0; i<vss.size(); ++i){
-        // Pad the data with spaces up to 11 characters for pretty display
-        for(int j=vss[i]->str().length(); j<11; ++j)
-          *vss[i] << " ";
-        hwlog << vss[i]->str();
-      }
-      if ((ov1725.end() - itv1725) == 1)
-        hwlog << std::endl;
-      else
-        hwlog << "|  ";
-
-    }
-    numloops++;
-  }
-
-  hwlog.close();
 
   return SUCCESS;
 }
