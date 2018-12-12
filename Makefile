@@ -1,9 +1,9 @@
 ####################################################################
 #
 #  Name:         Makefile
-#  Created by:   Stefan Ritt
+#  Created by:   Thomas Lindner
 #
-#  Contents:     Makefile for the v1720 frontend
+#  Contents:     Makefile for the v1725 frontend
 #
 #  Copied from DEAP frontend
 #
@@ -16,14 +16,14 @@
 # Hardware setup
 NBLINKSPERA3818=1 # Number of optical links used per A3818
 NBLINKSPERFE=1 # Number of optical links controlled by each frontend
-NB1720PERLINK=1 # Number of daisy-chained v1720s per optical link
-NBV1720TOTAL=1 # Number of v1720 boards in total
+NB1725PERLINK=1 # Number of daisy-chained v1725s per optical link
+NBV1725TOTAL=1 # Number of v1725 boards in total
 NBCORES=12
 USE_SYSTEM_BUFFER=1
 
 HWFLAGS = -DUSE_SYSTEM_BUFFER=$(USE_SYSTEM_BUFFER) \
--DNv1720=$(Nv1720) -DNBLINKSPERA3818=$(NBLINKSPERA3818) -DNBLINKSPERFE=$(NBLINKSPERFE) \
--DNB1720PERLINK=$(NB1720PERLINK) -DNBV1720TOTAL=$(NBV1720TOTAL) -DNBCORES=$(NBCORES)
+-DNv1725=$(Nv1725) -DNBLINKSPERA3818=$(NBLINKSPERA3818) -DNBLINKSPERFE=$(NBLINKSPERFE) \
+-DNB1725PERLINK=$(NB1725PERLINK) -DNBV1725TOTAL=$(NBV1725TOTAL) -DNBCORES=$(NBCORES)
 
 
 #--------------------------------------------------------------------
@@ -69,7 +69,7 @@ CFLAGS += -O2
 #
 ifdef ROOTSYS
 ROOTCFLAGS := $(shell  $(ROOTSYS)/bin/root-config --cflags)
-ROOTCFLAGS += -DHAVE_ROOT -DUSE_ROOT
+ROOTCFLAGS += -DHAVE_ROOT -DUSE_ROOT -I/Users/lindner/packages/CAENComm-1.2/include/
 ROOTLIBS   := $(shell  $(ROOTSYS)/bin/root-config --libs) -Wl,-rpath,$(ROOTSYS)/lib
 ROOTLIBS   += -lThread
 else
@@ -119,7 +119,7 @@ LIBCAENVME=-lCAENVME
 #
 # All includes
 # INCS = -I. -I./include -I$(MIDAS_INC) -I$(MIDAS_DRV) -I$(CAENVME_DIR)/include -I$(CAENCOMM_DIR)/include
-INCS = -I. -I./include -I$(MIDAS_INC) -I$(MIDAS_DRV)
+INCS = -I. -I./include -I$(MIDAS_INC) -I$(MIDAS_DRV) -I/Users/lindner/packages/CAENComm-1.2/include/ -I/Users/lindner/packages/CAENVMELib-2.50/include/
 
 ####################################################################
 # General commands
@@ -129,7 +129,7 @@ all: fe
 	@echo "***** Finished"
 	@echo "***** Use 'make doc' to build documentation"
 
-fe : feoV1720mt.exe
+fe : feoV1725mt.exe
 
 doc ::
 	doxygen
@@ -139,20 +139,20 @@ doc ::
 # Libraries/shared stuff
 ####################################################################
 
-ov1720.o : $(MIDAS_DRV)/ov1720.c
+ov1725.o : $(MIDAS_DRV)/ov1725.c
 	$(CC) -c $(CFLAGS) $(INCS) $< -o $@ 
 
 ####################################################################
 # Single-thread frontend
 ####################################################################
 
-feoV1720mt.exe: $(MIDAS_LIB)/mfe.o  feoV1720.o ov1720.o v1720CONET2.o
-	$(CXX) $(OSFLAGS) feoV1720.o v1720CONET2.o ov1720.o $(MIDAS_LIB)/mfe.o $(LIBMIDAS) $(LIBCAENCOMM) $(LIBCAENVME) -o $@ $(LDFLAGS)
+feoV1725mt.exe: $(MIDAS_LIB)/mfe.o  feoV1725.o ov1725.o v1725CONET2.o
+	$(CXX) $(OSFLAGS) feoV1725.o v1725CONET2.o ov1725.o $(MIDAS_LIB)/mfe.o $(LIBMIDAS) $(LIBCAENCOMM) $(LIBCAENVME) -o $@ $(LDFLAGS)
 
-feoV1720.o : feoV1720.cxx v1720CONET2.o
+feoV1725.o : feoV1725.cxx v1725CONET2.o
 	$(CXX) $(CFLAGS) $(OSFLAGS) $(INCS) -Ife -c $< -o $@
 
-v1720CONET2.o : v1720CONET2.cxx
+v1725CONET2.o : v1725CONET2.cxx
 	$(CXX) $(CFLAGS) $(OSFLAGS) $(INCS) -Ife -c $< -o $@
 
 $(MIDAS_LIB)/mfe.o:
