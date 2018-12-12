@@ -84,17 +84,7 @@ controls 2*2 = 4 v1725 boards.  Compile and run:
     ./feoV1725.exe
 
 
-\section deap DEAP-3600 notes
 
-MIDAS_SERVER_HOST should be set to deap00:7071. Otherwise frontends will require the
-option -h deap00:7071
-
-Each frontend will only access one link. To access all boards they
-should be run four times on each computer with each of the four indexes.
-
-
-
-$Id: feov1725.cxx 128 2011-05-12 06:26:34Z alex $
  *****************************************************************************/
 
 #include <stdio.h>
@@ -118,7 +108,7 @@ $Id: feov1725.cxx 128 2011-05-12 06:26:34Z alex $
 #ifndef NBLINKSPERA3818
 #define NBLINKSPERA3818   4   //!< Number of optical links used per A3818
 #define NBLINKSPERFE      4   //!< Number of optical links controlled by each frontend
-#define NB1725PERLINK     2   //!< Number of daisy-chained v1725s per optical link
+#define NB1725PERLINK     1   //!< Number of daisy-chained v1725s per optical link
 #define NBV1725TOTAL      32  //!< Number of v1725 boards in total
 #define NBCORES           8   //!< Number of cpu cores, for process/thread locking
 #endif
@@ -287,22 +277,24 @@ void seq_callback(INT h, INT hseq, void *info){
  */
 INT frontend_init(){
 
-  std::stringstream * ss = new std::stringstream();
   int feIndex = get_frontend_index();
-
+  // If feIndex == -1, then just treat it as the first frontend; ie, set to 0.
+  if(feIndex == -1) feIndex == 0;
+  
   set_equipment_status(equipment[0].name, "Initializing...", "#FFFF00");
   printf("<<< Begin of Init\n");
 
   {
     // Reset the PLL lock loss flag in ODB
     char Path[255];
-    sprintf(Path,"/DEAP Alarm/PLL Loss FE0%d",get_frontend_index());
+    sprintf(Path,"/DS Alarm/PLL Loss FE0%d",get_frontend_index());
     INT dummy;
     int size=sizeof(INT);
     db_get_value(hDB, 0, Path, &(dummy), &size, TID_INT, true);
     dummy=-1;
     db_set_value(hDB, 0, Path, &(dummy), sizeof(INT), 1, TID_INT);
   }
+  
   {
     // Correct the Trigger mask based on the frontend index, update ODB
     // Used for sorting the threads, and for logger filtering
@@ -317,104 +309,59 @@ INT frontend_init(){
     db_set_value(hDB, 0, sEpath, &(equipment[1].info.event_id), sizeof(WORD), 1, TID_WORD);
   }
 
-  // --- Suppress watchdog for PICe for now
+  // --- Suppress watchdog for PICe for now  ; what is this???
   cm_set_watchdog_params(FALSE, 0);
 
   int nExpected = 0; //Number of v1725 boards we expect to activate
   int nActive = 0;   //Number of v1725 boards activated at the end of frontend_init
   std::vector<std::pair<int,int> > errBoards;  //v1725 boards which we couldn't connect to
   
-  // If no index was supplied on the command-line, assume 1 frontend
-  // to control all the links and boards
-  if(feIndex == -1) {
-    nExpected = NB1725PERLINK*NBLINKSPERA3818;
-    
-    printf("<<< No index supplied! Assuming only 1 frontend only and starting all boards on all links\n");
-    for (int iLink=0; iLink < NBLINKSPERA3818; iLink++) {
-      for (int iBoard=0; iBoard < NB1725PERLINK; iBoard++) {
-        printf("==== Link:%d, Board:%d ====\n", iLink, iBoard);
-        
-        // Compose unique module ID
-        int moduleID = iLink*NB1725PERLINK + iBoard;
-        
-        // Create module objects
-        ov1725.emplace_back(feIndex, iLink, iBoard, moduleID, hDB);
-        
-        ov1725.back().SetVerbosity(0);
-        
-        // Open Optical interface
-        printf("Opening optical interface Link %d, Board %d\n", iLink, iBoard);
-        switch(ov1725.back().Connect()){
-        case v1725CONET2::ConnectSuccess:
-          nActive++;
-          break;
-        case v1725CONET2::ConnectErrorCaenComm:
-        case v1725CONET2::ConnectErrorTimeout:
-          errBoards.push_back(std::pair<int,int>(iLink,iBoard));
-          break;
-        case v1725CONET2::ConnectErrorAlreadyConnected:
-          //do nothing
-          break;
-        default:
-          //Can't happen
-          break;
-        }
-        
-        if(!((iLink == (NBLINKSPERA3818-1)) && (iBoard == (NB1725PERLINK-1)))){
-          printf("Sleeping for %d milliseconds before next board\n", SLEEP_TIME_BETWEEN_CONNECTS);
-          ss_sleep(SLEEP_TIME_BETWEEN_CONNECTS);
-        }
+  nExpected = NB1725PERLINK*NBLINKSPERFE;
+  
+  if((NBV1725TOTAL % (NB1725PERLINK*NBLINKSPERFE)) != 0){
+    printf("Incorrect setup: the number of boards controlled by each frontend"
+           " is not a fraction of the total number of boards.");
+  }
+  
+  int maxIndex = (NBV1725TOTAL/NB1725PERLINK)/NBLINKSPERFE - 1;
+  if(feIndex < 0 || feIndex > maxIndex){
+    printf("Front end index must be between 0 and %d\n", maxIndex);
+    exit(FE_ERR_HW);
+  }
+  
+  int firstLink = (feIndex % (NBLINKSPERA3818 / NBLINKSPERFE)) * NBLINKSPERFE;
+  int lastLink = firstLink + NBLINKSPERFE - 1;
+  for (int iLink=firstLink; iLink <= lastLink; iLink++) {
+    for (int iBoard=0; iBoard < NB1725PERLINK; iBoard++) {
+      printf("==== feIndex:%d, Link:%d, Board:%d ====\n", feIndex, iLink, iBoard);
+      
+      // Compose unique module ID
+      int moduleID = feIndex*NBLINKSPERFE*NB1725PERLINK + (iLink-firstLink)*NB1725PERLINK + iBoard;
+      
+      // Create module objects
+      ov1725.emplace_back(feIndex, iLink, iBoard, moduleID, hDB);
+      ov1725.back().SetVerbosity(0);
+      
+      // Open Optical interface
+      switch(ov1725.back().Connect()){
+      case v1725CONET2::ConnectSuccess:
+        nActive++;
+        break;
+      case v1725CONET2::ConnectErrorCaenComm:
+      case v1725CONET2::ConnectErrorTimeout:
+        errBoards.push_back(std::pair<int,int>(iLink,iBoard));
+        break;
+      case v1725CONET2::ConnectErrorAlreadyConnected:
+        //do nothing
+        break;
+      default:
+        //Can't happen
+        break;
       }
-    }
-  } else {  //index supplied
-    
-    nExpected = NB1725PERLINK*NBLINKSPERFE;
-    
-    if((NBV1725TOTAL % (NB1725PERLINK*NBLINKSPERFE)) != 0){
-      printf("Incorrect setup: the number of boards controlled by each frontend"
-             " is not a fraction of the total number of boards.");
-    }
-    
-    int maxIndex = (NBV1725TOTAL/NB1725PERLINK)/NBLINKSPERFE - 1;
-    if(feIndex < 0 || feIndex > maxIndex){
-      printf("Front end index must be between 0 and %d\n", maxIndex);
-      exit(FE_ERR_HW);
-    }
-    
-    int firstLink = (feIndex % (NBLINKSPERA3818 / NBLINKSPERFE)) * NBLINKSPERFE;
-    int lastLink = firstLink + NBLINKSPERFE - 1;
-    for (int iLink=firstLink; iLink <= lastLink; iLink++) {
-      for (int iBoard=0; iBoard < NB1725PERLINK; iBoard++) {
-        printf("==== feIndex:%d, Link:%d, Board:%d ====\n", feIndex, iLink, iBoard);
-        
-        // Compose unique module ID
-        int moduleID = feIndex*NBLINKSPERFE*NB1725PERLINK + (iLink-firstLink)*NB1725PERLINK + iBoard;
-        
-        // Create module objects
-        ov1725.emplace_back(feIndex, iLink, iBoard, moduleID, hDB);
-        ov1725.back().SetVerbosity(0);
-        
-        // Open Optical interface
-        switch(ov1725.back().Connect()){
-        case v1725CONET2::ConnectSuccess:
-          nActive++;
-          break;
-        case v1725CONET2::ConnectErrorCaenComm:
-        case v1725CONET2::ConnectErrorTimeout:
-          errBoards.push_back(std::pair<int,int>(iLink,iBoard));
-          break;
-        case v1725CONET2::ConnectErrorAlreadyConnected:
-          //do nothing
-          break;
-        default:
-          //Can't happen
-          break;
-        }
-
-        if(!((iLink == lastLink) && (iBoard == (NB1725PERLINK-1)))){
-          printf("Sleeping for %d milliseconds before next board\n", SLEEP_TIME_BETWEEN_CONNECTS);
-          ss_sleep(SLEEP_TIME_BETWEEN_CONNECTS);
-        }
+      
+      if(!((iLink == lastLink) && (iBoard == (NB1725PERLINK-1)))){
+        printf("Sleeping for %d milliseconds before next board\n", SLEEP_TIME_BETWEEN_CONNECTS);
+        ss_sleep(SLEEP_TIME_BETWEEN_CONNECTS);
       }
     }
   }
