@@ -2715,15 +2715,8 @@ int v1725CONET2::InitializeForAcq()
   uint32_t version = 0;
   uint32_t prev_chan = 0;
   // Hardcode correct firmware verisons
-  // Current release 3.4_0.11 Feb 2012
-  //  const uint32_t amc_fw_ver = 0xd215000c;
-  //  const uint32_t amc_fw_ver = 0xe527000d;
-  //  const uint32_t roc_fw_ver = 0xc2080304;
-  //  const uint32_t roc_fw_ver = 0xd4110401;
-  //  const uint32_t roc_fw_ver = 0xe5270402;
-  const uint32_t roc_fw_ver_test = 0xc5250306;   //new version we're testing
-	const uint32_t amc_fw_ver = 0x1906000f; 
-	const uint32_t roc_fw_ver = 0x17250410; 
+	const uint32_t amc_fw_ver = 0x14048c02; 
+	const uint32_t roc_fw_ver = 0x1331040c; 
   for(int iCh=0;iCh<8;iCh++) {
     addr = 0x108c | (iCh << 8);
     sCAEN = ReadReg_(addr, &version);
@@ -2746,16 +2739,13 @@ int v1725CONET2::InitializeForAcq()
   case roc_fw_ver:
     ss_fw_datatype << "ROC FW: 0x" << std::hex << version << ", ";
     break;
-  case roc_fw_ver_test:
-    cm_msg(MINFO,"InitializeForAcq","*** WARNING *** using new ROC Firmware Version: 0x%08x", version);
-    break;
   default:
     cm_msg(MERROR,"InitializeForAcq","Incorrect ROC Firmware Version: 0x%08x, 0x%08x expected", version, roc_fw_ver);
     break;
   }
 
   // Verify Board Type
-  const uint32_t v1725_board_type = 0x03;
+  const uint32_t v1725_board_type = 0x0e;
   sCAEN = ReadReg_(V1725_BOARD_INFO, &version);
   if((version & 0xFF) != v1725_board_type)
     cm_msg(MINFO,"InitializeForAcq","*** WARNING *** Trying to use a v1725 frontend with another"

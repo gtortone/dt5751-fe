@@ -107,7 +107,7 @@ controls 2*2 = 4 v1725 boards.  Compile and run:
 
 #ifndef NBLINKSPERA3818
 #define NBLINKSPERA3818   4   //!< Number of optical links used per A3818
-#define NBLINKSPERFE      4   //!< Number of optical links controlled by each frontend
+#define NBLINKSPERFE      1   //!< Number of optical links controlled by each frontend
 #define NB1725PERLINK     1   //!< Number of daisy-chained v1725s per optical link
 #define NBV1725TOTAL      32  //!< Number of v1725 boards in total
 #define NBCORES           8   //!< Number of cpu cores, for process/thread locking
@@ -122,8 +122,6 @@ controls 2*2 = 4 v1725 boards.  Compile and run:
 #define  FE_NAME   "feov1725MTI"       //!< Frontend name
 
 #define UNUSED(x) ((void)(x)) //!< Suppress compiler warnings
-//#define DEBUGTHREAD
-//#define SYNCEVENTS
 const bool SYNCEVENTS_DEBUG = true;
 
 // __________________________________________________________________
@@ -279,7 +277,11 @@ INT frontend_init(){
 
   int feIndex = get_frontend_index();
   // If feIndex == -1, then just treat it as the first frontend; ie, set to 0.
-  if(feIndex == -1) feIndex == 0;
+  if(feIndex < 0){
+		cm_msg(MERROR,"Init", "Must specify the frontend index (ie use -i X command line option)");
+		return FE_ERR_HW;
+	}
+
   
   set_equipment_status(equipment[0].name, "Initializing...", "#FFFF00");
   printf("<<< Begin of Init\n");
@@ -400,6 +402,8 @@ INT frontend_init(){
   if( sched_setaffinity(0, sizeof(mask), &mask) < 0 ){
     printf("ERROR setting cpu affinity for main thread: %s\n", strerror(errno));
   }
+
+	return FE_ERR_HW;
 
   return SUCCESS;
 }
@@ -580,16 +584,9 @@ void * link_thread(void * arg)
           pthread_exit((void*)&thread_retval[link]);
         }
         
-#ifdef DEBUGTHREAD
-        printf("THREAD %d (module %d): Found event\n", link, moduleID);
-#endif
         // Read data
         if(itv1725_thread[link]->ReadEvent(wp)) {
           
-#ifdef DEBUGTHREAD
-          printf("THREAD %d (module %d): Successfully read event\n", link, moduleID);
-          printf("THREAD %d (module %d): Events in buffer: %d\n", link, moduleID, itv1725_thread[link]->GetNumEventsInRB());
-#endif
         } else {
           cm_msg(MERROR,"link_thread", "Readout routine error on thread %d (module %d)", link, moduleID);
           cm_msg(MERROR,"link_thread", "Exiting thread %d", link);
@@ -899,257 +896,6 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
   if (!runInProgress) return 0;
 
   sn = SERIAL_NUMBER(pevent);
-
-  //#ifdef SYNCEVENTS
-#if 0
-  /* Check ring buffers to see if the event counters match.
-   * If not, discard old events. */
-  uint32_t event_header[4];
-  uint32_t timestamp[NBLINKSPERFE*NB1725PERLINK];
-  uint32_t highest_timestamp;
-  uint32_t lowest_timestamp;
-  int idx;
-  bool empty_buffers = false;
-
-  printf("\n### sn: %u\n", sn);
-
-#if 0 //********* Testing resync ********
-
-  /* This code will produce a situation where when we hit event serial number 4,
-   * we have ring buffers with 2 events (boards 0,3), 3 events (boards 5,6,7)
-   * and 1 event (boards 1,2,4).  The extra events in boards 0,3,5,6,7 have older
-   * timestamps and must be removed to resynchronize the boards and compose
-   * the final MIDAS event.
-   */
-  static int numattempts = 1;
-  if(sn == 0){
-    numattempts = 1;
-  }
-  if(sn == 1){
-    /* Write one random bank instead of calling
-     * FillBufferEvent(), so we keep the events
-     * in the ring buffers for now */
-    printf("### Filling ring buffers...\n");
-    bk_init32(pevent);
-    // Write random bank
-    DWORD *dest;
-    bk_create(pevent, "TEST", TID_DWORD, (void **)&dest);
-    *dest = 1;
-    bk_close(pevent, dest + 1);
-
-    for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-      if (! itv1725->IsConnected()) continue;   // Skip unconnected board
-      printf("### Module ID: %d, rb after sn 1: %d\n", itv1725->GetModuleID(), itv1725->GetNumEventsInRB());
-    }
-
-    INT ev_size = bk_size(pevent);
-    if(ev_size == 0)
-      cm_msg(MINFO,"read_trigger_event", "******** Event size is 0, SN: %d", sn);
-    //  return bk_size(pevent);
-    return ev_size;
-
-  }
-  if(sn == 2){
-    //Desynchronize some boards with respect to the others
-    printf("### Desynchronizing...\n");
-    bk_init32(pevent);
-    for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-      if (! itv1725->IsConnected()) continue;   // Skip unconnected board
-      // >>> Fill Event bank
-      int idx = itv1725 - ov1725.begin();
-      switch(idx){
-      case 0:
-      case 3:
-      case 5:
-      case 6:
-      case 7:
-        //don't fill bank so don't remove event from ring buffer
-        break;
-      default:
-        itv1725->FillEventBank(pevent);
-        break;
-      }
-    }
-
-    for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-      if (! itv1725->IsConnected()) continue;   // Skip unconnected board
-      printf("### Module ID: %d, rb after sn 2: %d\n", itv1725->GetModuleID(), itv1725->GetNumEventsInRB());
-    }
-
-    INT ev_size = bk_size(pevent);
-    if(ev_size == 0)
-      cm_msg(MINFO,"read_trigger_event", "******** Event size is 0, SN: %d", sn);
-    //  return bk_size(pevent);
-    return ev_size;
-  }
-  if(sn == 3){
-    //Desynchronize further
-    printf("### Desynchronizing further...\n");
-    bk_init32(pevent);
-    for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-      if (! itv1725->IsConnected()) continue;   // Skip unconnected board
-
-      // >>> Fill Event bank
-      int idx = itv1725 - ov1725.begin();
-      switch(idx){
-      case 5:
-      case 6:
-      case 7:
-        //don't fill bank so don't remove event from ring buffer
-        break;
-      default:
-        itv1725->FillEventBank(pevent);
-        break;
-      }
-    }
-
-    for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-      if (! itv1725->IsConnected()) continue;   // Skip unconnected board
-      printf("### Module ID: %d, rb after sn 3: %d\n", itv1725->GetModuleID(), itv1725->GetNumEventsInRB());
-    }
-
-    INT ev_size = bk_size(pevent);
-    if(ev_size == 0)
-      cm_msg(MINFO,"read_trigger_event", "******** Event size is 0, SN: %d", sn);
-    //  return bk_size(pevent);
-    return ev_size;
-  }
-  if(sn == 4){
-    /* Since the polling loop will always return true because there are events
-     * in all ring buffers, we need to give the threads some time to fill the
-     * event buffers until they are filled up like we want.  Give up after 100
-     * attempts and proceed with whatever number of events we have.  */
-    if(numattempts < 100){
-
-      if((ov1725[0].GetNumEventsInRB() != 2) ||
-         (ov1725[1].GetNumEventsInRB() != 1) ||
-         (ov1725[2].GetNumEventsInRB() != 1) ||
-         (ov1725[3].GetNumEventsInRB() != 2) ||
-         (ov1725[4].GetNumEventsInRB() != 1) ||
-         (ov1725[5].GetNumEventsInRB() != 3) ||
-         (ov1725[6].GetNumEventsInRB() != 3) ||
-         (ov1725[7].GetNumEventsInRB() != 3)){
-
-        printf("### Wrong number of events in buffers (attempt %d), return...\n", numattempts);
-        usleep(100);
-        ++numattempts;
-        return 0;
-      }
-    }
-  }
-  //********************************
-#endif //********* Testing resync ********
-
-  /* Since the trigger time stamps (TTT) are not perfectly aligned,
-   * (+/- 1 clock cycle), memorize the time stamps of the first event
-   * to use as offsets for subsequent events.  */
-  if(sn == 0) {
-    for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-      if (! itv1725->IsConnected()) continue;   // Skip unconnected board
-
-      itv1725->FetchHeaderNextEvent(event_header);
-      timestamp_offset[itv1725 - ov1725.begin()] = event_header[3] & ~(0x80000000);//ignore HSB on timestamp (roll-over bit);
-      
-      if(SYNCEVENTS_DEBUG) printf("Module: %d, rb: %d, event: %u, TS: 0x%08x\n"
-                                  ,iv1725->GetModuleID()
-                                  , itv1725->GetNumEventsInRB()
-                                  , event_header[2] & 0x00FFFFFF
-                                  , event_header[3] & ~(0x80000000));
-    }
-  } else {
-    
-    //Loop until all next events in ring buffers match
-    while(1) {
-      
-      /* Check if events match and find highest event counter
-       * Correct for timestamp offsets by subtracting the timestamps
-       * recorded for event 0 */
-      itv1725 = ov1725.begin();
-      itv1725->FetchHeaderNextEvent(event_header);
-      //ignore HSB on timestamp (roll-over bit)
-      timestamp[0] = (event_header[3] & ~(0x80000000)) - timestamp_offset[0];
-
-      highest_timestamp = lowest_timestamp = timestamp[0];
-
-      if(SYNCEVENTS_DEBUG) printf("Module: %d, rb: %d, event: %u, TS: 0x%08x\n",
-                                  itv1725->GetModuleID(), itv1725->GetNumEventsInRB(), event_header[2] & 0x00FFFFFF, event_header[3] & ~(0x80000000));
-      if(SYNCEVENTS_DEBUG) printf("Module: %d, rb: %d, event: %u, TS - offset: 0x%08x\n",
-                                  itv1725->GetModuleID(), itv1725->GetNumEventsInRB(), event_header[2] & 0x00FFFFFF, timestamp[0]);
-
-      ++itv1725;
-      idx = itv1725 - ov1725.begin();
-      for (; itv1725 != ov1725.end();) {
-        if (! itv1725->IsConnected()) continue;   // Skip unconnected board
-
-        itv1725->FetchHeaderNextEvent(event_header);
-        timestamp[idx] = (event_header[3] & ~(0x80000000)) - timestamp_offset[idx];
-
-        if(timestamp[idx] > highest_timestamp)
-          highest_timestamp = timestamp[idx];
-        else if(timestamp[idx] < lowest_timestamp)
-          lowest_timestamp = timestamp[idx];
-
-        if(SYNCEVENTS_DEBUG) printf("Module: %d, rb: %d, event: %u, TS: 0x%08x\n",
-                                    itv1725->GetModuleID(), itv1725->GetNumEventsInRB(), event_header[2] & 0x00FFFFFF, event_header[3] & ~(0x80000000));
-        if(SYNCEVENTS_DEBUG) printf("Module: %d, rb: %d, event: %u, TS - offset: 0x%08x\n",
-                                    itv1725->GetModuleID(), itv1725->GetNumEventsInRB(), event_header[2] & 0x00FFFFFF, timestamp[idx]);
-
-        ++itv1725;
-        ++idx;
-      }
-
-      /* If timestamps differ by more than a few clock cycles, then the events in the
-       * ring buffers are not synchronized.  We therefore need to get rid of the older
-       * events until we are re-synchronized. We use a window of 96ns (each timestamp
-       * count = 8ns -> 12*8ns = 96ns) in which we consider the board events to belong
-       * to the same physical event */
-      const uint32_t EVENT_TIME_WINDOW = 12;  //in timestamp counts (1 count = 8ns)
-      if((highest_timestamp - lowest_timestamp) < EVENT_TIME_WINDOW){
-        break;
-      }
-      else {
-
-        if(SYNCEVENTS_DEBUG) printf("### Events don't match!, removing older events from ring buffers...\n");
-
-        for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-          if (! itv1725->IsConnected()) continue;   // Skip unconnected board
-
-          idx = itv1725 - ov1725.begin();
-
-
-          if(SYNCEVENTS_DEBUG) printf("### idx: %d, rb: %d, timestamp[idx]: 0x%08x, highest_timestamp - 12: 0x%08x\n",
-                                      idx, itv1725->GetNumEventsInRB(), timestamp[idx], highest_timestamp - 12);
-
-          if(timestamp[idx] <  highest_timestamp - 12){
-
-            /* No need to mutex/spin lock this, since the only
-             * other place where the write pointer is incremented
-             * is in FillEventBank() called later in this function */
-            if(SYNCEVENTS_DEBUG) printf("### Removing next event for module %d\n", idx);
-            itv1725->DeleteNextEvent();
-
-            /* If that was the last event in the ring buffer,
-             * we can no longer compose the MIDAS event, return
-             * and wait for the next trigger     */
-            if(itv1725->GetNumEventsInRB() == 0){
-              if(SYNCEVENTS_DEBUG) printf("### Ring buffer %d is empty\n", itv1725->GetModuleID());
-              empty_buffers = true;
-            }
-          }
-        }
-
-        if(empty_buffers){
-          if(SYNCEVENTS_DEBUG) printf("### One or more ring buffers empty!, returning...\n");
-          return 0;
-        }
-        //else keep looping
-      }
-
-    } //while(1)
-  }
-
-  //#endif //SYNCEVENTS
-#endif
 
 	// >>> Get time before read (for data throughput analysis. To be removed)
 	//timeval tv, tv1;

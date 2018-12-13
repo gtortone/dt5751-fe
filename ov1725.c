@@ -216,18 +216,6 @@ CAENComm_ErrorCode ov1725_BufferOccupancy(int handle, uint32_t channel, uint32_t
   return  CAENComm_Read32(handle, reg, data);  
 }
 
-/*****************************************************************/
-CAENComm_ErrorCode ov1725_BufferFree(int handle, int nbuffer, uint32_t *mode)
-{
-  CAENComm_ErrorCode sCAEN;
-
-  sCAEN = CAENComm_Read32(handle, V1725_BUFFER_ORGANIZATION, mode);  
-  if (nbuffer <= (1 << *mode) ) {
-    sCAEN = CAENComm_Write32(handle,V1725_BUFFER_FREE, nbuffer);
-    return sCAEN;
-  } else
-    return sCAEN;
-}
 
 /*****************************************************************/
 CAENComm_ErrorCode ov1725_Status(int handle)
