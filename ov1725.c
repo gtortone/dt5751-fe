@@ -144,38 +144,38 @@ CAENComm_ErrorCode ov1725_ChannelConfig(int handle, uint32_t operation)
   CAENComm_ErrorCode sCAEN;
   uint32_t reg, cfg;
   
-  sCAEN = CAENComm_Read32(handle, V1725_CHANNEL_CONFIG, &reg);  
-  sCAEN = CAENComm_Read32(handle, V1725_CHANNEL_CONFIG, &cfg);  
+  sCAEN = CAENComm_Read32(handle, V1725_BOARD_CONFIG, &reg);  
+  sCAEN = CAENComm_Read32(handle, V1725_BOARD_CONFIG, &cfg);  
   //  printf("Channel_config1: 0x%x\n", cfg);  
 
   switch (operation) {
   case V1725_TRIGGER_UNDERTH:
-    sCAEN = CAENComm_Write32(handle, V1725_CHANNEL_CFG_BIT_SET, 0x40);
+    sCAEN = CAENComm_Write32(handle, V1725_BOARD_CFG_BIT_SET, 0x40);
     break;
   case V1725_TRIGGER_OVERTH:
-    sCAEN = CAENComm_Write32(handle, V1725_CHANNEL_CFG_BIT_CLR, 0x40);
+    sCAEN = CAENComm_Write32(handle, V1725_BOARD_CFG_BIT_CLR, 0x40);
     break;
   case V1725_PACK25_ENABLE:
-    sCAEN = CAENComm_Write32(handle, V1725_CHANNEL_CONFIG, (reg | 0x800));
+    sCAEN = CAENComm_Write32(handle, V1725_BOARD_CONFIG, (reg | 0x800));
     break;
   case V1725_PACK25_DISABLE:
-    sCAEN = CAENComm_Write32(handle, V1725_CHANNEL_CONFIG, (reg & ~(0x800)));
+    sCAEN = CAENComm_Write32(handle, V1725_BOARD_CONFIG, (reg & ~(0x800)));
     break;
   case V1725_NO_ZERO_SUPPRESSION:
-    sCAEN = CAENComm_Write32(handle, V1725_CHANNEL_CONFIG, (reg & ~(0xF000)));
+    sCAEN = CAENComm_Write32(handle, V1725_BOARD_CONFIG, (reg & ~(0xF000)));
     break;
   case V1725_ZLE:
     reg &= ~(0xF000);
-    sCAEN = CAENComm_Write32(handle, V1725_CHANNEL_CONFIG, (reg | 0x2000));
+    sCAEN = CAENComm_Write32(handle, V1725_BOARD_CONFIG, (reg | 0x2000));
     break;
   case V1725_ZS_AMP:
     reg &= ~(0xF000);
-    sCAEN = CAENComm_Write32(handle, V1725_CHANNEL_CONFIG, (reg | 0x3000));
+    sCAEN = CAENComm_Write32(handle, V1725_BOARD_CONFIG, (reg | 0x3000));
     break;
   default:
     break;
   }
-  sCAEN = CAENComm_Read32(handle, V1725_CHANNEL_CONFIG, &cfg);  
+  sCAEN = CAENComm_Read32(handle, V1725_BOARD_CONFIG, &cfg);  
   //  printf("Channel_config2: 0x%x\n", cfg);
   return sCAEN;
 }
@@ -232,7 +232,7 @@ CAENComm_ErrorCode ov1725_Status(int handle)
   printf("Acquisition control  : 0x%8.8x\n", reg);
   sCAEN = CAENComm_Read32(handle, V1725_ACQUISITION_STATUS, &reg);  
   printf("Acquisition status         : 0x%8.8x\n", reg);
-  sCAEN = CAENComm_Read32(handle, V1725_CHANNEL_CONFIG, &reg);  
+  sCAEN = CAENComm_Read32(handle, V1725_BOARD_CONFIG, &reg);  
   printf("Channel Configuration      : 0x%5.5x\n", reg);
   sCAEN = CAENComm_Read32(handle, V1725_TRIG_SRCE_EN_MASK, &reg);  
   printf("Trigger Source Enable Mask : 0x%8.8x\n", reg);
@@ -459,7 +459,7 @@ int main (int argc, char* argv[]) {
     ////////////////////////////////////////////////////////////////////////
     
     sCAEN = ov1725_AcqCtl(handle[h], 0x3);
-    sCAEN = CAENComm_Write32(handle[h], V1725_CHANNEL_CONFIG        , 0x10);
+    sCAEN = CAENComm_Write32(handle[h], V1725_BOARD_CONFIG        , 0x10);
     sCAEN = CAENComm_Write32(handle[h], V1725_BUFFER_ORGANIZATION   , 0xa);
     sCAEN = CAENComm_Write32(handle[h], V1725_CHANNEL_EN_MASK       , 0x3);
     sCAEN = CAENComm_Write32(handle[h], V1725_TRIG_SRCE_EN_MASK     , 0x40000000);

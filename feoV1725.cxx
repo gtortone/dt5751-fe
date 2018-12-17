@@ -403,8 +403,6 @@ INT frontend_init(){
     printf("ERROR setting cpu affinity for main thread: %s\n", strerror(errno));
   }
 
-	return FE_ERR_HW;
-
   return SUCCESS;
 }
 
@@ -453,7 +451,7 @@ INT begin_of_run(INT run_number, char *error){
   {
     // Reset the PLL lock loss flag in ODB
     char Path[255];
-    sprintf(Path,"/DEAP Alarm/PLL Loss FE0%d",get_frontend_index());
+    sprintf(Path,"/DS Alarm/PLL Loss FE0%d",get_frontend_index());
     INT dummy = -1;
     db_set_value(hDB, 0, Path, &(dummy), sizeof(INT), 1, TID_INT);
   }
@@ -476,9 +474,6 @@ INT begin_of_run(INT run_number, char *error){
       }
     }
     
-    // Done in frontend_init, or StartRun if settings have changed
-    // itv1725->InitializeForAcq(); 
-
     bool go = itv1725->StartRun();
     if (go == false) return FE_ERR_HW;
     
@@ -948,7 +943,7 @@ INT read_buffer_level(char *pevent, INT off) {
   // Set ODB flag if PLL lock lost
   if (PLLLockLossID > -1){
     char Path[255];
-    sprintf(Path,"/DEAP Alarm/PLL Loss FE0%d",get_frontend_index());
+    sprintf(Path,"/DS Alarm/PLL Loss FE0%d",get_frontend_index());
     db_set_value(hDB, 0, Path, &(PLLLockLossID), sizeof(INT), 1, TID_INT);
     // PLL loss lock reset by the VME_STATUS read!
   }

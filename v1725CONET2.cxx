@@ -21,9 +21,8 @@ This file contains the class implementation for the v1725 module driver.
 
 //! Configuration string for this board. (ODB: /Equipment/[eq_name]/Settings/[board_name]/)
 const char * v1725CONET2::config_str_board[] = {\
-    "setup = INT : 0",\
     "Acq mode = INT : 3",\
-    "Channel Configuration = DWORD : 16",\
+    "Board Configuration = DWORD : 16",\
     "Buffer organization = INT : 10",\
     "Custom size = INT : 625",\
     "Channel Mask = DWORD : 255",\
@@ -130,49 +129,6 @@ v1725CONET2::v1725CONET2(int feindex, int link, int board, int moduleID, HNDLE h
   rb_handle_ = -1;
   verbosity_ = 0;
 
-  for (int i = 0; i < 32; i++) {
-    for (int j = 0; j < 8; j++) {
-      channel_minima_[i][j] = 4096;
-    }
-  }
-
-  for (int i = 0; i < 8; i++) {
-    pmts[i] = NULL;
-  }
-
-  DefaultBaseline = 3901.;
-  CurrentDefaultBaseline = DefaultBaseline;
-  saturationFail = false;
-  baselineFail = false;
-  IsAdjacent = false;
-
-  pfConfig.ChargeCut = 50;
-  pfConfig.SubPeakDerivThreshold = -3;
-  pfConfig.DerivThreshold = 3;
-  pfConfig.StopDeriv = 2;
-  pfConfig.StopVolt = 2;
-  pfConfig.MinBaselineSamples = 4;
-  pfConfig.MaxBaselineSamples = 62;
-  pfConfig.DoHiddenPeakFind = false;
-  pfConfig.ChargeResidualLimit = 50;
-  pfConfig.ClosePulseHeightThresh = 3;
-  pfConfig.ClosePulseDerivThresh = 3;
-  pfConfig.ClosePulseLookAhead = 3;
-  pfConfig.ClosePulseNearEndOfBlock = 4;
-  pfConfig.ExtendPulseEnd = true;
-  pfConfig.EnableSubPeaks = false;
-  pfConfig.EnablePulseSplitting = false;
-  pfConfig.MaxSPEWidthIntercept = 1254;
-  pfConfig.MaxSPEWidthSlope = 0.015184382;
-  pfConfig.MaxSPECharge = 500;
-  pfConfig.SplitPulseCharge = 65535;
-
-  ResetForNewChannel();
-  ResetForNewPulse();
-
-  IsAdjacent = false;
-
-  LoadSmartQTConfig(); // Read a bunch of other params from a txt file
 }
 /**
  * Move constructor needed because we're putting v1725CONET2 objects in a vector which requires
@@ -195,26 +151,7 @@ v1725CONET2::v1725CONET2(v1725CONET2&& other) noexcept
   verbosity_ = std::move(other.verbosity_);
   config = std::move(other.config);
 
-  for (int i = 0; i < 32; i++) {
-    for (int j = 0; j < 8; j++) {
-      channel_minima_[i][j] = std::move(other.channel_minima_[i][j]);
-    }
-  }
 
-  for (int i = 0; i < 8; i++) {
-    pmts[i] = std::move(other.pmts[i]);
-  }
-
-  DefaultBaseline = std::move(other.DefaultBaseline);
-  CurrentDefaultBaseline = std::move(other.CurrentDefaultBaseline);
-  saturationFail = std::move(other.saturationFail);
-  baselineFail = std::move(other.baselineFail);
-  IsAdjacent = std::move(other.IsAdjacent);
-
-  pulseState = std::move(other.pulseState);
-  channelState = std::move(other.channelState);
-  pfConfig = std::move(other.pfConfig);
-  spePdf = std::move(other.spePdf);
 }
 v1725CONET2& v1725CONET2::operator=(v1725CONET2&& other) noexcept
 {
@@ -236,27 +173,6 @@ v1725CONET2& v1725CONET2::operator=(v1725CONET2&& other) noexcept
     verbosity_ = std::move(other.verbosity_);
     config = std::move(other.config);
 
-
-    for (int i = 0; i < 32; i++) {
-      for (int j = 0; j < 8; j++) {
-        channel_minima_[i][j] = std::move(other.channel_minima_[i][j]);
-      }
-    }
-
-    for (int i = 0; i < 8; i++) {
-      pmts[i] = std::move(other.pmts[i]);
-    }
-
-    DefaultBaseline = std::move(other.DefaultBaseline);
-    CurrentDefaultBaseline = std::move(other.CurrentDefaultBaseline);
-    saturationFail = std::move(other.saturationFail);
-    baselineFail = std::move(other.baselineFail);
-    IsAdjacent = std::move(other.IsAdjacent);
-
-    pulseState = std::move(other.pulseState);
-    channelState = std::move(other.channelState);
-    pfConfig = std::move(other.pfConfig);
-    spePdf = std::move(other.spePdf);
   }
   return *this;
 }
@@ -496,32 +412,15 @@ bool v1725CONET2::StartRun()
     return false;
   }
 
-	//  if (settings_touched_)
-	if(1) // Always reset the parameters
-  {
-		//    cm_msg(MINFO, "StartRun", "Note: settings on board %s touched. Re-initializing board.",
-		//  GetName().c_str());
-    std::cout << "reinitializing" << std::endl;
+	std::cout << "reinitializing" << std::endl;
+	
+	//Re-read the record from ODB, it may have changed
+	int size = sizeof(V1725_CONFIG_SETTINGS);
+	db_get_record(odb_handle_, settings_handle_, &config, &size, 0);
 
-    //Re-read the record from ODB, it may have changed
-    int size = sizeof(V1725_CONFIG_SETTINGS);
-    db_get_record(odb_handle_, settings_handle_, &config, &size, 0);
-
-    // So we can re-use exactly the same code as RAT for pulse-finding,
-    // we need to copy some parameters over
-
-    pfConfig.ChargeCut = config.MinPulseCharge; // 50
-    pfConfig.DerivThreshold = config.PulseDerivativeThreshold; // 3
-    pfConfig.StopDeriv = config.PulseStop_MaxDeriv; // 2
-    pfConfig.StopVolt = config.PulseStop_MaxHeight; // 2
-    pfConfig.ClosePulseHeightThresh = config.PulseExtend_MinHeight; //3
-    pfConfig.MaxSPEWidthIntercept = config.MaxWidthIntercept; // 1254
-    pfConfig.MaxSPEWidthSlope = config.MaxWidthSlope; // 0.015184382
-    pfConfig.MaxSPECharge = config.MaxPulseCharge; // 500
-		
-    int status = InitializeForAcq();
-		if (status == -1) return false;
-  }
+	
+	int status = InitializeForAcq();
+	if (status == -1) return false;  
 	
   CAENComm_ErrorCode e = AcqCtl_(V1725_RUN_START);
   if (e == CAENComm_Success)
@@ -564,23 +463,6 @@ bool v1725CONET2::StopRun()
   return true;
 }
 
-//
-//--------------------------------------------------------------------------------
-/**
- * \brief   Setup board registers using preset (see ov1725.c:ov1725_Setup())
- *
- * Setup board registers using a preset defined in the midas file ov1725.c
- * - Mode 0x0: "Setup Skip\n"
- * - Mode 0x1: "Trigger from FP, 8ch, 1Ks, postTrigger 800\n"
- * - Mode 0x2: "Trigger from LEMO\n"
- *
- * \param   [in]  mode Configuration mode number
- * \return  CAENComm Error Code (see CAENComm.h)
- */
-CAENComm_ErrorCode v1725CONET2::SetupPreset_(int mode)
-{
-  return ov1725_Setup(device_handle_, mode);
-}
 
 //
 //--------------------------------------------------------------------------------
@@ -594,8 +476,6 @@ CAENComm_ErrorCode v1725CONET2::SetupPreset_(int mode)
  */
 CAENComm_ErrorCode v1725CONET2::AcqCtl_(uint32_t operation)
 {
-//  Obsolete, we need LVDS BusyIn bit (8)
-//  return ov1725_AcqCtl(_device_handle, operation);
 
   uint32_t reg;
   CAENComm_ErrorCode sCAEN;
@@ -797,18 +677,6 @@ bool v1725CONET2::ReadEvent(void *wp)
     }
   }
 
-  // >>> Fill Smart QT bank if ZLE data.
-  // Code for calculating minima lives here too.
-  if(this->IsZLEData() && (this->config.smartqt_bank || this->config.minima_bank)){
-    if(!this->ReadSmartQTData((uint32_t*)wp)){
-      return false;
-    }
-  }
-  if(this->IsZLEData() && this->config.minima_bank){
-    if(!this->ReadMinimaData((uint32_t*)wp)){
-      return false;
-    }
-  }
   
   /* increment num_events_in_rb_ AFTER writing the QT bank, or the main
    * thread might read the QT data before we're done writing it */
@@ -819,76 +687,6 @@ bool v1725CONET2::ReadEvent(void *wp)
   return (sCAEN == CAENComm_Success);
 }
 
-//
-//-------------------------------------------------------------------------------------------
-bool v1725CONET2::ReadEventCAEN(void *wp)
-{
-  CAENComm_ErrorCode sCAEN;
-
-  /*******************************************************************************************
-   **** WARNING: The CAEN doc says that the 4th parameter of CAENComm_BLTRead (BltSize) is
-   **** in bytes.  That is FALSE.  It must be in 32-bit dwords.  P-L
-   *******************************************************************************************/
-  
-  DWORD to_read_dwords=1000000, *pdata = (DWORD *)wp;
-  int dwords_read = 0;
-  
-  sCAEN = CAENComm_BLTRead(device_handle_
-                           , V1725_EVENT_READOUT_BUFFER
-                           , (DWORD *)pdata
-                           , to_read_dwords
-                           , &dwords_read);
-  
-  if (verbosity_>=2) std::cout << sCAEN << " = BLTRead(handle=" << device_handle_
-                               << ", addr=" << V1725_EVENT_READOUT_BUFFER
-                               << ", pdata=" << pdata
-                               << ", to_read_dwords=" << to_read_dwords
-                               << ", dwords_read returned " << dwords_read << ");"<< std::endl;
-  
-  // if dwords_read == to_read_dwords, 
-  // BLT tranfert may have been limited and all the event not transfered...
-  if( dwords_read == (int)to_read_dwords) 
-    cm_msg(MERROR,"ReadEvent", "BLT transfert of maximum size (%d/%d)"
-           , dwords_read, to_read_dwords);
-  
-  // If no event ready, dwords_read will stay at 0, return
-  // Since the event is always smaller than 1000000,
-  // BLTRead returns CAENComm_Terminated, not CAENComm_success
-  if (dwords_read != 0) {
-   
-    rb_increment_wp(this->GetRingBufferHandle(), dwords_read*sizeof(int));
-
-    // >>> Fill QT bank if ZLE data
-    if(this->IsZLEData() && this->config.qt_bank) {
-      if(!this->ReadQTData((uint32_t*)wp)) {
-        return false;
-      }
-    }
-
-    // >>> Fill QT bank if ZLE data. Minima code lives here too (to save
-    // reading ZLE data twice).
-    if(this->IsZLEData() && (this->config.smartqt_bank || this->config.minima_bank)) {
-      if(!this->ReadSmartQTData((uint32_t*)wp)) {
-        return false;
-      }
-    }
-    if(this->IsZLEData() && this->config.minima_bank) {
-      if(!this->ReadMinimaData((uint32_t*)wp)){
-        return false;
-      }
-    }
-
-    /* increment num_events_in_rb_ AFTER writing the QT bank, or the main
-     * thread might read the QT data before we're done writing it */
-    this->IncrementNumEventsInRB(); //atomic
-  }
-
-  bool result = (sCAEN == CAENComm_Terminated);
-  if (result == false) 
-          cm_msg(MERROR,"ReadEvent", "V1725 BLT Read return error: %d", sCAEN);
-  return result;
-
-}
 
 //
 //---------------------------------------------------------------------------------
@@ -1139,267 +937,7 @@ bool v1725CONET2::ReadQTData(uint32_t *ZLEData){
 
 
 
-bool v1725CONET2::ReadSmartQTData(uint32_t *ZLEData){
-  // This function fills the smart QT information into the ring buffer,
-  // and also calculates information about the minima of each channel,
-  // which is stored in memory until a later function writes it the buffer.
-  // This approach simplifies the logic in this function, without requiring
-  // us to parse the ZLE data twice.
 
-
-#if POSTPONE_CHARGE_FILTERING
-  uint32_t QTDataArr[MAX_QT_WORDS];
-  uint32_t *QTData = QTDataArr;
-#else
-  uint32_t *QTData;             // Pointer to location where to write QT data
-#endif
-  uint32_t* nQTWords;           // Pointer to location where number of QT words is
-  void     *wp;                 // RB write pointer
-
-  uint32_t nEnabledChannels;    // Number of channels enabled on the board
-  bool     chEnabled[8] = {false};        // Channel enabled flag
-
-  uint32_t iCurrentWord;        // Index of current 32-bit word in the ZLE event
-  uint32_t chSize_words;        // Size of the current channel in 32-bit words
-  uint32_t words_read;          // Number of words read so far for the current channel
-  uint32_t iCurrentSample;      // Index of current sample in the channel
-  bool     goodData;            // Indicates if the data following the control word must be processed or skipped
-  bool     prevGoodData;        // goodData of previous word
-  uint32_t nStoredSkippedWords; // Number of words to be stored (goodData = true) or skipped (goodData = false)
-                                // after the control word
-  uint32_t i,j;                 // Loop indices
-  bool     previousBlockHadPulse; // Have a smart QT pulse in previous block?
-
-  for (int i = 0; i < 8; i++) {
-    channel_minima_[this->GetModuleID()][i] = 4096;
-  }
-
-  if (this->config.smartqt_bank) {
-    // >>> Get write pointer into ring buffer
-    int status = rb_get_wp(this->GetRingBufferHandle(), &wp, 100);
-    if (status == DB_TIMEOUT) {
-      cm_msg(MERROR,"ReadSmartQTData", "Got wp timeout for thread %d (module %d).  Is the ring buffer full?",
-          this->GetLink(), this->GetModuleID());
-      return false;
-    }
-
-#if POSTPONE_CHARGE_FILTERING
-#else
-    QTData = (uint32_t*)wp;
-#endif
-
-    // >>> copy some header words
-    *QTData++ = *(ZLEData+2); // event counter QTData[0]
-    *QTData++ = *(ZLEData+3); // trigger time tag QTData[1]
-
-    // >>> Skip location QTData[2]. Will be used for number of QT and bank version.
-    nQTWords = QTData;
-    *(nQTWords) = 0;
-    QTData++;
-  }
-
-  // >>> Figure out channel mapping
-  nEnabledChannels = 0;
-  uint32_t chMask = ZLEData[1] & 0xFF;
-  for(i=0; i<8; ++i){
-    if(chMask & (1<<i)){
-      chEnabled[i] = true;
-      ++nEnabledChannels;
-    }
-  }
-
-  /* If all data was ZLE suppressed, the channel mask field will be set to 0. In
-   * that case, the QT bank will contain only the header   */
-  if(nEnabledChannels==0) {
-    if (this->config.smartqt_bank) {
-#if POSTPONE_CHARGE_FILTERING
-      uint32_t* QTData_final = (uint32_t*)wp;
-      *QTData_final++ = QTData[0]; // event counter
-      *QTData_final++ = QTData[1]; // trigger time tag
-      *QTData_final++ = 0; // nQTWords
-#endif
-
-      rb_increment_wp(this->GetRingBufferHandle(), (3 + *nQTWords)*sizeof(uint32_t));
-    }
-    return true;
-  }
-
-  if (this->config.smartqt_bank) {
-    for (int i = 0; i < 8; i++) {
-      if (pmts[i]) {
-        delete pmts[i];
-        pmts[i] = NULL;
-      }
-    }
-  }
-
-  iCurrentWord=4;  //Go to first CH0 size word
-  for(i=0; i < 8; i++){
-
-    if(!chEnabled[i]) continue;
-
-    if (this->config.smartqt_bank) {
-      pmts[i] = new PMT();
-      pmt = pmts[i];
-    }
-
-    chSize_words = ZLEData[iCurrentWord];  // Read size word
-    iCurrentSample = 0;                    // Start processing sample 0
-    prevGoodData = true;                   // First word
-
-    words_read = 1;                        // The size of the "size" word is included in its value
-    iCurrentWord++;                        // Go to CH0 control word
-    previousBlockHadPulse = false;
-    bool firstBlock = true;
-
-    ResetForNewChannel();
-
-    while(words_read < chSize_words){
-
-      /************************ TEMPORARY *************************
-       * Check for control word indicator, if not present,
-       * print this stuff. This should NOT happen.
-       ************************************************************/
-      //      assert(ZLEData[iCurrentWord] & 0x40000000);
-      if((this->GetModuleID() == 0) && (i == 0)){
-        if(!(ZLEData[iCurrentWord] & 0x40000000)){
-          printf("### b %u ch %u: Control word has wrong format!\n", this->GetModuleID(), i);
-          printf("### b %u ch %u: Control word: 0x%08x\n", this->GetModuleID(), i, ZLEData[iCurrentWord]);
-          printf("### b %u ch %u: Before: 0x%08x\n", this->GetModuleID(), i, ZLEData[iCurrentWord-1]);
-          printf("### b %u ch %u: After: 0x%08x\n", this->GetModuleID(), i, ZLEData[iCurrentWord+1]);
-          printf("### b %u ch %u: chSize_words: %u\n", this->GetModuleID(), i, chSize_words);
-          printf("### b %u ch %u: words_read: %u\n", this->GetModuleID(), i, words_read);
-          printf("### b %u ch %u: prevGoodData: %d\n", this->GetModuleID(), i, prevGoodData);
-        }
-      }
-
-      goodData = ((ZLEData[iCurrentWord]>>31) & 0x1);           // 0: skip 1: good
-      nStoredSkippedWords = (ZLEData[iCurrentWord] & 0xFFFFF);  // stored/skipped words
-
-
-      /* "skip" data should always be followed by "good" data unless
-       * the end of the event is reached.  Print error in case of
-       * two consecutive control word with "skip" field   */
-      if(!prevGoodData && !goodData){
-        cm_msg(MERROR,"ReadQTData", "Consecutive skip data in module %d", this->GetModuleID());
-      }
-
-      if(goodData){
-        /* For each time good data is encountered process the next nStoredSkippedWords
-         * words.  Get the find the sample minimum value and create a QT bank
-         * to store this information.  */
-
-        iCurrentWord++; // Go to CH0 data word 0
-        words_read++;
-
-        samples.clear();
-        samples.resize(nStoredSkippedWords * 2);
-
-        if (prevGoodData) {
-          // If there are consecutive ZLE blocks (the previous word was also good)
-          // we are probably starting in the middle of the second pulse (due to the
-          // postsamples of the previous block).
-          // prevGoodData is initialized to true, so make sure we don't use this
-          // logic for the first pulse of an event.
-          if (previousBlockHadPulse && this->config.smartqt_bank) {
-            pmt->GetLastPulse()->SetConfidence(DS::QT::ADJACENT_BLOCK);
-          }
-
-          // And now set a flag so we'll set the confidence of the pulses in this block
-          // to 255 too
-          IsAdjacent = true;
-        } else {
-          IsAdjacent = false;
-        }
-
-
-        for(j=0; j < nStoredSkippedWords; j++){
-          samples[j*2] = (ZLEData[iCurrentWord] & 0xFFF);
-          samples[j*2 + 1] = ((ZLEData[iCurrentWord] >> 16) & 0xFFF);
-          iCurrentWord++;
-          words_read++;
-
-          // Keep a record of the minimum value this channel reaches.
-          channel_minima_[this->GetModuleID()][i] = std::min(channel_minima_[this->GetModuleID()][i], (int)samples[j*2]);
-          channel_minima_[this->GetModuleID()][i] = std::min(channel_minima_[this->GetModuleID()][i], (int)samples[j*2 + 1]);
-        }
-
-        if (this->config.smartqt_bank) {
-
-          pulseState.Offset = iCurrentSample;
-          pulseState.IsLowGain = false;
-          pulseState.IsV1740 = false;
-
-          int oldCount = pmt->GetPulseCount();
-
-          FindPulses(firstBlock,
-                     pfConfig.ClosePulseLookAhead,
-                     pfConfig.ClosePulseNearEndOfBlock,
-                     pfConfig.ExtendPulseEnd,
-                     pfConfig.EnableSubPeaks,
-                     pfConfig.EnablePulseSplitting);
-
-          previousBlockHadPulse = (pmt->GetPulseCount() != oldCount);
-
-        } // End of smart QT
-
-        firstBlock = false;
-      } else {
-        /* Data is bad, skip the next nStoredSkippedWords words */
-
-        iCurrentWord++; //Go to next control word, which should be "good" data
-        words_read++;
-      }
-
-      prevGoodData=goodData;
-      iCurrentSample += (nStoredSkippedWords*2); //2 samples per 32-bit word
-
-    }
-
-    if (this->config.smartqt_bank) {
-      // End of channel
-      UpdateBaselinesAndCutOnCharge(pfConfig.ChargeCut);
-    }
-  }
-
-
-  if (this->config.smartqt_bank) {
-    ConvertPMTsToBanks(QTData, nQTWords);
-    // And actually write to the ring bugger.
-    rb_increment_wp(this->GetRingBufferHandle(), (3 + *nQTWords)*sizeof(uint32_t));
-  }
-
-  //if (this->GetModuleID() == 0) printf("### ReadSmartQTData: nQTWords: %u\n", *nQTWords);
-
-  return true;
-}
-
-bool v1725CONET2::ReadMinimaData(uint32_t *ZLEData){
-  uint32_t *minData;             // Pointer to location where to write QT data
-  void     *wp;                 // RB write pointer
-
-  // >>> Get write pointer into ring buffer
-  int status = rb_get_wp(this->GetRingBufferHandle(), &wp, 100);
-  if (status == DB_TIMEOUT) {
-    cm_msg(MERROR,"ReadMinimaData", "Got wp timeout for thread %d (module %d).  Is the ring buffer full?",
-        this->GetLink(), this->GetModuleID());
-    return false;
-  }
-  minData = (uint32_t*)wp;
-
-  // First some header words
-  *minData++ = *(ZLEData+2); // event counter QTData[0]
-  *minData++ = *(ZLEData+3); // trigger time tag QTData[1]
-
-  // Now the data - 8 channels packed into 4 32-bit words
-  for (int i = 0; i < 8; i += 2) {
-    *minData++ = (((channel_minima_[this->GetModuleID()][i] << 16) & 0xFFFF0000) | (channel_minima_[this->GetModuleID()][i + 1] & 0x0000FFFF));
-  }
-
-  rb_increment_wp(this->GetRingBufferHandle(), 6*sizeof(uint32_t));
-
-  return true;
-}
 
 //
 //--------------------------------------------------------------------------------
@@ -1537,475 +1075,12 @@ bool v1725CONET2::FillEventBank(char * pevent)
     this->FillQTBank(pevent, dest);
   }
 
-  // >>> Fill smart QT bank if ZLE data
-  if(this->IsZLEData() && this->config.smartqt_bank) {
-    this->FillSmartQTBank(pevent, dest);
-  }
-  if(this->IsZLEData() && this->config.minima_bank) {
-    this->FillMinimaBank(pevent, dest);
-  }
+
   return true;
 
 }
 
-/// This function should be IDENTICAL to that used in RAT.
-void v1725CONET2::ResetForNewChannel()
-{
-  CurrentDefaultBaseline = DefaultBaseline;
-  channelState.BaselineInt = 0;
-  channelState.BaselineSquareInt = 0;
-  channelState.BaselineSamples = 0;
-  channelState.IsBlockCombinedWithPrevious.clear();
-  channelState.Saturated = false;
-}
 
-/// This function should be IDENTICAL to that used in RAT.
-void v1725CONET2::ResetForNewPulse()
-{
-  pulseState.Charge = 0;
-  pulseState.ChargePeak = 0;
-  pulseState.ChargeConv = 0;
-  pulseState.Start = 0;
-  pulseState.Stop = 0;
-  pulseState.Conf = 0;
-  pulseState.MaxV = 5000;
-  pulseState.MaxD = 0;
-  pulseState.MaxVT.clear();
-  pulseState.MaxVindex = 0;
-  pulseState.MaxDindex = 0;
-  pulseState.Charge_MaxD = 0;
-  pulseState.Charge_MaxV = 0;
-  pulseState.Charge_Frac = 0;
-  pulseState.GlobalMaxD = 0;
-  pulseState.BaseV = 0;
-  pulseState.BaselineInt = 0;
-  pulseState.BaselineSquareInt = 0;
-  pulseState.BaselineSamples = 0;
-  pulseState.MinVT = 0;
-  pulseState.MinV = 0;
-  pulseState.GlobalMaxV = 5000;
-  pulseState.GlobalMaxVT = 0;
-  pulseState.CanSplit = false;
-  pulseState.IsSplit = false;
-}
-
-/// This function should be IDENTICAL to that used in RAT.
-void v1725CONET2::FindPulses(bool firstBlock, int closePulseLookAhead, int closePulseNearEndOfBlock, bool extendPulseEnd, bool enableSubPeaks, bool enablePulseSplitting)
-{
-  int sampsize = samples.size();
-  CalculateDerivativesFromSamples();
-
-  Bool_t InPulse = false;
-  UShort_t PeakVoltage = 0;
-  UShort_t GlobalPeakVoltage = 5000;
-
-  ResetForNewPulse();
-
-  for (int i = 1; i < sampsize - 2; i++) {
-    if (samples[i] == 0) {
-      saturationFail = true;
-      channelState.Saturated = true;
-    }
-
-    if (InPulse) {
-      pulseState.Charge += 4096 - samples[i];
-      if (samples[i] < pulseState.MaxV) {
-        if (!enableSubPeaks) {
-          pulseState.MaxVT[0] = i;
-          pulseState.ChargePeak = pulseState.Charge;
-        }
-        pulseState.MaxV = samples[i];
-      }
-      if (enablePulseSplitting &&
-          TMath::Abs((Float_t)samples[i]-pulseState.BaseV) < 3*pfConfig.StopVolt &&
-          AbsDeriv[i] < pfConfig.StopDeriv &&
-          pulseState.Charge > pfConfig.SplitPulseCharge &&
-          pulseState.MaxVT.size()) {
-        pulseState.CanSplit = true;
-      }
-
-      if (pulseState.MinV < samples[i]) {
-        pulseState.MinVT = i;
-        pulseState.MinV = samples[i];
-      }
-      if (pulseState.GlobalMaxV > samples[i]) {
-        pulseState.GlobalMaxV = samples[i];
-        pulseState.GlobalMaxVT = i;
-      }
-      if (AbsDeriv[i] > TMath::Abs(pulseState.MaxD)) {
-        pulseState.MaxD = Deriv[i];
-        if (TMath::Abs(pulseState.MaxD) > TMath::Abs(pulseState.GlobalMaxD)) {
-          pulseState.GlobalMaxD = pulseState.MaxD;
-        }
-      }
-      if (enableSubPeaks) {
-        if (samples[i] == 0 && samples[i-1] > 0) {
-          pulseState.MaxVT.push_back(i);
-          PeakVoltage = samples[i];
-          if (PeakVoltage < GlobalPeakVoltage) {
-            pulseState.ChargePeak = pulseState.Charge;
-            GlobalPeakVoltage = PeakVoltage;
-            pulseState.MaxVindex = i;
-          }
-        } else if ((Deriv[i-1] * Deriv[i] <= 0) && (Deriv[i-1] * Deriv[i+1] <= 0) && Deriv[i-1] != 0) {
-          if (Deriv[i]<=0 && Deriv[i+1]<=0) {
-            pulseState.MaxD = Deriv[i];
-          } else if (Deriv[i]>=0 && Deriv[i+1]>=0) {
-            if (pulseState.CanSplit &&
-                pulseState.MaxD < pfConfig.SubPeakDerivThreshold) {
-              UInt_t NewPulseCharge = 0;
-              for (int j = i; j >= pulseState.MinVT; --j) {
-                NewPulseCharge += 4096 - samples[j];
-              }
-              pulseState.Charge -= NewPulseCharge;
-              UShort_t chanBaselineInt = channelState.BaselineInt;
-              UShort_t chanBaselineSamples = channelState.BaselineSamples;
-              UShort_t chanBaselineSquareInt = channelState.BaselineSquareInt;
-              UShort_t BaselineSamples = pulseState.BaselineSamples;
-              UShort_t BaselineInt = pulseState.BaselineInt;
-              UShort_t BaselineSquareInt = pulseState.BaselineSquareInt;
-              UShort_t Start = pulseState.MinVT;
-              Short_t MaxD = pulseState.MaxD;
-              int end = pulseState.MinVT-1;
-              std::vector<UShort_t> newMaxVT;
-              for (UShort_t j = 0; j < pulseState.MaxVT.size(); ++j) {
-                if (pulseState.MaxVT[j] > end) {
-                  newMaxVT.push_back(pulseState.MaxVT[j]);
-                  pulseState.MaxVT.erase(pulseState.MaxVT.begin() + j);
-                  --j;
-                }
-              }
-              ClosePulseAndSetVariables(end, firstBlock, false,closePulseLookAhead);
-              pulseState.MaxVT = newMaxVT;
-              pulseState.Charge = NewPulseCharge;
-              pulseState.Start = Start;
-              GlobalPeakVoltage = samples[i];
-              pulseState.MaxD = Deriv[i];
-              pulseState.GlobalMaxD = Deriv[i];
-              channelState.BaselineInt = chanBaselineInt;
-              channelState.BaselineSamples = chanBaselineSamples;
-              channelState.BaselineSquareInt = chanBaselineSquareInt;
-              pulseState.BaselineSamples = BaselineSamples;
-              pulseState.BaselineInt = BaselineInt;
-              pulseState.BaselineSquareInt = BaselineSquareInt;
-              pulseState.MaxD = MaxD;
-              pulseState.IsSplit = true;
-            }
-            PeakVoltage = 5000;
-            int peaktime = 0;
-            UShort_t ChargePeak = pulseState.Charge + samples[i] + samples[i-1] + samples[i-2] - 12288;
-            for (int j = i-2; j <= i+2; ++j) {
-              ChargePeak += 4096 - samples[j];
-              if (samples[j] < PeakVoltage) {
-                peaktime = j;
-                PeakVoltage = samples[j];
-                if (PeakVoltage < GlobalPeakVoltage) {
-                  pulseState.ChargePeak = ChargePeak;
-                  GlobalPeakVoltage = PeakVoltage;
-                  pulseState.MaxVindex = j;
-                }
-              }
-            }
-            if (PeakVoltage - pulseState.MinV < pfConfig.SubPeakDerivThreshold &&
-                !(pulseState.MaxVT.size() && peaktime == pulseState.MaxVT[pulseState.MaxVT.size()-1])) {
-              pulseState.MaxVT.push_back(peaktime);
-              pulseState.MinV = 0;
-              pulseState.MinVT = i;
-              pulseState.MaxD = Deriv[i];
-              pulseState.CanSplit = false;
-            }
-          }
-        }
-      }
-
-      if ((TMath::Abs((Float_t)samples[i]-pulseState.BaseV) < pfConfig.StopVolt && AbsDeriv[i] < pfConfig.StopDeriv && samples[i] > 0)
-          || (i == (sampsize - closePulseNearEndOfBlock))) {
-        if (i < (sampsize - 2*closePulseLookAhead)) {
-
-          bool closepulsebool = true;
-          for (int j=closePulseLookAhead+1+i; j<=(2*closePulseLookAhead+i); ++j)
-            if (TMath::Abs((Float_t)samples[j]-pulseState.BaseV) > pfConfig.ClosePulseHeightThresh || AbsDeriv[j] > pfConfig.ClosePulseDerivThresh)
-              closepulsebool = false;
-
-          if (closepulsebool) {
-            pulseState.CanSplit = false;
-            if (!pulseState.MaxVT.size()) pulseState.MaxVT.push_back(pulseState.GlobalMaxVT);
-            ClosePulseAndSetVariables(i, firstBlock, extendPulseEnd,closePulseLookAhead);
-            InPulse = kFALSE;
-
-            if (enableSubPeaks) {
-              GlobalPeakVoltage = 5000;
-              pulseState.MaxD = Deriv[i];
-              pulseState.GlobalMaxD = Deriv[i];
-            }
-          }
-        } else if (i == (sampsize - closePulseNearEndOfBlock)) {
-          if (!pulseState.MaxVT.size()) pulseState.MaxVT.push_back(pulseState.GlobalMaxVT);
-          ClosePulseAndSetVariables(i, firstBlock, extendPulseEnd,closePulseLookAhead);
-          InPulse = kFALSE;
-        }
-      }
-    } else {
-      if (AbsDeriv[i] > pfConfig.DerivThreshold || samples[i] < DefaultBaseline - 50.) {
-        // Starting a new pulse
-        //look back.
-        pulseState.Start = TMath::Max(i-closePulseLookAhead,0);
-        pulseState.MaxVT.clear();
-        pulseState.MinVT = pulseState.Start;
-        pulseState.MinV = samples[pulseState.Start];
-        if (!enableSubPeaks) {
-          pulseState.MaxVT.push_back(i);
-          pulseState.MaxV = samples[i];
-        }
-        pulseState.Charge = 4096 - samples[i];
-        for (int j = pulseState.Start; j < i; ++j) {
-          pulseState.Charge += 4096 - samples[j];
-          if (pulseState.BaselineSamples) {
-            --pulseState.BaselineSamples;
-            pulseState.BaselineSquareInt -= ((UInt_t)samples[j]*samples[j])-(3892*3892);
-            pulseState.BaselineInt -= samples[j]-3892;
-            --channelState.BaselineSamples;
-            channelState.BaselineInt -= samples[j]-3892;
-            channelState.BaselineSquareInt -= ((UInt_t)samples[j]*samples[j])-(3892*3892);
-          }
-        }
-
-        if (pulseState.BaselineSamples > 4) {
-          pulseState.BaseV = ((float)pulseState.BaselineInt / (float)pulseState.BaselineSamples) + 3892;
-        } else {
-          pulseState.BaseV = CurrentDefaultBaseline;
-        }
-        CurrentDefaultBaseline = pulseState.BaseV;
-        PeakVoltage = samples[i];
-        GlobalPeakVoltage = 5000;
-        InPulse = true;
-      } else {
-        ++pulseState.BaselineSamples;
-        pulseState.BaselineSquareInt += ((UInt_t)samples[i]*samples[i])-(3892*3892);
-        pulseState.BaselineInt += samples[i]-3892;
-
-        if (channelState.BaselineSamples < pfConfig.MaxBaselineSamples) {
-          ++channelState.BaselineSamples;
-          channelState.BaselineInt += samples[i]-3892;
-          channelState.BaselineSquareInt += ((UInt_t)samples[i]*samples[i])-(3892*3892);
-        }
-      }
-    }
-  }
-}
-
-/// This function should be IDENTICAL to that used in RAT.
-void v1725CONET2::ClosePulseAndSetVariables(int& i, bool firstBlock, bool extendPulseEnd, int closePulseLookAhead)
-{
-  if (extendPulseEnd) {
-    for (int j = 1; j <= closePulseLookAhead; ++j) {
-      pulseState.Charge += 4096 - samples[i+j];
-    }
-    i += closePulseLookAhead;
-  }
-
-  pulseState.Stop = i;
-
-  SetPulseVariables();
-
-  if (channelState.BaselineSamples < 3 && firstBlock) {
-    channelState.BaselineInt = 0;
-    channelState.BaselineSamples = 0;
-    channelState.BaselineSquareInt = 0;
-  }
-
-  pulseState.BaselineSamples = 0;
-  pulseState.BaselineInt = 0;
-  pulseState.BaselineSquareInt = 0;
-}
-
-/// This function needs changing compared to that used in RAT.
-void v1725CONET2::SetPulseVariables()
-{
-  if (pulseState.MaxVT.size() && pulseState.MaxVT[pulseState.MaxVT.size()-1] >= pulseState.Stop-1) {
-    pulseState.MaxVT.pop_back();
-  }
-
-  if (pulseState.MaxVT.size() == 0) {
-    if (pulseState.IsSplit) {
-      pulse = pmt->GetLastPulse();
-      pulseState.Charge += pulse->GetChargeADCRel4096();
-      AdjustPulseChargeAndTypeToAvoidOverflow();
-      pulse->SetChargeADCRel4096(pulseState.Charge);
-      pulse->SetRightEdge(pulseState.Stop + pulseState.Offset);
-    }
-
-    ResetForNewPulse();
-    return;
-  }
-
-  if (pulseState.IsLowGain) {
-    pulse = pmt->AddNewLGPulse();
-  } else {
-    pulse = pmt->AddNewPulse();
-  }
-
-  AdjustPulseChargeAndTypeToAvoidOverflow();
-  pulse->SetChargeADCRel4096(pulseState.Charge);
-  pulse->SetBaselineIntRel3892(pulseState.BaselineInt);
-  pulse->SetBaselineSquareIntRel3892(pulseState.BaselineSquareInt);
-  pulse->SetBaselineSamples(pulseState.BaselineSamples);
-  pulse->SetMinimumADC(pulseState.MaxV);
-  /* START OF DIFF
-  pulse->SetLeftEdge(pulseState.Start + pulseState.Offset);
-  pulse->SetRightEdge(pulseState.Stop + pulseState.Offset);
-
-  for (UInt_t j = 0; j < pulseState.MaxVT.size(); ++j) {
-    if (pulseState.MaxVT[j] > 1 && pulseState.MaxVT[j] < samples.size() - 1) {
-      pulseState.SubnsSamples.clear();
-      for (int i = -2; i < 2; ++i) {
-        pulseState.SubnsSamples.push_back(samples[pulseState.MaxVT[j] + i]);
-      }
-      pulse->SetTimingSamples(pulseState.SubnsSamples);
-    }
-  }
-
-  for (unsigned int i = 0; i < pulseState.MaxVT.size(); ++i) {
-    pulseState.MaxVT[i] += pulseState.Offset;
-  }
-
-  pulse->SetSubpeaks(pulseState.MaxVT);
-  pulse->SetTimeOffset(channelState.TimeOffset);
-
-  if (pulseState.IsV1740) {
-    pulse->SetBoardID(board1740->GetID());
-    pulse->SetInputID(rawWF->GetInputID());
-    pulse->SetRawBlockStartBin(0);
-  } else {
-    pulse->SetBoardID(board->GetID());
-    pulse->SetInputID(channel->GetInputID());
-    pulse->SetRawBlockStartBin(rawBlock->GetStartBin());
-  }
-  */
-
-  pulse->SetLeftEdge(pulseState.Start);
-  pulse->SetRightEdge(pulseState.Stop);
-  pulse->SetMaxD(pulseState.MaxD);
-  pulse->SetMaxV(pulseState.MaxV);
-  pulse->SetMaxVT(pulseState.MaxVT[0]);
-  pulse->SetPeakChargeADCRel4096(pulseState.ChargePeak);
-  pulse->SetOffset(pulseState.Offset);
-  pulse->SetPeakTime(pulseState.MaxVT[0]);
-  pulse->SetPrePreSample(samples[pulseState.MaxVT[0] - 2]);
-  pulse->SetPreSample(samples[pulseState.MaxVT[0] - 1]);
-  pulse->SetPeakVoltage(samples[pulseState.MaxVT[0]]);
-  pulse->SetPostSample(samples[pulseState.MaxVT[0] + 1]);
-  pulse->SetPulseType(PulseUtil::TYPE_V1725_SMARTQT);
-  // This must be last as it relies on other values in pulse.
-  pulse->SetConfidence(EvalSQTPulse());
-  // END OF DIFF
-
-  ResetForNewPulse();
-}
-
-void v1725CONET2::AdjustPulseChargeAndTypeToAvoidOverflow() {
-  // THIS IS A UNIQUE IMPLEMENTATION FOR ONLINE
-  if (pulseState.Charge > 65535) {
-    pulseState.Charge = 65535;
-  }
-}
-
-void v1725CONET2::UpdateBaselinesAndCutOnCharge(int chargeCutADCRelBaseline, bool lowGain)
-{
-  /* DIFF
-  if (channelState.BaselineSamples <= pfConfig.MinBaselineSamples) {
-    // Bad baseline, so set the failure flag
-    baselineFail = true;
-  }*/
-
-  int pulseCount = lowGain ? pmt->GetLGPulseCount() : pmt->GetPulseCount();
-
-  for (Int_t ipulse = 0; ipulse < pulseCount; ++ipulse) {
-    pulse = lowGain ? pmt->GetLGPulse(ipulse) : pmt->GetPulse(ipulse);
-
-// DIFF    if (pulse->GetPulseType() != PulseUtil::TYPE_V1725_SMARTQT) {
-      pulse->SetBaselineIntRel3892(channelState.BaselineInt);
-      pulse->SetBaselineSquareIntRel3892(channelState.BaselineSquareInt);
-      pulse->SetBaselineSamples(channelState.BaselineSamples);
-// DIFF    }
-
-    if (pulse->GetChargeADCRelBaseline() < chargeCutADCRelBaseline) {
-      pulse = NULL;
-      pulseCount--;
-/* DIFF      if (lowGain) {
-        pmt->RemoveLGPulse(ipulse--);
-      } else {*/
-        pmt->RemovePulse(ipulse--);
-// DIFF      }
-      continue;
-    }
-/* DIFF
-    if (pulse->GetPulseType() < PulseUtil::TYPE_V1740 && pmt->GetID() > -1 && pmt->GetID() < 255) {
-      motherblock = GetRawBlock();
-      pulseState.Offset = motherblock->GetStartBin();
-      samples = motherblock->GetSamples();
-      FitTime_Block();
-      if (pulse->GetPulseType() < PulseUtil::TYPE_V1725_SMARTQT &&
-          pulse->GetChargeADCRelBaseline() >= pfConfig.SubPeakChargeCutOff) {
-        SetLargePulseSubPeakCharge();
-      } else if (pulse->GetPulseType() < PulseUtil::TYPE_V1725_SMARTQT &&
-                 (pulse->GetSubpeakCount() > 9 || pulse->GetLeftEdge() == 0 || channelState.Saturated) &&
-                 TMath::Abs(pulse->GetChargeResidualFrac()) > pfConfig.ChargeResidualFracLimit &&
-                 TMath::Abs(pulse->GetChargeResidualADC()) > pfConfig.ChargeResidualLimit) {
-        SetLargePulseSubPeakCharge();
-      } else if (pfConfig.DoHiddenPeakFind &&
-                 pulse->GetPulseType() < PulseUtil::TYPE_V1725_SMARTQT &&
-                 TMath::Abs(pulse->GetChargeResidualFrac()) > pfConfig.ChargeResidualFracLimit &&
-                 TMath::Abs(pulse->GetChargeResidualADC()) > pfConfig.ChargeResidualLimit) {
-        DS::Pulse* pulseOriginal = pulse;
-        pulse = (DS::Pulse*) pulseOriginal->Clone();
-        FitTime_BruteForce();
-        if (TMath::Abs(pulse->GetChargeResidualADC()) < TMath::Abs(pulseOriginal->GetChargeResidualADC())) {
-          pmt->ReplacePulse(ipulse, pulse);
-        } else {
-          delete pulse;
-          pulse = pulseOriginal;
-        }
-        for (UShort_t j = 0; j < pulse->GetSubpeakCount(); ++j) {
-          if (pulse->GetSubpeak(j)-pulseState.Offset > -1 && pulse->GetSubpeak(j)-pulseState.Offset < samples.size()) {
-            pulse->AddSubpeakMinimum(samples[pulse->GetSubpeak(j)-pulseState.Offset]);
-          } else {
-            pulse->AddSubpeakMinimum(0);
-          }
-        }
-
-      } else {
-        for (int j=0; j<pulse->GetSubpeakCount(); ++j) {
-          pulse->AddSubpeakMinimum(samples[pulse->GetSubpeak(j)-pulseState.Offset]);
-        }
-      }
-
-      SetPETimes();
-    }
-
-    pulse->CalcTransients();*/
-  }
-}
-
-// This function should e IDENTICAL to that in rat
-void v1725CONET2::CalculateDerivativesFromSamples()
-{
-  int sampsize = samples.size();
-
-  Deriv.clear();
-  AbsDeriv.clear();
-
-  Deriv.push_back(2*((int)samples[1]-(int)samples[0]));
-  AbsDeriv.push_back(TMath::Abs(Deriv[0]));
-
-  for (int i = 1; i < sampsize - 2; i++) {
-    Deriv.push_back((int)samples[i+1] - (int)samples[i-1]);
-    AbsDeriv.push_back(TMath::Abs(Deriv[i]));
-  }
-
-  Deriv.push_back(2*((int)samples[sampsize-2]-(int)samples[sampsize-1]));
-  AbsDeriv.push_back(TMath::Abs(2*((int)samples[sampsize-2]-(int)samples[sampsize-1])));
-}
 
 
 //
@@ -2048,382 +1123,7 @@ bool v1725CONET2::FillQTBank(char * pevent, uint32_t * pZLEData){
   return true;
 }
 
-void v1725CONET2::ConvertPMTsToBanks(uint32_t*& QTData, uint32_t*& nQTWords) {
-  // Current packing:
-  // CBBVVVXX, C: Channel, BB: Bank version, VVV: Peak voltage, XX: pre-pre
-  // YYZZCCCC, YY: pre, ZZ: post, CCCC: Charge (4096 - samples)
-  // FFFFAAOO, FFFF: Offset (start bin of block), AA: Start bin of pulse in block, OO: Stop bin of pulse in block
-  // 0BBBPPSS, BBB: (Baseline sum relative to 3892), PP: Bin of peak of pulse in block, SS: SPE confidence
-  // SSSSSSNN, SSSSSS: Sum of baseline squares (rel to 3892), NN: Baseline number of samples
-  //
-  // Note, if this packing is changed, you MUST also update
-  // ebSmartQTFilter::AnalyzeBanks() so it reads the right values.
-  //
-  // Changelog:
-  // v8 - Initial Smart QT implementation
-  // v9 - No change to V1725 section, but Event Builder filtering improved.
 
-  for (int p = 0; p < 8; p++) {
-    if (!pmts[p]) {
-      continue;
-    }
-
-    for (int u = 0; u < pmts[p]->GetPulseCount(); u++) {
-      pulse = pmts[p]->GetPulse(u);
-
-      uint32_t _Channel = p;
-      uint32_t _Version = 9;
-      uint32_t _PeakV = pulse->GetPeakVoltage();
-      uint32_t _PrePreMV = pulse->GetPrePreSample() - _PeakV;
-
-      *QTData = (((_Channel << 28) & 0xF0000000) | ((_Version << 20) & 0x0FF00000) | ((_PeakV << 8) & 0x000FFF00) | ((_PrePreMV) & 0x000000FF));
-      QTData++;
-
-      uint32_t _PreMV = pulse->GetPreSample() - _PeakV;
-      uint32_t _PostMV = pulse->GetPostSample() - _PeakV;
-      uint32_t _Charge = pulse->GetChargeADCRel4096();
-
-      *QTData = (((_PreMV << 24) & 0xFF000000) | ((_PostMV << 16) & 0x00FF0000) | (_Charge & 0x0000FFFF));
-      QTData++;
-
-      uint32_t _Offset = pulse->GetOffset();
-      uint32_t _Start = pulse->GetLeftEdge();
-      uint32_t _Stop = pulse->GetRightEdge();
-
-      *QTData = (((_Offset << 16) & 0xFFFF0000) | ((_Start << 8) & 0x0000FF00) | (_Stop & 0x000000FF));
-      QTData++;
-
-      uint32_t _BaselineB = pulse->GetBaselineIntRel3892();
-      uint32_t _PeakT = pulse->GetPeakTime();
-      uint32_t _Conf = pulse->GetConfidence();
-
-      *QTData = (((_BaselineB << 16) & 0x0FFF0000) | ((_PeakT << 8 ) & 0x0000FF00) | (_Conf & 0x000000FF));
-      QTData++;
-
-      uint32_t _BaselineS = pulse->GetBaselineSquareIntRel3892();
-      uint32_t _BaselineN = pulse->GetBaselineSamples();
-
-      *QTData = (((_BaselineS << 8) & 0xFFFFFF00) | (_BaselineN & 0x000000FF));
-      QTData++;
-
-      (*nQTWords) += NUM_SQ_WORDS; // increment number of QT words
-    }
-  }
-}
-
-bool v1725CONET2::LoadSmartQTConfig() {
-  std::ifstream myfile;
-  myfile.open("/home/deap/pro/FrontEnd/v1725mt/SmartQTArrays.txt");
-
-  double dummy;
-  myfile >> dummy;
-  myfile >> spePdf.MaxVbins;
-  myfile >> spePdf.ChargeFracbins;
-  myfile >> dummy;
-  myfile >> dummy;
-  myfile >> dummy;
-  myfile >> spePdf.MaxVmin;
-  myfile >> spePdf.MaxVmax;
-  myfile >> spePdf.ChargeFracmin;
-  myfile >> spePdf.ChargeFracmax;
-  for (int z = 0; z < 22; ++z) {
-    for (int x = 0; x < spePdf.MaxVbins; ++x) {
-      for (int y = 0; y < spePdf.ChargeFracbins; ++y) {
-        myfile >> dummy;
-        spePdf.MaxV_ChargeFrac.push_back(dummy);
-      }
-    }
-  }
-  myfile >> dummy;
-  myfile >> dummy;
-  myfile >> spePdf.MaxDbins;
-  myfile >> dummy;
-  myfile >> dummy;
-  myfile >> dummy;
-  myfile >> dummy;
-  myfile >> dummy;
-  myfile >> spePdf.MaxDmin;
-  myfile >> spePdf.MaxDmax;
-
-  for (int z = 0; z < 22; ++z) {
-    for (int x = 0; x < spePdf.MaxVbins; ++x) {
-      for (int y = 0; y < spePdf.MaxDbins; ++y) {
-        myfile >> dummy;
-        spePdf.MaxV_MaxD.push_back(dummy);
-      }
-    }
-  }
-
-
-  myfile.close();
-
-  std::cout << "Read SmartQT configuration file okay" << std::endl;
-
-  return true;
-}
-
-Byte_t v1725CONET2::EvalSQTPulse()
-{
-  Float_t charge = pulse->GetChargeADCRelBaseline();
-  Float_t baseline = pulse->CalcBaselineADC();
-  Float_t width = pulse->GetWidthBins();
-  Float_t width_limit = (Float_t)(charge + pfConfig.MaxSPEWidthIntercept) * (pfConfig.MaxSPEWidthSlope);
-  if (baseline > 3908 || baseline < 3892) return DS::QT::BAD_BASELINE;
-  if (charge > pfConfig.MaxSPECharge) return DS::QT::CHARGE_TOO_HIGH;
-  if (width > width_limit) return DS::QT::WIDTH_TOO_WIDE;
-  if (charge < 25) return DS::QT::FAIL_LIKELIHOOD;
-
-  // DIFF
-  if (IsAdjacent) return DS::QT::ADJACENT_BLOCK;
-
-  return (Byte_t)(200.*(GetBinMaxV_ChargeFrac()*GetBinMaxV_MaxD()));
-}
-
-//MaxVMaxD PDF value.
-Float_t v1725CONET2::GetBinMaxV_MaxD()
-{
-  int graph = (int)((pulse->GetChargeADCRelBaseline() - 50.)/20.);
-  if (graph < 0 || graph > 21) return 0.;
-  int xbin = (pulse->GetChargeHeightRatio() - spePdf.MaxVmin)/((spePdf.MaxVmax-spePdf.MaxVmin)/spePdf.MaxVbins);
-  if (xbin<0 || xbin >= spePdf.MaxVbins) return 0;
-  int ybin = (pulse->GetChargeMaxDRatio() - spePdf.MaxDmin)/((spePdf.MaxDmax-spePdf.MaxDmin)/spePdf.MaxDbins);
-  if (ybin<0 || ybin >= spePdf.MaxDbins) return 0;
-  return spePdf.MaxV_MaxD[spePdf.MaxDbins*spePdf.MaxVbins*graph+spePdf.MaxDbins*xbin+ybin];
-}
-
-//MaxVChargeFrac PDF value.
-Float_t v1725CONET2::GetBinMaxV_ChargeFrac()
-{
-  int graph = (int)((pulse->GetChargeADCRelBaseline() - 50.)/20.);
-  if (graph < 0 || graph > 21) return 0.;
-  int xbin = (pulse->GetChargeHeightRatio() - spePdf.MaxVmin)/((spePdf.MaxVmax-spePdf.MaxVmin)/spePdf.MaxVbins);
-  if (xbin<0 || xbin >= spePdf.MaxVbins) return 0;
-  int ybin = (pulse->GetChargeFrac() - spePdf.ChargeFracmin)/((spePdf.ChargeFracmax-spePdf.ChargeFracmin)/spePdf.ChargeFracbins);
-  if (ybin<0 || ybin >= spePdf.ChargeFracbins) return 0;
-  return spePdf.MaxV_ChargeFrac[spePdf.MaxVbins*spePdf.ChargeFracbins*graph+spePdf.ChargeFracbins*xbin+ybin];
-}
-
-
-
-/*
-// Returns the PDF value for MaxV_ChargeFrac
-double v1725CONET2::GetBinMaxV_ChargeFrac()
-{
-  int graph =(int)((Charge_conv - 50.)/20.);
-  if (graph < 0 || graph > 21) return 0.;
-  int xbin = (Charge_MaxV - MaxVmin)/((MaxVmax-MaxVmin)/MaxVbins);
-  if (xbin<0 || xbin >= MaxVbins) return 0;
-  int ybin = (Charge_Frac - ChargeFracmin)/((ChargeFracmax-ChargeFracmin)/ChargeFracbins);
-  if (ybin<0 || ybin >= ChargeFracbins) return 0;
-  return MaxV_ChargeFrac[MaxVbins*ChargeFracbins*graph+ChargeFracbins*xbin+ybin];
-}
-
-// Returns the PDF value for MaxV_MaxD
-double v1725CONET2::GetBinMaxV_MaxD()
-{
-  int graph =(int)((Charge_conv - 50.)/20.);
-  if (graph < 0 || graph > 21) return 0.;
-  int xbin = (Charge_MaxV - MaxVmin)/((MaxVmax-MaxVmin)/MaxVbins);
-  if (xbin<0 || xbin >= MaxVbins) return 0;
-  int ybin = (Charge_MaxD - MaxDmin)/((MaxDmax-MaxDmin)/MaxDbins);
-  if (ybin<0 || ybin >= MaxDbins) return 0;
-  return MaxV_MaxD[MaxDbins*MaxVbins*graph+MaxDbins*xbin+ybin];
-}
-
-// ResetPulseVariables resets pulse variables back to null values.
-void v1725CONET2::ResetPulseVariables()
-{
-  BaselineBefore = 0;
-  Charge = 0;
-  MaxD = 0;
-  PrePreMaxV = 0;
-  PreMaxV = 0;
-  PostMaxV = 0;
-  PeakVoltage = 3900;
-  PeakTime = 0;
-  Start = 0;
-  Stop = 0;
-  Conf = 0;
-  ChargePeak=0;
-}
-*/
-//
-//--------------------------------------------------------------------------------
-/**
- * \brief   Fill Smart QT Bank
- *
- * \param   [in]  pevent  pointer to event buffer
- * \param   [in]  pZLEData  pointer to the data area of the bank
- */
-bool v1725CONET2::FillSmartQTBank(char * pevent, uint32_t * pZLEData){
-
-  DWORD *src;
-  DWORD *dest;
-  uint32_t nQTWords;
-
-  //The read pointer points to the QT data following ZLE Event data
-  int status = rb_get_rp(this->GetRingBufferHandle(), (void**)&src, 100);
-  if (status == DB_TIMEOUT) {
-    cm_msg(MERROR,"FillSmartQTBank", "Got rp timeout for module %d", this->GetModuleID());
-    printf("rp timeout, Module %d\n", this->GetModuleID());
-    return false;
-  }
-
-  char tBankName[5];
-  snprintf(tBankName, sizeof(tBankName), "SQ%02d",this->GetModuleID());
-  bk_create(pevent, tBankName, TID_DWORD, (void **)&dest);
-
-  //Copy Smart QT header
-  memcpy(dest, src, 3*sizeof(uint32_t));  //The Smart QT header is 3 words long (see ReadSmartQTData())
-  nQTWords = *(src + 2);
-  //if (this->GetModuleID() == 0) printf("### FillSmartQTBank: nQTWords: %u\n", nQTWords);
-
-  //Copy Smart QT words
-  memcpy(dest+3, src+3, nQTWords*sizeof(uint32_t));
-
-  rb_increment_rp(this->GetRingBufferHandle(), (3 + nQTWords)*sizeof(uint32_t));
-  bk_close(pevent, dest + 3 + nQTWords);
-
-  return true;
-}
-
-
-//
-//--------------------------------------------------------------------------------
-/**
- * \brief   Fill Minima Bank
- *
- * \param   [in]  pevent  pointer to event buffer
- * \param   [in]  pZLEData  pointer to the data area of the bank
- */
-bool v1725CONET2::FillMinimaBank(char * pevent, uint32_t * pZLEData){
-
-  DWORD *src;
-  DWORD *dest;
-
-  //The read pointer points to the QT data following ZLE Event data
-  int status = rb_get_rp(this->GetRingBufferHandle(), (void**)&src, 100);
-  if (status == DB_TIMEOUT) {
-    cm_msg(MERROR,"FillMinimaBank", "Got rp timeout for module %d", this->GetModuleID());
-    printf("rp timeout, Module %d\n", this->GetModuleID());
-    return false;
-  }
-
-  char tBankName[5];
-  snprintf(tBankName, sizeof(tBankName), "MN%02d",this->GetModuleID());
-  bk_create(pevent, tBankName, TID_DWORD, (void **)&dest);
-
-  // Only 6 words in this bank - see ReadMinimaData()
-  memcpy(dest, src, 6*sizeof(uint32_t));
-
-  rb_increment_rp(this->GetRingBufferHandle(), 6*sizeof(uint32_t));
-  bk_close(pevent, dest + 6);
-
-  return true;
-}
-
-
-//
-//--------------------------------------------------------------------------------
-bool v1725CONET2::FillQTBankOld(char * pevent, uint32_t * pZLEData){
-  // >>> Create bank.
-  // QtData is the pointer to the memory location hodling the Qt data
-  // Content
-  // V1725 event counter
-  // V1725 Trigger time tag
-  // Number of Qt
-  // QT format: channel 28 time 16 charge 0
-  char tBankName[5];
-  snprintf(tBankName, sizeof(tBankName), "QT%02d",this->moduleID_);
-  uint32_t *QtData;
-  bk_create(pevent, tBankName, TID_DWORD, (void **)&QtData);
-
-
-  // >>> copy some header words
-  *QtData = *(pZLEData+2); // event counter QtData[0]
-  QtData++;
-  *QtData = *(pZLEData+3); // trigger time tag QtData[1]
-  QtData++;
-
-  // >>> Figure out channel mapping
-  //if(mNCh==0){
-  int mNCh=0;
-  uint32_t mChMap[8];
-  uint32_t chMask = pZLEData[1] & 0xFF;
-  for(int iCh=0; iCh<8; iCh++){
-    if(chMask & (1<<iCh)){
-      mChMap[mNCh] = iCh;
-      mNCh++;
-    }
-  }
-  if(mNCh==0){
-    // printf("No channels found for module %i! Something wrong with channel mask\n", aModule);
-  }
-
-  // >>> Skip location QtData[2]. Will be used for number of QT;
-  uint32_t* nQt = QtData;
-  *(nQt) = 0;
-  QtData++;
-  //std::cout << QtData[0] <<  " " << *(QtData-2) << " " << QtData[1] << " " << *nQt << " " << *(QtData-1)<< " ";
-  // >>> Loop over ZLE data and fill up Qt data bank
-
-  uint32_t iPtr=4;
-  for(int iCh=0; iCh<mNCh; iCh++){
-    uint32_t chSize = pZLEData[iPtr];
-    uint32_t iChPtr = 1;// The chSize space is included in chSize
-    uint32_t iBin=0;
-    iPtr++;
-    //std::cout << "--------------- Channel: " << aModule << "-" << iCh << " size=" << chSize << " " <<  std::endl;
-    uint32_t prevGoodData=1;
-    while(iChPtr<chSize){
-      uint32_t goodData = ((pZLEData[iPtr]>>31) & 0x1);
-      uint32_t nWords = (pZLEData[iPtr] & 0xFFFFF);
-      if(prevGoodData==0 && goodData==0){ // consecutive skip. Bad
-        /*  std::cout << "consecutive skip: V1725=" << aModule
-      << " | ch=" << iCh
-      << " | prev word="  << pZLEData[iPtr-1]
-      << " | cur word=" << pZLEData[iPtr] << std::endl;
-         */}
-      prevGoodData=goodData;
-      if(goodData){
-        uint32_t iMin = iBin;
-        uint32_t min=4096;
-        uint32_t baseline = (pZLEData[iPtr+1]&0xFFF);
-        for(uint32_t iWord=0; iWord<nWords; iWord++){
-          iPtr++;
-          iChPtr++;
-          if(min > (pZLEData[iPtr]&0xFFF) ){
-            iMin = iBin+iWord*2;
-            min = (pZLEData[iPtr]&0xFFF);
-          }
-          if(min > ((pZLEData[iPtr]>>16)&0xFFF) ){
-            iMin = iBin+iWord*2+1;
-            min = ((pZLEData[iPtr]>>16)&0xFFF);
-          }
-        }
-        // package channel | iMin | min in one 32 bit word
-        // don't bother for now. Temporary!!!!
-        (*nQt)++; // increment number of Qt
-        min = baseline-min; // turn it into a positive number
-        *QtData = (((mChMap[iCh]<<28) & 0xF0000000) |
-            ((iMin<<16)        & 0x0FFF0000) |
-            (min               & 0x0000FFFF));
-        QtData++;
-        //std::cout << aModule << " "  << mChMap[iCh] << " " << iMin << " " << min << " " << *(QtData-1) << std::endl;
-      }
-      else{  // skip
-        iBin += (nWords*2);
-      }
-
-      iChPtr++;
-      iPtr++;
-    }
-  }
-  //std::cout << " | " << *nQt << std::endl;
-  bk_close(pevent, QtData);
-
-  return true;
-}
 
 //
 //--------------------------------------------------------------------------------
@@ -2655,7 +1355,7 @@ int v1725CONET2::SetHistoryRecord(HNDLE h, void(*cb_func)(INT,INT,void*))
  * - board type
  *
  * ### Set registers
- * Use a preset if setup != 0 in the config string, or set them manually otherwise.
+ * Set parameters manually from ODB.
  *
  * \return  0 on success, -1 on error
  */
@@ -2676,11 +1376,6 @@ int v1725CONET2::InitializeForAcq()
     return -1;
   }
         
-
-	// TL change: always do the board re-initialization.
-  //if (settings_loaded_ && !settings_touched_)
-	//return 0;
-        
   CAENComm_ErrorCode sCAEN;
         
   // Do special board reset for lockup prevention                                                 
@@ -2690,7 +1385,8 @@ int v1725CONET2::InitializeForAcq()
 	
 	// Need time for the PLL to lock
 	ss_sleep(500);
-	
+
+	// Leave FP IO stuff disabled for now... will setup later...	
 	// Clear done by accessing Buffer Origanization later on
 	//  sCAEN = WriteReg_(V1725_SW_CLEAR, 0x1);
   
@@ -2699,8 +1395,8 @@ int v1725CONET2::InitializeForAcq()
   sCAEN = WriteReg_(V1725_FP_IO_CONTROL, 0x00000000);
         
   // Setup Busy daisy chaining
-  sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x104); // 0x100:enable new config, 0x4:LVDS I/O[3..0] output
-  sCAEN = WriteReg_(V1725_FP_LVDS_IO_CRTL,      0x022); // 0x20: I/O[7..4] input mode nBusy/Veto (4:nBusy input)
+  //sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x104); // 0x100:enable new config, 0x4:LVDS I/O[3..0] output
+  //sCAEN = WriteReg_(V1725_FP_LVDS_IO_CRTL,      0x022); // 0x20: I/O[7..4] input mode nBusy/Veto (4:nBusy input)
                                                         // 0x02: I/O[3..0] output mode nBusy/Veto (1:Busy)
 
   std::stringstream ss_fw_datatype;
@@ -2774,106 +1470,70 @@ int v1725CONET2::InitializeForAcq()
     break;
   }
 
-        //-PAA- Moved after PLL check
-        //  cm_msg(MINFO, "InitializeForAcq", ss_fw_datatype.str().c_str());
 
-  //use preset setting if enabled
-  if (config.setup != 0) SetupPreset_(config.setup);
-  //else use odb values
-  else
-  {
-    //already reset/clear earlier this function, so skip here
-    AcqCtl_(config.acq_mode);
-    WriteReg_(V1725_CHANNEL_CONFIG,          config.channel_config);
-    WriteReg_(V1725_BUFFER_ORGANIZATION,     config.buffer_organization);
-    WriteReg_(V1725_CUSTOM_SIZE,             config.custom_size);
-
-    /* A bug exists in the firmware where if the channel mask is 0 (all channels
-     * disabled), the board misbehaves (reports bogus number of events in output
-     * buffer, event ready register doesn't work, etc).  Don't allow it     */
-    if(!config.channel_mask){
-      cm_msg(MERROR,"InitializeForAcq","The board misbehaves if channel mask is 0 (all channels disabled). Exiting...");
-      exit(FE_ERR_HW);
-    }
-
-    WriteReg_(V1725_CHANNEL_EN_MASK,         config.channel_mask);
-    AcqCtl_(V1725_COUNT_ACCEPTED_TRIGGER);
-    WriteReg_(V1725_TRIG_SRCE_EN_MASK,       config.trigger_source);
-    WriteReg_(V1725_FP_TRIGGER_OUT_EN_MASK,  config.trigger_output);
-    WriteReg_(V1725_POST_TRIGGER_SETTING,    config.post_trigger);
-    WriteReg_(V1725_ALMOST_FULL_LEVEL,       config.almost_full);
-    WriteReg_(V1725_MONITOR_MODE,            0x3);
-    WriteReg_(V1725_BLT_EVENT_NB,            0x1);
-    WriteReg_(V1725_VME_CONTROL,             V1725_ALIGN64);
-
-    //set specfic channel values
-    for (int iChan=0; iChan<8; iChan++)
-    {
-      WriteReg_(V1725_CHANNEL_THRESHOLD   + (iChan<<8), config.auto_trig_threshold     [iChan]);
-      WriteReg_(V1725_CHANNEL_OUTHRESHOLD + (iChan<<8), config.auto_trig_N_4bins_min [iChan]);
-//      _WriteReg(V1725_ZS_THRESHOLD        + (iChan<<8), config.zs_threshold  [iChan]);
-      // !!!!!!! If this disapears one more time, I will be very pissed off. FR
-      if( config.zle_signed_threshold[iChan]>0){
-        WriteReg_(V1725_ZS_THRESHOLD        + (iChan<<8), config.zle_signed_threshold  [iChan]);
-      }
-      else{// this is necessary for negative going pulses. It is easier to use decimal numbers
+	//already reset/clear earlier this function, so skip here
+	AcqCtl_(config.acq_mode); 
+	WriteReg_(V1725_BOARD_CONFIG,            config.board_config);
+	WriteReg_(V1725_BUFFER_ORGANIZATION,     config.buffer_organization);
+	WriteReg_(V1725_CUSTOM_SIZE,             config.custom_size);
+	
+	/* A bug exists in the firmware where if the channel mask is 0 (all channels
+	 * disabled), the board misbehaves (reports bogus number of events in output
+	 * buffer, event ready register doesn't work, etc).  Don't allow it     */
+	if(!config.channel_mask){
+		cm_msg(MERROR,"InitializeForAcq","The board misbehaves if channel mask is 0 (all channels disabled). Exiting...");
+		return FE_ERR_HW;
+	}
+	
+	WriteReg_(V1725_CHANNEL_EN_MASK,         config.channel_mask);
+	AcqCtl_(V1725_COUNT_ACCEPTED_TRIGGER);
+	WriteReg_(V1725_TRIG_SRCE_EN_MASK,       config.trigger_source);
+	WriteReg_(V1725_FP_TRIGGER_OUT_EN_MASK,  config.trigger_output);
+	WriteReg_(V1725_POST_TRIGGER_SETTING,    config.post_trigger);
+	WriteReg_(V1725_ALMOST_FULL_LEVEL,       config.almost_full);
+	WriteReg_(V1725_MONITOR_MODE,            0x3); // Buffer Occupancy mode;
+	WriteReg_(V1725_BLT_EVENT_NB,            0x1); // TL? max number of events per BLT is 1?
+	WriteReg_(V1725_VME_CONTROL,             V1725_ALIGN64);
+	
+	//set specfic channel values
+	// TODO: add ADC calibration
+	// TODO: add right registers for V1725 ZLE
+	// FIXME HERE!
+	for (int iChan=0; iChan<8; iChan++){
+		WriteReg_(V1725_CHANNEL_THRESHOLD   + (iChan<<8), config.auto_trig_threshold     [iChan]);
+		WriteReg_(V1725_CHANNEL_OUTHRESHOLD + (iChan<<8), config.auto_trig_N_4bins_min [iChan]);
+		if( config.zle_signed_threshold[iChan]>0){
+			WriteReg_(V1725_ZS_THRESHOLD        + (iChan<<8), config.zle_signed_threshold  [iChan]);
+		}
+		else{
         WriteReg_(V1725_ZS_THRESHOLD        + (iChan<<8), (0x80000000 | (-1*config.zle_signed_threshold[iChan])));
-      }
-//      _WriteReg(V1725_ZS_NSAMP            + (iChan<<8), config.zs_nsamp      [iChan]);
-      WriteReg_(V1725_ZS_NSAMP            + (iChan<<8), ((config.zle_bins_before[iChan]<<16) | config.zle_bins_after[iChan]));
-      WriteReg_(V1725_CHANNEL_DAC         + (iChan<<8), config.dac           [iChan]);
-      //NB: in original frontend, zst and zsn regs were set via a short calculation in the
-      //frontend, not the exact values as in odb. it was not clear that this was done
-      //without looking at source code, so i have changed it to just take values direct
-      //from ODB.
-      //On my todo list is to figure out a better way of setting up ODB settings
-      //for the frontends.
+		}
+		WriteReg_(V1725_ZS_NSAMP            + (iChan<<8), ((config.zle_bins_before[iChan]<<16) | config.zle_bins_after[iChan]));
+		WriteReg_(V1725_CHANNEL_DAC         + (iChan<<8), config.dac           [iChan]);			
+	}		
 
-    }
-
-//    ov1725_Status(GetDeviceHandle());
-  }
-
-  //todo: some kind of check to make sure stuff is set correctly???
-        // Check finally for Acquisition status
-//      sCAEN = ReadReg_(V1725_ACQUISITION_STATUS, &reg);
-//      cm_msg(MINFO, "AcqInit", "Module %d (Link %d Board %d) Acquisition Status : 0x%x", moduleID_, link_, board_, reg);
-        sCAEN = ReadReg_(0x8178, &reg);
-				printf("Board error status 0x%x\n",reg);
-        sCAEN = ReadReg_(0x8100, &reg);
-				printf("Board acquisition control 0x%x\n",reg);
-        sCAEN = ReadReg_(0x8104, &reg);
-				printf("Board acquisition status 0x%x\n",reg);
-
-        sCAEN = ReadReg_(V1725_ACQUISITION_STATUS, &reg);
-        ss_fw_datatype << ", Acq Reg: 0x" << std::hex << reg;
-        cm_msg(MINFO, "InitializeForAcq", ss_fw_datatype.str().c_str());
-
-//      cm_msg(MINFO, "AcqInit", "Module %d (Link %d Board %d) Acquisition Status : 0x%x", moduleID_, link_, board_, reg);
-        if ((reg & 0xF0) != 0x80) { // Ie internal clock, PLL locked
-                cm_msg(MERROR, "InitAcq", "Module %d (Link %d Board %d ) not initilized properly acq status:0x%x",  moduleID_, link_, board_, reg);
-                return -1;
-        }
-/*
-  // Read the DAC values, so we can print them to log for debugging purposes.
-  std::stringstream ss_dac;
-  ss_dac << "Module " << moduleID_ << ", DAC values are ";
-
-  for (int iChan=0; iChan<8; iChan++) {
-    DWORD dac_read = 0;
-    sCAEN = ReadReg_(V1725_CHANNEL_DAC + (iChan<<8), &dac_read);
-    ss_dac << dac_read << " ";
-  }
-
-  cm_msg(MINFO, "InitializeForAcq", ss_dac.str().c_str());
-  // End of DAC debug code.
-*/
-
+	// Check finally for Acquisition status
+	sCAEN = ReadReg_(0x8178, &reg);
+	printf("Board error status 0x%x\n",reg);
+	sCAEN = ReadReg_(0x8100, &reg);
+	printf("Board acquisition control 0x%x\n",reg);
+	sCAEN = ReadReg_(0x8104, &reg);
+	printf("Board acquisition status 0x%x\n",reg);
+	
+	sCAEN = ReadReg_(V1725_ACQUISITION_STATUS, &reg);
+	ss_fw_datatype << ", Acq Reg: 0x" << std::hex << reg;
+	cm_msg(MINFO, "InitializeForAcq", ss_fw_datatype.str().c_str());
+	
+	//      cm_msg(MINFO, "AcqInit", "Module %d (Link %d Board %d) Acquisition Status : 0x%x", moduleID_, link_, board_, reg);
+	if ((reg & 0xF0) != 0x80) { // Ie internal clock, PLL locked
+		cm_msg(MERROR, "InitAcq", "Module %d (Link %d Board %d ) not initilized properly acq status:0x%x",  moduleID_, link_, board_, reg);
+		return -1;
+	}
+	
   settings_touched_ = false;
   UNUSED(sCAEN);
-
+	
   //ready to do start run
-
   return 0;
 }
 
@@ -2890,8 +1550,8 @@ v1725CONET2::DataType v1725CONET2::GetDataType()
 {
         
   // Set Device, data type and packing for QT calculation later
-  int dataType = ((config.channel_config >> 11) & 0x1);
-  if(((config.channel_config >> 16) & 0xF) == 0) {
+  int dataType = ((config.board_config >> 11) & 0x1);
+  if(((config.board_config >> 16) & 0xF) == 0) {
     if(dataType == 1) {
       // 2.5 pack, full data
       data_type_ = RawPack25;
@@ -2901,7 +1561,7 @@ v1725CONET2::DataType v1725CONET2::GetDataType()
       data_type_ = RawPack2;
       return RawPack2;
     }
-  } else if(((config.channel_config >> 16) & 0xF) == 2) {
+  } else if(((config.board_config >> 16) & 0xF) == 2) {
     if(dataType == 1) {
       // 2.5 pack, ZLE data
       data_type_ = ZLEPack25;

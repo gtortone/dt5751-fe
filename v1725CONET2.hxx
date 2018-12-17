@@ -43,267 +43,7 @@ namespace TMath {
      { return a >= b ? a : b; }
 };
 
-namespace DS {
-  namespace QT {
-    enum SpeFailureReasons {
-      FAIL_LIKELIHOOD = 0, ///< Pulse is "sensible", but not SPE-like.
-      CHARGE_TOO_HIGH = 248, ///< Integrated charge too high to be SPE-like.
-      FEW_BASELINE_SAMPLES = 249, ///< Fewer than 5 baseline samples - likely innaccurate.
-      WIDTH_TOO_WIDE = 250, ///< Pulse was too wide to be SPE-like.
-      FINISHES_TOO_LATE = 251, ///< Pulse finished too close to end of ZLE block - may be truncated.
-      CHARGE_EXTREMELY_HIGH = 252, ///< Integrated charge > 60000ADC, may overflow UShort_t.
-      PEAK_TOO_SHARP = 253, ///< Pre-pre/pre/post sample too different from minimum sample, may overflow Byte_t.
-      BAD_BASELINE = 254, ///< Baseline outside range 3892-3908. Cannot be accurately stored.
-      ADJACENT_BLOCK = 255 ///< Two ZLE blocks are adjacent, may have a pulse split across.
-    };
-  }
-}
 
-namespace PulseUtil {
-  enum PulseType {
-    TYPE_V1725, ///< The pulse came from a V1725 board
-    TYPE_V1725_SMARTQT, ///< The pulse came from a V1725 board through front end SmartQT pulse finding.
-    TYPE_V1740, ///< The pulse came from a V1740 board
-    TYPE_COUNT  ///< Do not add anything after TYPE_COUNT
-  };
-}
-
-namespace QTUtil {
-  inline Float_t CalcChargeMaxDRatio(Float_t ChargeConv,Short_t MaxD)
-  {
-    return -ChargeConv/MaxD;
-  }
-
-  inline Float_t CalcChargeHeightRatio(Float_t ChargeConv,Float_t Baseline,UShort_t MaxV)
-  {
-    return ChargeConv/(Baseline - (Float_t)MaxV);
-  }
-
-  inline Float_t CalcChargeFrac(Float_t ChargeConv,Float_t Baseline,UShort_t maxVT, UShort_t left, UShort_t chargetopeakADC)
-  {
-    Float_t Charge_Frac = -((4096.-Baseline)*(Float_t)(maxVT-left+1) - (Float_t)chargetopeakADC);
-    Charge_Frac /= (ChargeConv-Charge_Frac);
-    return Charge_Frac;
-  }
-}
-
-class Pulse {
-  public:
-    Pulse() {
-      chargeADC = 0;
-      minimumADC = 0;
-      offset = 0;
-      left = 0;
-      right = 0;
-      baselineIntRel3892 = 0;
-      baselineSquareIntRel3892 = 0;
-      baselineSamples = 0;
-      for (int i = 0; i < 4; i++) {
-        SubnsSamples[i] = 0;
-      }
-      peakT = 0;
-      conf = 0;
-      type = PulseUtil::TYPE_COUNT;
-
-      peakchargeADC = 0;
-      maxD = 0;
-      maxV = 0;
-      maxVT = 0;
-    }
-
-    ~Pulse() {}
-
-    Pulse(Pulse&& other) noexcept {
-      chargeADC = std::move(other.chargeADC);
-      minimumADC = std::move(other.minimumADC);
-      offset = std::move(other.offset);
-      left = std::move(other.left);
-      right = std::move(other.right);
-      baselineIntRel3892 = std::move(other.baselineIntRel3892);
-      baselineSquareIntRel3892 = std::move(other.baselineSquareIntRel3892);
-      baselineSamples = std::move(other.baselineSamples);
-      for (int i = 0; i < 4; i++) {
-        SubnsSamples[i] = std::move(other.SubnsSamples[i]);
-      }
-      peakT = std::move(other.peakT);
-      conf = std::move(other.conf);
-      type = std::move(other.type);
-
-      peakchargeADC = std::move(other.peakchargeADC);
-      maxD = std::move(other.maxD);
-      maxV = std::move(other.maxV);
-      maxVT = std::move(other.maxVT);
-    }
-    Pulse& operator=(Pulse&& other) noexcept {
-      if (this != &other) {
-        chargeADC = std::move(other.chargeADC);
-        minimumADC = std::move(other.minimumADC);
-        offset = std::move(other.offset);
-        left = std::move(other.left);
-        right = std::move(other.right);
-        baselineIntRel3892 = std::move(other.baselineIntRel3892);
-        baselineSquareIntRel3892 = std::move(other.baselineSquareIntRel3892);
-        baselineSamples = std::move(other.baselineSamples);
-        for (int i = 0; i < 4; i++) {
-          SubnsSamples[i] = std::move(other.SubnsSamples[i]);
-        }
-        peakT = std::move(other.peakT);
-        conf = std::move(other.conf);
-        type = std::move(other.type);
-
-        peakchargeADC = std::move(other.peakchargeADC);
-        maxD = std::move(other.maxD);
-        maxV = std::move(other.maxV);
-        maxVT = std::move(other.maxVT);
-      }
-      return *this;
-    }
-
-
-    void SetChargeADCRel4096(UShort_t _charge) { chargeADC = _charge;}
-    UShort_t GetChargeADCRel4096() { return chargeADC;}
-
-    Float_t GetChargeADCRelBaseline()
-    {
-      return -((4096.-CalcBaselineADC())*((Float_t)GetWidthBins()) - (Float_t)chargeADC);
-    }
-
-    Float_t CalcBaselineADC()
-    {
-      if (baselineSamples == 0) {
-        return 0;
-      } else {
-        return (3892. + ((Float_t)baselineIntRel3892/(Float_t)baselineSamples));
-      }
-    }
-
-    UShort_t GetWidthBins() {return (right-left+1);}
-
-    void SetMinimumADC(UShort_t _minimum) { minimumADC = _minimum;}
-    UShort_t GetMinimumADC() { return minimumADC;}
-
-    void SetOffset(UShort_t _offset) { offset = _offset; }
-    UShort_t GetOffset() { return offset; }
-
-    void SetLeftEdge(UShort_t _left) { left = _left;}
-    int GetLeftEdge() { return (int)left; }
-
-    void SetRightEdge(UShort_t _right) { right = _right;}
-    int GetRightEdge() { return (int)right; }
-
-    void SetBaselineIntRel3892(UShort_t _baselineIntRel3892) { baselineIntRel3892 = _baselineIntRel3892;}
-    UShort_t GetBaselineIntRel3892() { return baselineIntRel3892; }
-
-    void SetBaselineSquareIntRel3892(UInt_t _baselineSquareIntRel3892) { baselineSquareIntRel3892 = _baselineSquareIntRel3892;}
-    UInt_t GetBaselineSquareIntRel3892() { return baselineSquareIntRel3892; }
-
-    void SetBaselineSamples(Byte_t _baselineSamples) { baselineSamples = _baselineSamples; }
-    Byte_t GetBaselineSamples() { return baselineSamples; }
-
-
-
-    void SetPrePreSample(UShort_t adc) { SubnsSamples[0] = adc; }
-    void SetPreSample(UShort_t adc) { SubnsSamples[1] = adc; }
-    void SetPeakVoltage(UShort_t adc) { SubnsSamples[2] = adc; }
-    void SetPostSample(UShort_t adc) { SubnsSamples[3] = adc; }
-    UShort_t GetPrePreSample() { return SubnsSamples[0]; }
-    UShort_t GetPreSample() { return SubnsSamples[1]; }
-    UShort_t GetPeakVoltage() { return SubnsSamples[2]; }
-    UShort_t GetPostSample() { return SubnsSamples[3]; }
-
-    void SetPeakTime(UShort_t _peakT) { peakT = _peakT; };
-    UShort_t GetPeakTime() { return peakT; }
-
-    void SetConfidence(Byte_t _conf) { conf = _conf; };
-    Byte_t GetConfidence() { return conf; }
-
-    void SetPulseType(PulseUtil::PulseType _type) { type = _type; }
-    PulseUtil::PulseType GetPulseType() { return type; }
-
-    void SetMaxD(Float_t _maxD) {maxD = _maxD;}
-    void SetMaxV(UShort_t _maxV) {maxV = _maxV;}
-    void SetMaxVT(UShort_t _maxVT) {maxVT = _maxVT;}
-    void SetPeakChargeADCRel4096(UShort_t _peakchargeADC) {peakchargeADC = _peakchargeADC;}
-
-
-    Float_t GetChargeFrac()
-    {
-      return QTUtil::CalcChargeFrac(GetChargeADCRelBaseline(),CalcBaselineADC(),maxVT,left,peakchargeADC);
-    }
-
-    Float_t GetChargeMaxDRatio() {
-      return QTUtil::CalcChargeMaxDRatio(GetChargeADCRelBaseline(),maxD);
-    }
-
-    Float_t GetChargeHeightRatio() {
-      return QTUtil::CalcChargeHeightRatio(GetChargeADCRelBaseline(),CalcBaselineADC(),maxV);
-    }
-
-
-
-  private:
-    UShort_t chargeADC;
-    UShort_t minimumADC;
-    UShort_t offset;
-    UShort_t left;
-    UShort_t right;
-    UShort_t baselineIntRel3892;
-    UInt_t baselineSquareIntRel3892;
-    Byte_t baselineSamples;
-    UShort_t SubnsSamples[4];
-    UShort_t peakT;
-    Byte_t conf;
-    PulseUtil::PulseType type;
-    UShort_t peakchargeADC;
-    Float_t maxD;
-    UShort_t maxV;
-    UShort_t maxVT;
-};
-
-class PMT {
-  public:
-    PMT() {
-      pulse.clear();
-    };
-    ~PMT() {
-      for (int i = 0; i < GetPulseCount(); i++) {
-        if (pulse[i]) delete pulse[i];
-      }
-    };
-    PMT(PMT&& other) noexcept {
-      pulse = std::move(other.pulse);
-    }
-    PMT& operator=(PMT&& other) noexcept {
-      if (this != &other) {
-        pulse = std::move(other.pulse);
-      }
-      return *this;
-    }
-    Pulse *GetPulse(Int_t i) const { return pulse[i]; }
-    Pulse *GetLastPulse() const { return pulse[pulse.size()-1]; }
-    Pulse *AddNewPulse()
-    {
-      Pulse *o = new Pulse();
-      pulse.push_back(o);
-      return o;
-    }
-    void AddPulse(Pulse *p) {
-      pulse.push_back(p);
-    }
-    void RemovePulse(int ipulse) {
-      delete pulse[ipulse];
-      pulse.erase(pulse.begin()+ipulse);
-    }
-    int GetPulseCount() { return pulse.size(); }
-
-    // Just so we don't have to comment out more code
-    Pulse* AddNewLGPulse() { return NULL; }
-    Pulse* GetLGPulse(Int_t i) { (void)i; return NULL; }
-    Int_t GetLGPulseCount() { return 0; }
-
-  private:
-    std::vector<Pulse*> pulse;
-};
 
 
 /**
@@ -337,9 +77,8 @@ public:
     UnrecognizedDataFormat
   };
   struct V1725_CONFIG_SETTINGS {
-    INT       setup; //!< Initial board setup mode number
     INT       acq_mode;                //!< 0x8100@[ 1.. 0]
-    DWORD     channel_config;          //!< 0x8000@[19.. 0]
+    DWORD     board_config;            //!< 0x8000@[19.. 0]
     INT       buffer_organization;     //!< 0x800C@[ 3.. 0]
     INT       custom_size;             //!< 0x8020@[31.. 0]
     DWORD     channel_mask;            //!< 0x8120@[ 7.. 0]
@@ -400,10 +139,7 @@ public:
   bool WriteReg(DWORD, DWORD);
   bool CheckEvent();
   bool ReadEvent(void *);
-  bool ReadEventCAEN(void *);
   bool ReadQTData(uint32_t *);
-  bool ReadSmartQTData(uint32_t *);
-  bool ReadMinimaData(uint32_t *);
   bool FillEventBank(char *);
   bool FillQTBank(char * aDest, uint32_t * aZLEData);
   bool FillSmartQTBank(char * aDest, uint32_t * aZLEData);
@@ -422,18 +158,6 @@ public:
   int InitializeForAcq();
 
   void FindPulses(bool firstBlock, int closePulseLookAhead, int closePulseNearEndOfBlock, bool extendPulseEnd, bool enableSubPeaks, bool enablePulseSplitting);
-  void CalculateDerivativesFromSamples();
-  void ClosePulseAndSetVariables(int& i, bool firstBlock, bool extendPulseEnd, int closePulseLookAhead);
-  void SetPulseVariables();
-  void ResetForNewChannel();
-  void ResetForNewPulse();
-  void ConvertPMTsToBanks(uint32_t*& QTData, uint32_t*& nQTWords);
-  void UpdateBaselinesAndCutOnCharge(int chargeCutADCRelBaseline, bool lowGain = false);
-  void AdjustPulseChargeAndTypeToAvoidOverflow();
-  bool LoadSmartQTConfig();
-  uint8_t EvalSQTPulse();
-  Float_t GetBinMaxV_MaxD();
-  Float_t GetBinMaxV_ChargeFrac();
 
   /* Getters/Setters */
   int GetModuleID() { return moduleID_; } //!< returns unique module ID
@@ -518,116 +242,12 @@ private:
    * incrementation and an increment/decrement of this variable.   */
   std::atomic<int> num_events_in_rb_;  //!< Number of events stored in ring buffer
 
-  //! Minimum sample value for each channel. Only used for very temporary storage between
-  //  calculating the minima and actually writing them to the ring buffers.
-  int channel_minima_[32][8];
-
-  PMT*      pmts[8];  ///< "PMT" object for each channel
-  PMT*      pmt;      ///< Current PMT being filled.
-  Pulse*    pulse;    ///< Current pulse being filled;
-
-  Float_t                 DefaultBaseline;             ///< Default baseline.
-  Float_t                 CurrentDefaultBaseline;      ///< Current default baseline, set to Default or the last well measued baseline for this channel.
-  std::vector<UShort_t>   samples;  ///< Samples to do pulse-finding on.
-  std::vector<Int_t>      Deriv;    ///< Derivative between samples.
-  std::vector<Int_t>      AbsDeriv; ///< Absolute derivative between samples.
-  bool saturationFail; ///< Whether some pulses reached 0 ADC
-  bool baselineFail;   ///< Whether we failed to calculate the baseline for some pulses
-  bool IsAdjacent;
-
-  struct PulseState {
-    UInt_t Charge;     ///< Charge of the pulse, relative to 4906.
-    UShort_t ChargePeak; ///< Charge up to and including the pulse's peak.
-    Float_t  ChargeConv; ///< Charge of pulse.
-    UShort_t Start;      ///< Start of the pulse, in bins since start of block.
-    UShort_t Stop;       ///< End of the pulse, in bins since start of block.
-    UShort_t Offset;     ///< The block offset, in bins since start of block.
-    Byte_t   Conf;       ///< How SPE-like the pulse is.
-    UShort_t MaxV;       ///< Minimum sample, in ADC.
-    UShort_t MinV;       ///< Maximum sample between current peaks in ADCs.
-    UShort_t MinVT;      ///< Time of Maximum.
-    Int_t    MaxD;       ///< Maximum derivative of a pulse.
-    std::vector<UShort_t> MaxVT;      ///< The bin number of each subpeak
-    UShort_t GlobalMaxV;
-    UShort_t GlobalMaxVT;
-    UShort_t MaxVindex;  ///< MaxVT vector index of largest peak.
-    UShort_t MaxDindex;  ///< MaxDT vector index.
-    Float_t  Charge_MaxD; ///< Charge/MaxD.
-    Float_t  Charge_MaxV; ///< Charge/MaxX.
-    Float_t  Charge_Frac; ///< ChargePeak/(Charge-ChargePeak).
-    Float_t  GlobalMaxD;  ///< Maximum derivative over whole pulse.
-    Float_t  BaseV;       ///< Baseline of pulse, in ADC.
-    Short_t  BaselineInt;       ///< Sum of baseline samples, relative to 3892.
-    Short_t  BaselineSquareInt; ///< Sum of squares of baseline samples, relative to 3892*3892.
-    Byte_t   BaselineSamples;   ///< Number of samples used for baseline calc.
-    Bool_t   IsLowGain;         ///< Whether the pulse is from a LAr low-gain channel.
-    Bool_t   IsV1740;           ///< Whether the pulse is from a V1740 board.
-    Bool_t   CanSplit;    ///< Can pulse be split.
-    Bool_t   IsSplit;     ///< Indicates if pulse is the tail of a split pulse.
-    std::vector<UShort_t> SubnsSamples;
-  } pulseState;
-
-  struct ChannelState {
-    Int_t   BaselineInt;       ///< Sum of baseline samples, relative to 3892.
-    Int_t   BaselineSquareInt; ///< Sum of squares of baseline samples, relative to 3892*3892.
-    UShort_t BaselineSamples;  ///< Number of samples used for baseline calc.
-    bool    Saturated;
-    Float_t TimeOffset; /// Time offset of the channel, in ns.
-
-    /// Whether a raw block has been combined with the previous block and
-    /// should be ignored.
-    std::vector<Bool_t> IsBlockCombinedWithPrevious;
-    /// The offsets of ll the blocks we've analyzed so far.
-    std::vector<UShort_t> BlockOffsetsAnalyzed;
-  } channelState;
-
-  struct PulseFindingConfig {
-    Float_t ChargeCut;              ///< Charge cut for V1725 pulses, in ADC.
-    Int_t   SubPeakDerivThreshold;  ///< Threshold for secondary peaks.
-    Int_t   DerivThreshold;         ///< Derivative threshold for starting a pulse.
-    Int_t   StopDeriv;              ///< Derivative threshold for stopping a pulse.
-    Int_t   StopVolt;               ///< Voltage threshold for stopping a pulse.
-    Int_t   MinBaselineSamples;     ///< If don't have enough samples, pulse will be PRUNED!
-    Int_t   MaxBaselineSamples;     ///< Max # baseline samples. MUST be < 256 or Pulse class won't handle it cleanly.
-    Bool_t  DoHiddenPeakFind;       ///< Whether to do extra peak finding in sub-ns function.
-    Float_t ChargeResidualLimit;    ///< ChargeResidual cut for doing higher order Sub-ns and peak finding.
-    Int_t   ClosePulseHeightThresh; ///< Require lookahead pulses to be below this to close.
-    Int_t   ClosePulseDerivThresh;  ///< Require lookahead pulses to be below this to close.
-    Int_t   ClosePulseLookAhead;          ///< See FindPulses() documentation.
-    Int_t   ClosePulseNearEndOfBlock;     ///< See FindPulses() documentation.
-    UShort_t   SplitPulseCharge;          ///< The Charge that decides if a pulse can be split or not.
-    Float_t SubPeakChargeCutOff;          ///< Above this charge peaks are not fit for their charge, just integrated.
-    Float_t ChargeResidualFracLimit;      ///< Above this limit the brute force fitter is used to find hidden peaks.
-    UShort_t SubPeakCountLimit;           ///< Above this limit peaks charges are not fit just integrated.
-    UShort_t MaxPasses;                   ///< Maximum number of passes that the brute force fitter can take.
-    Bool_t  ExtendPulseEnd;               ///< See FindPulses() documentation.
-    Bool_t  EnableSubPeaks;               ///< See FindPulses() documentation.
-    Bool_t  EnablePulseSplitting;         ///< See FindPulses() documentation.
-    Int_t   MaxSPEWidthIntercept;   /// Max width = (charge + intercept) * slope
-    Float_t MaxSPEWidthSlope;       /// Max width = (charge + intercept) * slope
-    Int_t   MaxSPECharge;           /// Max charge of SPE pulse in ADC
-  } pfConfig;
-
-  struct SPEPDF {
-    Int_t   MaxVbins;       ///< Number of MaxV bins in the PDFs.
-    Float_t MaxVmin;        ///< Lower limit for MaxV in the PDFs.
-    Float_t MaxVmax;        ///< Upper limit for MaxV in the PDFs.
-    Int_t   MaxDbins;       ///< Number of MaxD binds in the PDFs.
-    Float_t MaxDmin;        ///< Lower limit for MaxD in the PDFs.
-    Float_t MaxDmax;        ///< Upper limit for MaxD in the PDFs.
-    Int_t   ChargeFracbins; ///< Number of chargefrac bins in the PDFs.
-    Float_t ChargeFracmin;  ///< Lower limit for chargefrac in the PDFs.
-    Float_t ChargeFracmax;  ///< Upper limit for chargefrac in the PDFs.
-    std::vector<Float_t> MaxV_ChargeFrac; ///< MaxV_ChargeFrac PDFs
-    std::vector<Float_t> MaxV_MaxD;       ///< MaxV_MaxD PDFs.
-  } spePdf;
 
 
   Bool_t kFALSE = false;
 
     /* Private methods */
   CAENComm_ErrorCode AcqCtl_(uint32_t);
-  CAENComm_ErrorCode SetupPreset_(int);
   CAENComm_ErrorCode WriteChannelConfig_(uint32_t);
   CAENComm_ErrorCode ReadReg_(DWORD, DWORD*);
   CAENComm_ErrorCode WriteReg_(DWORD, DWORD);
