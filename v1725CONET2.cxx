@@ -646,10 +646,7 @@ bool v1725CONET2::ReadEvent(void *wp)
   }
   
   rb_increment_wp(this->GetRingBufferHandle(), dwords_read_total*sizeof(int));
-
   
-  /* increment num_events_in_rb_ AFTER writing the QT bank, or the main
-   * thread might read the QT data before we're done writing it */
   this->IncrementNumEventsInRB(); //atomic
   if (sCAEN != CAENComm_Success) 
     cm_msg(MERROR,"ReadEvent", "Communication error: %d", sCAEN);
@@ -657,47 +654,6 @@ bool v1725CONET2::ReadEvent(void *wp)
   return (sCAEN == CAENComm_Success);
 }
 
-
-
-
-//
-//--------------------------------------------------------------------------------
-bool v1725CONET2::FetchHeaderNextEvent(uint32_t * header)
-{
-  DWORD *src;
-
-  int status = rb_get_rp(this->GetRingBufferHandle(), (void**)&src, 100);
-  if (status == DB_TIMEOUT) {
-    cm_msg(MERROR,"FetchHeaderNextEvent", "Got rp timeout for module %d", this->GetModuleID());
-    return false;
-  }
-
-  memcpy(header, src, 32);
-
-  return true;
-}
-
-//
-//--------------------------------------------------------------------------------
-bool v1725CONET2::DeleteNextEvent()
-{
-  int status;
-  DWORD *rp;
-
-  status = rb_get_rp(this->GetRingBufferHandle(), (void**)&rp, 100);
-  if (status == DB_TIMEOUT) {
-    cm_msg(MERROR,"DeleteNextEvent", "Got rp timeout for module %d", this->GetModuleID());
-    return false;
-  }
-
-  uint32_t size_words = *rp & 0x0FFFFFFF;
-
-  this->DecrementNumEventsInRB(); //atomic
-  rb_increment_rp(this->GetRingBufferHandle(), size_words*4);
-
-
-  return true;
-}
 
 //
 //--------------------------------------------------------------------------------
@@ -746,28 +702,28 @@ bool v1725CONET2::FillEventBank(char * pevent)
     cm_msg(MERROR,"FillEventBank","Event with size: %u (Module %02d) bigger than max %u, event truncated", size_words, this->GetModuleID(), limit_size);
     if(this->IsZLEData()){
       uint32_t toBeCopyed = 4; // Starting with the header
-	  // We need to find out how many channels we can copy before reaching the limit...
-	  int i;
-	  for (i=8; i>0 ; --i){ //We have potentially 8 channels to copy
+			// We need to find out how many channels we can copy before reaching the limit...
+			int i;
+			for (i=8; i>0 ; --i){ //We have potentially 8 channels to copy
         uint32_t channelSize = 0;
-	    channelSize = *(src+toBeCopyed); // Get the size of the data for this channel
-	    if (toBeCopyed + channelSize > limit_size) break; 
-	    toBeCopyed += channelSize; // We have enough space for this channel
-	  }
-	  size_copied = toBeCopyed + i; //This it the size of the headers, the filled channel, and the "empty channels size" padding.
-//    printf("will be copied: %u out of %u (%d channels)\n", size_copied, size_words, (8-i));
+				channelSize = *(src+toBeCopyed); // Get the size of the data for this channel
+				if (toBeCopyed + channelSize > limit_size) break; 
+				toBeCopyed += channelSize; // We have enough space for this channel
+			}
+			size_copied = toBeCopyed + i; //This it the size of the headers, the filled channel, and the "empty channels size" padding.
+			//    printf("will be copied: %u out of %u (%d channels)\n", size_copied, size_words, (8-i));
       cm_msg(MERROR,"FillEventBank","will be copied: %u out of %u (%d channels)", size_copied, size_words, (8-i));
       *(src + 0) = 0xA0000000 + size_copied; // Adjust the event size
-	  for ( ; i>0 ; --i){
-	    *(src + toBeCopyed+(i-1)) = (uint32_t) 0x1; // Pad the empty channel size = 1 DWORDS
-	  }
-	}
-	else {
-//      printf("Raw mode with long waveforms, exceeding the limit: event skipped\n");
+			for ( ; i>0 ; --i){
+				*(src + toBeCopyed+(i-1)) = (uint32_t) 0x1; // Pad the empty channel size = 1 DWORDS
+			}
+		}
+		else {
+			//      printf("Raw mode with long waveforms, exceeding the limit: event skipped\n");
       cm_msg(MERROR,"FillEventBank","Raw mode with long waveforms, exceeding the limit: event skipped");
       *(src + 0) = 0xA0000004; // Event Size set to 0 data (4 DWORDS for the the header ==> TO be checked !)
-	  size_copied = 4;
-	}
+			size_copied = 4;
+		}
   } 
   
   memcpy(dest, src, size_copied*sizeof(uint32_t));
@@ -784,39 +740,6 @@ bool v1725CONET2::FillEventBank(char * pevent)
 }
 
 
-
-
-
-
-//
-//--------------------------------------------------------------------------------
-bool v1725CONET2::FillStatBank(char * pevent, suseconds_t usStart)
-{
-  if (! this->IsConnected()) {
-    cm_msg(MERROR,"FillStatBank","Board %d disconnected", this->GetModuleID());
-    return false;
-  }
-
-  DWORD *pdata, eStored, eSize;
-  CAENComm_ErrorCode sCAEN;
-
-  sCAEN = ReadReg_(V1725_EVENT_STORED, &eStored);
-  sCAEN = ReadReg_(V1725_EVENT_SIZE, &eSize);
-
-  // >>> Statistical bank for data throughput analysis
-  char statBankName[5];
-  snprintf(statBankName, sizeof(statBankName), "ST%02d", this->GetModuleID());
-  bk_create(pevent, statBankName, TID_DWORD, (void **)&pdata);
-  *pdata++ = this->GetModuleID();
-  *pdata++ = eStored;
-  *pdata++ = eSize;
-  *pdata++ = usStart;               //time before read
-  timeval tv; gettimeofday(&tv,0);
-  *pdata++ = tv.tv_usec;            //time after read
-  bk_close(pevent, pdata);
-
-  return (sCAEN == CAENComm_Success);
-}
 
 //
 //--------------------------------------------------------------------------------

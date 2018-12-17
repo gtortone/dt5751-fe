@@ -627,7 +627,7 @@ INT end_of_run(INT run_number, char *error)
 
     runInProgress = false;  //Signal threads to quit
 
-    // Do not quite parent before children processes, wait for the proper
+    // Do not quit parent before children processes, wait for the proper
     // child exit first.
     for(int i=0; i < NBLINKSPERFE; ++i){
       pthread_join(tid[i],(void**)&status);
@@ -645,7 +645,7 @@ INT end_of_run(INT run_number, char *error)
 
         rb_delete(itv1725->GetRingBufferHandle());
         itv1725->SetRingBufferHandle(-1);
-		itv1725->ResetNumEventsInRB();
+				itv1725->ResetNumEventsInRB();
       }
     }
 
@@ -794,24 +794,8 @@ INT frontend_loop()
   return SUCCESS;
 }
 
-/*------------------------------------------------------------------*/
-/********************************************************************\
-  Readout routines for different events
-\********************************************************************/
-int Nloop;  //!< Number of loops executed in event polling
-int Ncount; //!< Loop count for event polling timeout
-DWORD acqStat; //!< ACQUISITION STATUS reg, must be global because read by poll_event, accessed by read_trigger_event
 // ___________________________________________________________________
-/*-- Trigger event routines ----------------------------------------*/
-/**
- * \brief   Polling routine for events.
- *
- * \param   [in]  source Event source (LAM/IRQ)
- * \param   [in]  count Loop count for event polling timeout
- * \param   [in]  test flag used to time the polling
- * \return  1 if event is available, 0 if done polling (no event).
- * If test equals TRUE, don't return.
- */
+// Event polling; only ready for readout only when data is present in all ring buffers
 extern "C" INT poll_event(INT source, INT count, BOOL test)
 {
 
@@ -823,7 +807,6 @@ extern "C" INT poll_event(INT source, INT count, BOOL test)
     bool evtReady = true;
     for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725){
 
-      //      if(itv1725->GetNumEventsInRB() == 0){
       if(itv1725->IsConnected() && (itv1725->GetNumEventsInRB() == 0)){
         evtReady = false;
       }
@@ -873,15 +856,7 @@ extern "C" INT interrupt_configure(INT cmd, INT source, POINTER_T adr)
 /**
  * \brief   Event readout
  *
- * Event readout routine.  This is called by the polling or interrupt routines.
- * (see mfe.c).  For each module, read the event buffer into a midas data bank.
- * If ZLE data exists, create another bank for it.  Finally, create a statistical
- * bank for data throughput analysis.
- *
- * \param   [in]  pevent Pointer to event buffer
- * \param   [in]  off Caller info (unused here), see mfe.c
- *
- * \return  Size of the event
+ * Get data from all ring buffers and compose the MIDAS banks.
  */
 INT read_event_from_ring_bufs(char *pevent, INT off) {
 
@@ -889,34 +864,22 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
 
   sn = SERIAL_NUMBER(pevent);
 
-	// >>> Get time before read (for data throughput analysis. To be removed)
-	//timeval tv, tv1;
-	//gettimeofday(&tv,0);
-	suseconds_t usStart = 0;//tv.tv_usec;
-
 
   bk_init32(pevent);
   for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
     if (! itv1725->IsConnected()) continue;   // Skip unconnected board
 
-
     // >>> Fill Event bank
     itv1725->FillEventBank(pevent);
 
-    // >>> Fill statistical bank
-	// itv1725->FillStatBank(pevent, usStart);
-
   }
-
-  //primitive progress bar
-  if (sn % 1000 == 0) printf(".");// printf("%i %i .\n",endStart-usStart,total_event_bank);
 
   INT ev_size = bk_size(pevent);
   if(ev_size == 0)
     cm_msg(MINFO,"read_trigger_event", "******** Event size is 0, SN: %d", sn);
-  //  return bk_size(pevent);
   return ev_size;
 }
+
 
 //                                                                                         
 //----------------------------------------------------------------------------             
@@ -947,12 +910,4 @@ INT read_buffer_level(char *pevent, INT off) {
   printf(" | ");  
   return bk_size(pevent);
 }
-/* emacs
- * Local Variables:
- * mode:C
- * mode:font-lock
- * tab-width: 2
- * c-basic-offset: 2
- * End:
- */
 

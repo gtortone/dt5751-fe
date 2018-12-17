@@ -129,9 +129,6 @@ public:
   bool CheckEvent();
   bool ReadEvent(void *);
   bool FillEventBank(char *);
-  bool FetchHeaderNextEvent(uint32_t * header);
-  bool DeleteNextEvent();
-  bool FillStatBank(char *, suseconds_t);
   bool FillBufferLevelBank(char *);
   bool IsZLEData();
 
