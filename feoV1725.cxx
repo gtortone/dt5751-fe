@@ -526,7 +526,7 @@ void * link_thread(void * arg)
      * ex 2: NBCORES 4, 4 threads:
      * threads (links) 0,1,2,3 will go on cores 1,2,3,1     */
     CPU_SET((link % (NBCORES-1)) + 1, &mask);
-    printf("core setting: NBCORES:%d link:%d\n", NBCORES, link);
+    printf("core setting: NBCORES:%d link:%d core %d\n", NBCORES, link,(link % (NBCORES-1)) + 1);
     break;
   }
   if( sched_setaffinity(0, sizeof(mask), &mask) < 0 ){
@@ -541,12 +541,8 @@ void * link_thread(void * arg)
   int firstBoard = link*NB1725PERLINK; //First board on this link
 
   while(1) {  // Indefinite until run stopped (!runInProgress)
-    // This loop is running until the DTM has released the EOR flag (runInProgress)
-    // We expect that by that time, the HW buffers (eStored) will be empty
-    // If the EOR is set while B02 is processed, there is a possibility that B00..02 
-    // will still have data in the HW buffer but looked at as the break is happening!
-    // In principle once the EOR is asserted, the for loop should run once more time.
-    // Not done in here.
+    // This loop is running until EOR flag (runInProgress)
+
     // process the addressed board for that link only
     for (itv1725_thread[link] = ov1725.begin() + firstBoard;
          itv1725_thread[link] != ov1725.begin() + firstBoard + NB1725PERLINK;
@@ -558,6 +554,7 @@ void * link_thread(void * arg)
 
       // Check if event in hardware to read
       if (itv1725_thread[link]->CheckEvent()){
+
         /* If we've reached 75% of the ring buffer space, don't read
          * the next event.  Wait until the ring buffer level goes down.
          * It is better to let the v1725 buffer fill up instead of

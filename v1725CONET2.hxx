@@ -95,7 +95,6 @@ public:
     INT       zle_bins_before[8];      //!< 0x1n28@[31.. 16]
     INT       zle_bins_after[8];       //!< 0x1n28@[15.. 0]
     DWORD     dac[8];                  //!< 0x1n98@[15.. 0]
-    BOOL      qt_bank;                 //!< Write the QT bank
   } config; //!< instance of config structure
 
   /* Static */
@@ -129,12 +128,7 @@ public:
   bool WriteReg(DWORD, DWORD);
   bool CheckEvent();
   bool ReadEvent(void *);
-  bool ReadQTData(uint32_t *);
   bool FillEventBank(char *);
-  bool FillQTBank(char * aDest, uint32_t * aZLEData);
-  bool FillSmartQTBank(char * aDest, uint32_t * aZLEData);
-  bool FillMinimaBank(char * aDest, uint32_t * aZLEData);
-  bool FillQTBankOld(char * aDest, uint32_t * aZLEData);
   bool FetchHeaderNextEvent(uint32_t * header);
   bool DeleteNextEvent();
   bool FillStatBank(char *, suseconds_t);

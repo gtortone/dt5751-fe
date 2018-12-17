@@ -90,8 +90,6 @@ const char * v1725CONET2::config_str_board[] = {\
     "[5] 10000",\
     "[6] 10000",\
     "[7] 10000",\
-
-    "QT Bank = BOOL : y",\
     NULL
 };
 
@@ -613,12 +611,6 @@ bool v1725CONET2::CheckEvent()
 {
   DWORD vmeStat, eStored;
   this->ReadReg(V1725_VME_STATUS, &vmeStat);
-        //-PAA- for debugging 
-  if (verbosity_ >= 2){ 
-    std::cout << GetName() << "::CheckEvent "<< this->GetModuleID() << " " << vmeStat << std::endl;
-    ReadReg_(V1725_EVENT_STORED, &eStored);
-    printf("### num events: %d\n", eStored);
-  }
   return (vmeStat & 0x1);
 }
 
@@ -627,16 +619,11 @@ bool v1725CONET2::CheckEvent()
 bool v1725CONET2::ReadEvent(void *wp)
 {
   CAENComm_ErrorCode sCAEN;
-  //  printf("### ReadEvent (board %d) wp: %p\n", this->GetModuleID(), wp);
-  
-  /*******************************************************************************************
-   **** WARNING: The CAEN doc says that the 4th parameter of CAENComm_BLTRead (BltSize) is
-   **** in bytes.  That is FALSE.  It must be in 32-bit dwords.  P-L
-   *******************************************************************************************/
   
   DWORD size_remaining_dwords, to_read_dwords, *pdata = (DWORD *)wp;
   int dwords_read_total = 0, dwords_read = 0;
-  
+
+	// Block read to get all data from board.  
   sCAEN = ReadReg_(V1725_EVENT_SIZE, &size_remaining_dwords);
   
   while ((size_remaining_dwords > 0) && (sCAEN == CAENComm_Success)) {
@@ -660,13 +647,6 @@ bool v1725CONET2::ReadEvent(void *wp)
   
   rb_increment_wp(this->GetRingBufferHandle(), dwords_read_total*sizeof(int));
 
-  // >>> Fill QT bank if ZLE data
-  if(this->IsZLEData() && this->config.qt_bank){
-    if(!this->ReadQTData((uint32_t*)wp)){
-      return false;
-    }
-  }
-
   
   /* increment num_events_in_rb_ AFTER writing the QT bank, or the main
    * thread might read the QT data before we're done writing it */
@@ -676,255 +656,6 @@ bool v1725CONET2::ReadEvent(void *wp)
 
   return (sCAEN == CAENComm_Success);
 }
-
-
-//
-//---------------------------------------------------------------------------------
-bool v1725CONET2::ReadQTData(uint32_t *ZLEData){
-
- 
-
-  uint32_t *QTData;             // Pointer to location where to write QT data
-  uint32_t* nQTWords;           // Pointer to location where number of QT words is
-  void     *wp;                 // RB write pointer
-
-  uint32_t nEnabledChannels;    // Number of channels enabled on the board
-  bool     chEnabled[8] = {false};        // Channel enabled flag
-
-  uint32_t iCurrentWord;        // Index of current 32-bit word in the ZLE event
-  uint32_t chSize_words;        // Size of the current channel in 32-bit words
-  uint32_t words_read;          // Number of words read so far for the current channel
-  uint32_t iCurrentSample;      // Index of current sample in the channel
-  uint32_t iMinSample=0;          // Index of sample with minimum value
-  uint32_t minSampleValue=0xfff;  // Value of min sample
-  float    baseline_before;     // baseline before pulse
-  float    baseline_after;      // baseline after pulse
-  float    baseline_avg;        // baseline avg for integral calulation
-  float    baseline_before_prev;// baseline before previous pulse
-  float    integral_value;      // value of the integral over the pulse
-  uint32_t tmp_value;           // Temp sample value
-  bool     goodData;            // Indicates if the data following the control word must be processed or skipped
-  bool     prevGoodData;        // goodData of previous word
-  uint32_t nStoredSkippedWords; // Number of words to be stored (goodData = true) or skipped (goodData = false)
-                                // after the control word
-  uint32_t i,j;                 // Loop indices
-
-  // >>> Get write pointer into ring buffer
-  int status = rb_get_wp(this->GetRingBufferHandle(), &wp, 100);
-//  printf("### ReadQTData (board %d) wp: %p\n", this->GetModuleID(), wp);
-//  printf("### ReadQTData (board %d) pZLEData: %p\n", this->GetModuleID(), ZLEData);
-  if (status == DB_TIMEOUT) {
-    cm_msg(MERROR,"ReadQTData", "Got wp timeout for thread %d (module %d).  Is the ring buffer full?",
-        this->GetLink(), this->GetModuleID());
-    return false;
-  }
-  QTData = (uint32_t*)wp;
-
-  // >>> copy some header words
-  *QTData++ = *(ZLEData+2); // event counter QTData[0]
-  *QTData++ = *(ZLEData+3); // trigger time tag QTData[1]
-
-  // >>> Skip location QTData[2]. Will be used for number of QT and bank version.
-  nQTWords = QTData;
-  *(nQTWords) = 0;
-  QTData++;
-
-  // >>> Figure out channel mapping
-  nEnabledChannels = 0;
-  uint32_t chMask = ZLEData[1] & 0xFF;
-//  printf("### Board %d, ZLEData[0]: 0x%08x\n", this->GetModuleID(), ZLEData[0]);
-//  printf("### Board %d, ZLEData[1]: 0x%08x\n", this->GetModuleID(), ZLEData[1]);
-//  printf("### Board %d, ZLEData[2]: 0x%08x\n", this->GetModuleID(), ZLEData[2]);
-//  printf("### Board %d, ZLEData[3]: 0x%08x\n", this->GetModuleID(), ZLEData[3]);
-  for(i=0; i<8; ++i){
-    if(chMask & (1<<i)){
-      chEnabled[i] = true;
-      ++nEnabledChannels;
-    }
-  }
-
-  /* If all data was ZLE suppressed, the channel mask field will be set to 0. In
-   * that case, the QT bank will contain only the header   */
-  if(nEnabledChannels==0){
-    rb_increment_wp(this->GetRingBufferHandle(), (3 + *nQTWords)*sizeof(uint32_t));
-    return true;
-  }
-
-  iCurrentWord=4;  //Go to first CH0 size word
-  for(i=0; i < 8; i++){
-
-    if(!chEnabled[i]) continue;
-
-    chSize_words = ZLEData[iCurrentWord];  // Read size word
-    iCurrentSample = 0;                    // Start processing sample 0
-    prevGoodData = true;                   // First word
-    baseline_before_prev = 0;              // Default value
-
-    words_read = 1;                        // The size of the "size" word is included in its value
-    iCurrentWord++;                        // Go to CH0 control word
-    while(words_read < chSize_words){
-
-      /************************ TEMPORARY *************************
-       * Check for control word indicator, if not present,
-       * print this stuff. This should NOT happen.
-       ************************************************************/
-      //      assert(ZLEData[iCurrentWord] & 0x40000000);
-      if((this->GetModuleID() == 0) && (i == 0)){
-        if(!(ZLEData[iCurrentWord] & 0x40000000)){
-          printf("### b %u ch %u: Control word has wrong format!\n", this->GetModuleID(), i);
-          printf("### b %u ch %u: Control word: 0x%08x\n", this->GetModuleID(), i, ZLEData[iCurrentWord]);
-          printf("### b %u ch %u: Before: 0x%08x\n", this->GetModuleID(), i, ZLEData[iCurrentWord-1]);
-          printf("### b %u ch %u: After: 0x%08x\n", this->GetModuleID(), i, ZLEData[iCurrentWord+1]);
-          printf("### b %u ch %u: chSize_words: %u\n", this->GetModuleID(), i, chSize_words);
-          printf("### b %u ch %u: words_read: %u\n", this->GetModuleID(), i, words_read);
-          printf("### b %u ch %u: prevGoodData: %d\n", this->GetModuleID(), i, prevGoodData);
-        }
-      }
-
-      goodData = ((ZLEData[iCurrentWord]>>31) & 0x1);           // 0: skip 1: good
-      nStoredSkippedWords = (ZLEData[iCurrentWord] & 0xFFFFF);  // stored/skipped words
-
-
-      /* "skip" data should always be followed by "good" data unless
-       * the end of the event is reached.  Print error in case of
-       * two consecutive control word with "skip" field   */
-      if(!prevGoodData && !goodData){
-        cm_msg(MERROR,"ReadQTData", "Consecutive skip data in module %d", this->GetModuleID());
-      }
-
-      if(goodData){
-        /* For each time good data is encountered process the next nStoredSkippedWords
-         * words.  Get the find the sample minimum value and create a QT bank
-         * to store this information.  */
-
-        minSampleValue = 0xfff;
-        iMinSample = 0;
-        iCurrentWord++; // Go to CH0 data word 0
-        words_read++;
-
-        //Get baseline before pulse.  Use first 6 samples
-        tmp_value = 0;
-        for(j=0; j < 3; ++j){
-          tmp_value += (ZLEData[iCurrentWord + j] & 0xFFF); //First sample in word
-          tmp_value += ((ZLEData[iCurrentWord + j] >> 16) & 0xFFF); //Second sample in word
-        }
-        baseline_before = tmp_value/6.;  //avg
-
-        // If there are consecutive ZLE blocks (the previous word was also good)
-        // we are probably starting in the middle of the second pulse (due to the
-        // postsamples of the previous block). Set the baseline_before of this
-        // block to be the same as that of the previous block.
-        // prevGoodData is initialized to true, so make sure we don't use this
-        // logic for the first pulse of an event.
-        if (prevGoodData && words_read > 1) {
-          baseline_before = baseline_before_prev;
-        }
-        baseline_before_prev = baseline_before;
-
-        //Get baseline after pulse.  Use last 6 samples
-        tmp_value = 0;
-        for(j = nStoredSkippedWords-3; j < nStoredSkippedWords; ++j){
-          tmp_value += (ZLEData[iCurrentWord + j] & 0xFFF); //First sample in word
-          tmp_value += ((ZLEData[iCurrentWord + j] >> 16) & 0xFFF); //Second sample in word
-        }
-        baseline_after = tmp_value/6.;  //avg
-
-        //Get baseline avg for integral calculation
-        baseline_avg = (baseline_before);
-
-        //Calculate integral
-        integral_value = 0;
-        for(j=0; j < nStoredSkippedWords; j++){
-          integral_value += baseline_avg - (ZLEData[iCurrentWord] & 0xFFF);
-          integral_value += baseline_avg - ((ZLEData[iCurrentWord] >> 16) & 0xFFF);
-
-                                        // Pulse amplitude
-          tmp_value = (ZLEData[iCurrentWord] & 0xFFF);
-          if(tmp_value < minSampleValue){
-            iMinSample = iCurrentSample + j*2;
-            minSampleValue = tmp_value;
-          }
-          tmp_value = ((ZLEData[iCurrentWord] >> 16) & 0xFFF);
-          if(minSampleValue > tmp_value){
-            iMinSample = iCurrentSample + j*2 + 1;
-            minSampleValue = tmp_value;
-          }
-
-          // Go to next data word.  If all data words have been process, this
-          // skips to the next control word, which should be "bad" data
-          iCurrentWord++;
-          words_read++;
-        }
-
-        // Don't allow integral to be negative. If we did, we'd get a huge value
-        // when casting to uint32_t.
-        if (integral_value < 0) {
-          integral_value = 0;
-        }
-
-        /* Package QT data in three 32-bit words:
-         * word 0: 0xA0BBBCCC
-         *  A : Channel number
-         *  B : Baseline before pulse
-         *  C : Baseline after pulse
-         * word 1: 0xDDDDEEEE
-         *  D : Num first sample in ZLE data
-         *  E : Num last sample in ZLE data
-         * word 2: 0x00FFFFFF
-         *  F : Integral value
-         * word 3: 0xGGGGHHHH
-         *  G : iMinSample value
-         *  H : minSampleValue value
-         *
-         * notes: The maximum value of the integral occurs when the pulse is maximum (V = 2^12 = 4096)
-         *        over the whole time interval (2500 samples) => 4096*2500 = 10 240 000, which requires
-         *        24 bits.  The baselines each require 12 bits.  */
-        *QTData = ((i << 28) & 0xF0000000) | ((((uint32_t)baseline_before) << 12) & 0x00FFF000) | (((uint32_t)baseline_after) & 0x00000FFF);
-        QTData++;
-        //2 samples per word
-        *QTData = ((iCurrentSample << 16) & 0xFFFF0000) | ((iCurrentSample + nStoredSkippedWords*2) & 0x0000FFFF);
-        QTData++;
-        *QTData = (uint32_t)integral_value;
-        QTData++;
-        *QTData = ((iMinSample & 0xFFFF) << 16) | (minSampleValue & 0xFFFF);
-        QTData++;
-
-        (*nQTWords) += 4; // increment number of QT words
-
-//        if(i==0){
-//          printf("### Wrote QT word 0. Board: %u, Chan: %u, baseline_before: %u, baseline_after: %u\n",
-//              this->GetModuleID(), i, baseline_before, baseline_after);
-//          printf("### Full word: 0x%08x\n", *(QTData-2));
-//          printf("### Wrote QT word 1. Board: %u, Chan: %u, integral_value: %u\n",
-//              this->GetModuleID(), i, integral_value);
-//          printf("### Full word: 0x%08x\n", *(QTData-1));
-//        }
-      }
-      else{
-        /* Data is bad, skip the next nStoredSkippedWords words */
-
-        iCurrentWord++; //Go to next control word, which should be "good" data
-        words_read++;
-      }
-
-      prevGoodData=goodData;
-      iCurrentSample += (nStoredSkippedWords*2); //2 samples per 32-bit word
-
-//      if((i==0)&&(this->GetModuleID()==0)){
-//        printf("### iCurrentSample: %u\n", iCurrentSample);
-//        printf("### iCurrentSample + nStoredSkippedWords*2: %u\n", iCurrentSample + nStoredSkippedWords*2);
-//        printf("### nQTWords: %u\n", (*nQTWords));
-//      }
-    }
-  }
-
-  rb_increment_wp(this->GetRingBufferHandle(), (3 + *nQTWords)*sizeof(uint32_t));
-  //if (this->GetModuleID() == 0) printf("### ReadQTData: nQTWords: %u\n", *nQTWords);
-
-
-  return true;
-}
-
 
 
 
@@ -987,18 +718,6 @@ bool v1725CONET2::FillEventBank(char * pevent)
     return false;
   }
 
-#ifdef DEBUGTHREAD
-  printf("Event size (words): %u\n", *src & 0x0FFFFFFF);
-  printf("Event Counter: %u\n", *(src+2) & 0x00FFFFFF);
-  printf("TTT: %u\n", *(src + 3));
-  int nbWords = *src & 0x0FFFFFFF;
-  for (int i=0; i< nbWords && i<1000; ++i) 
-  {
-    if (i%8 == 0) printf("\n%d: ",i);
-    printf ("%08x ", src[i]);
-  }
-  assert((*src & 0xF0000000) == 0xA0000000);  //Event header indicator
-#endif
 
   if ((*src & 0xF0000000) != 0xA0000000){
     cm_msg(MERROR,"FillEventBank","Incorrect hearder for board:%d (0x%x)", this->GetModuleID(), *src);
@@ -1059,12 +778,6 @@ bool v1725CONET2::FillEventBank(char * pevent)
   //Close data bank
   bk_close(pevent, dest + size_copied);
 
- // printf("Bank size (after %s): %u\n" , bankName, bk_size(pevent));
-  // >>> Fill QT bank if ZLE data
-  if(this->IsZLEData() && this->config.qt_bank){
-    this->FillQTBank(pevent, dest);
-  }
-
 
   return true;
 
@@ -1072,46 +785,6 @@ bool v1725CONET2::FillEventBank(char * pevent)
 
 
 
-
-//
-//--------------------------------------------------------------------------------
-/**
- * \brief   Fill Qt Bank
- *
- * \param   [in]  pevent  pointer to event buffer
- * \param   [in]  pZLEData  pointer to the data area of the bank
- */
-bool v1725CONET2::FillQTBank(char * pevent, uint32_t * pZLEData){
-
-  DWORD *src;
-  DWORD *dest;
-  uint32_t nQTWords;
-
-  //The read pointer points to the QT data following ZLE Event data
-  int status = rb_get_rp(this->GetRingBufferHandle(), (void**)&src, 100);
-  if (status == DB_TIMEOUT) {
-    cm_msg(MERROR,"FillQTBank", "Got rp timeout for module %d", this->GetModuleID());
-    printf("rp timeout, Module %d\n", this->GetModuleID());
-    return false;
-  }
-
-  char tBankName[5];
-  snprintf(tBankName, sizeof(tBankName), "QT%02d",this->GetModuleID());
-  bk_create(pevent, tBankName, TID_DWORD, (void **)&dest);
-
-  //Copy QT header
-  memcpy(dest, src, 3*sizeof(uint32_t));  //The QT header is 3 words long (see ReadQTData())
-  nQTWords = *(src + 2);
-  //if (this->GetModuleID() == 0) printf("### FillQTBank: nQTWords: %u\n", nQTWords);
-
-  //Copy QT words
-  memcpy(dest+3, src+3, nQTWords*sizeof(uint32_t));
-
-  rb_increment_rp(this->GetRingBufferHandle(), (3 + nQTWords)*sizeof(uint32_t));
-  bk_close(pevent, dest + 3 + nQTWords);
-
-  return true;
-}
 
 
 
