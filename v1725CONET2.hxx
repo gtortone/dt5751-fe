@@ -96,16 +96,6 @@ public:
     INT       zle_bins_after[8];       //!< 0x1n28@[15.. 0]
     DWORD     dac[8];                  //!< 0x1n98@[15.. 0]
     BOOL      qt_bank;                 //!< Write the QT bank
-    BOOL      minima_bank;             //!< Write the MN bank
-    BOOL      smartqt_bank;            //!< Write the SQ bank
-    INT       PulseDerivativeThreshold;//!< For Smart QT
-    float     PulseStop_MaxHeight;     //!< For Smart QT
-    INT       PulseStop_MaxDeriv;      //!< For Smart QT
-    float     PulseExtend_MinHeight;   //!< For Smart QT
-    float     MinPulseCharge;          //!< For Smart QT
-    float     MaxPulseCharge;          //!< For Smart QT
-    float     MaxWidthIntercept;       //!< For Smart QT
-    float     MaxWidthSlope;           //!< For Smart QT
   } config; //!< instance of config structure
 
   /* Static */

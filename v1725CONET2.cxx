@@ -92,16 +92,6 @@ const char * v1725CONET2::config_str_board[] = {\
     "[7] 10000",\
 
     "QT Bank = BOOL : y",\
-    "Minima Bank = BOOL : y",\
-    "Smart QT Bank = BOOL : n",\
-    "Smart QT PulseDerivativeThresho = INT : 3",\
-    "Smart QT PulseStop_MaxHeight = FLOAT : 2",\
-    "Smart QT PulseStop_MaxDeriv = INT : 2",\
-    "Smart QT PulseExtend_MinHeight = FLOAT : 3",\
-    "Smart QT MinPulseCharge = FLOAT : 50",\
-    "Smart QT MaxPulseCharge = FLOAT : 500",\
-    "Smart QT MaxWidthIntercept = FLOAT : 1254",\
-    "Smart QT MaxWidthSlope = FLOAT : 0.015184382",\
     NULL
 };
 
