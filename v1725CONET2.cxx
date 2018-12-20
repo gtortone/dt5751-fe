@@ -982,7 +982,8 @@ int v1725CONET2::InitializeForAcq()
         
   // Setup Busy daisy chaining
   sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x13c); // 0x100:enable new config, 0x3c:LVDS I/O[15..0] output
-  sCAEN = WriteReg_(V1725_FP_LVDS_IO_CRTL,      0x1111); // 0x1111 set the outputs to all output the trigger.
+  sCAEN = WriteReg_(V1725_FP_LVDS_IO_CRTL,      0x0211); // 0x2211 set the outputs to all output the trigger
+	// for first two groups and the busy for the third group
 
   std::stringstream ss_fw_datatype;
   ss_fw_datatype << "Module " << moduleID_ << ", ";
