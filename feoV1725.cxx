@@ -758,7 +758,7 @@ INT resume_run(INT run_number, char *error)
       itv1725->SetRingBufferHandle(rb_handle);
     }
     else{
-      cm_msg(MERROR, "feov1725:BOR", "Failed to create rb for board %d", itv1725->GetModuleID());
+      cm_msg(MERROR, "feov1725:Resume", "Failed to create rb for board %d", itv1725->GetModuleID());
     }
   }
 
@@ -767,7 +767,7 @@ INT resume_run(INT run_number, char *error)
     thread_link[i] = i;
     status = pthread_create(&tid[i], NULL, &link_thread, (void*)&thread_link[i]);
     if(status){
-      cm_msg(MERROR,"feov1725:BOR", "Couldn't create thread for link %d. Return code: %d", i, status);
+      cm_msg(MERROR,"feov1725:Resume", "Couldn't create thread for link %d. Return code: %d", i, status);
     }
   }
 

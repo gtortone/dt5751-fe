@@ -981,9 +981,8 @@ int v1725CONET2::InitializeForAcq()
   sCAEN = WriteReg_(V1725_FP_IO_CONTROL, 0x00000000);
         
   // Setup Busy daisy chaining
-  //sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x104); // 0x100:enable new config, 0x4:LVDS I/O[3..0] output
-  //sCAEN = WriteReg_(V1725_FP_LVDS_IO_CRTL,      0x022); // 0x20: I/O[7..4] input mode nBusy/Veto (4:nBusy input)
-                                                        // 0x02: I/O[3..0] output mode nBusy/Veto (1:Busy)
+  sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x13c); // 0x100:enable new config, 0x3c:LVDS I/O[15..0] output
+  sCAEN = WriteReg_(V1725_FP_LVDS_IO_CRTL,      0x1111); // 0x1111 set the outputs to all output the trigger.
 
   std::stringstream ss_fw_datatype;
   ss_fw_datatype << "Module " << moduleID_ << ", ";
@@ -1089,10 +1088,10 @@ int v1725CONET2::InitializeForAcq()
 		WriteReg_(V1725_CHANNEL_THRESHOLD   + (iChan<<8), config.auto_trig_threshold     [iChan]);
 		WriteReg_(V1725_CHANNEL_OUTHRESHOLD + (iChan<<8), config.auto_trig_N_4bins_min [iChan]);
 		if( config.zle_signed_threshold[iChan]>0){
-			WriteReg_(V1725_ZS_THRESHOLD        + (iChan<<8), config.zle_signed_threshold  [iChan]);
+			WriteReg_(V1725_ZLE_THRESHOLD        + (iChan<<8), config.zle_signed_threshold  [iChan]);
 		}
 		else{
-        WriteReg_(V1725_ZS_THRESHOLD        + (iChan<<8), (0x80000000 | (-1*config.zle_signed_threshold[iChan])));
+        WriteReg_(V1725_ZLE_THRESHOLD        + (iChan<<8), (0x80000000 | (-1*config.zle_signed_threshold[iChan])));
 		}
 		WriteReg_(V1725_ZS_NSAMP            + (iChan<<8), ((config.zle_bins_before[iChan]<<16) | config.zle_bins_after[iChan]));
 		WriteReg_(V1725_CHANNEL_DAC         + (iChan<<8), config.dac           [iChan]);			
@@ -1137,28 +1136,36 @@ v1725CONET2::DataType v1725CONET2::GetDataType()
         
   // Set Device, data type and packing for QT calculation later
   int dataType = ((config.board_config >> 11) & 0x1);
+
   if(((config.board_config >> 16) & 0xF) == 0) {
     if(dataType == 1) {
       // 2.5 pack, full data
       data_type_ = RawPack25;
+			printf("RawPack25 type: %x %x %x\n",dataType, config.board_config, ((config.board_config >> 16) & 0xF));
       return RawPack25;
     } else {
       // 2 pack, full data
       data_type_ = RawPack2;
-      return RawPack2;
+			printf("RawPack2 type: %x %x %x\n",dataType, config.board_config, ((config.board_config >> 16) & 0xF));      
+			return RawPack2;
     }
   } else if(((config.board_config >> 16) & 0xF) == 2) {
     if(dataType == 1) {
       // 2.5 pack, ZLE data
       data_type_ = ZLEPack25;
+			printf("ZLEPack25 type: %x %x %x\n",dataType, config.board_config, ((config.board_config >> 16) & 0xF));
       return ZLEPack25;
     } else {
       // 2 pack, ZLE data
       data_type_ = ZLEPack2;
+			printf("ZLEPack2 type: %x %x %x\n",dataType, config.board_config, ((config.board_config >> 16) & 0xF));
       return ZLEPack2;
     } 
-        } else
+	} else{
+		printf("Unrecognized type: %x %x %x\n",dataType, config.board_config, ((config.board_config >> 16) & 0xF));
           return UnrecognizedDataFormat;
+
+	}
 }
 
 //
