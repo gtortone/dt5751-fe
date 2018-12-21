@@ -844,9 +844,9 @@ int v1725CONET2::SetBoardRecord(HNDLE h, void(*cb_func)(INT,INT,void*))
   char set_str[200];
 
   if(feIndex_ == -1)
-    snprintf(set_str, sizeof(set_str), "/Equipment/FEV1725MTI/Settings/Board%d", moduleID_ % 8);
+    snprintf(set_str, sizeof(set_str), "/Equipment/V1725_Data/Settings/Board%d", moduleID_ % 8);
   else
-    snprintf(set_str, sizeof(set_str), "/Equipment/FEV1725MTI%02d/Settings/Board%d", feIndex_, moduleID_ % 8);
+    snprintf(set_str, sizeof(set_str), "/Equipment/V1725_Data%02d/Settings/Board%d", feIndex_, moduleID_ % 8);
 
   if (verbosity_) std::cout << GetName() << "::SetBoardRecord(" << h << "," << set_str << ",...)" << std::endl;
   int status,size;
@@ -889,13 +889,13 @@ int v1725CONET2::SetBoardRecord(HNDLE h, void(*cb_func)(INT,INT,void*))
  */
 int v1725CONET2::SetHistoryRecord(HNDLE h, void(*cb_func)(INT,INT,void*))
 {
-  char settings_path[200] = "/Equipment/BUFLVLMT/Settings/";
+  char settings_path[200] = "/Equipment/V1725_BufLvl/Settings/";
   char names_path[200];
 
   if(feIndex_ == -1)
-    snprintf(settings_path, sizeof(settings_path), "/Equipment/BUFLVLMT/Settings/");
+    snprintf(settings_path, sizeof(settings_path), "/Equipment/V1725_BufLvl/Settings/");
   else
-    snprintf(settings_path, sizeof(settings_path), "/Equipment/BUFLVLMT%02d/Settings/", feIndex_);
+    snprintf(settings_path, sizeof(settings_path), "/Equipment/V1725_BufLvl%02d/Settings/", feIndex_);
 
 //  if (verbosity_) std::cout << GetName() << "::SetHistoryRecord(" << h << "," << settings_path << ",...)" << std::endl;
   int status;//,size;
@@ -1109,6 +1109,8 @@ int v1725CONET2::InitializeForAcq()
 			}else{
 				cm_msg(MINFO, "InitializeForAcq", "ADC Calibration did not finish!");
 			}					
+		}else{
+			printf("ADC calibration finished already");
 		}
 	}
 	

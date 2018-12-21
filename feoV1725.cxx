@@ -167,6 +167,7 @@ extern void interrupt_routine(void);  //!< Interrupt Service Routine
 
 INT read_event_from_ring_bufs(char *pevent, INT off);
 INT read_buffer_level(char *pevent, INT off);
+INT read_temperature(char *pevent, INT off);
 void * link_thread(void *);
 
 // __________________________________________________________________
@@ -176,7 +177,7 @@ void * link_thread(void *);
 EQUIPMENT equipment[] =
 {
     {
-        "FEV1725MTI%02d",           /* equipment name */
+        "V1725_Data%02d",           /* equipment name */
         {
             EQ_EVID, EQ_TRGMSK,     /* event ID, trigger mask */
 #if USE_SYSTEM_BUFFER
@@ -204,7 +205,7 @@ EQUIPMENT equipment[] =
     },
 
     {
-        "BUFLVLMT%02d",             /* equipment name */
+        "V1725_BufLvl%02d",             /* equipment name */
         {
             100, 0x1000,            /* event ID, corrected with feIndex, trigger mask */
             "SYSTEM",               /* event buffer */
@@ -222,7 +223,25 @@ EQUIPMENT equipment[] =
         },
         read_buffer_level,       /* readout routine */
     },
-
+    {
+      "V1725_Temp%02d",             /* equipment name */
+      {
+	100, 0x1000,            /* event ID, corrected with feIndex, trigger mask */
+	"SYSTEM",               /* event buffer */
+	EQ_PERIODIC,            /* equipment type */
+	0,                      /* event source */
+	"MIDAS",                /* format */
+	TRUE,                   /* enabled */
+	RO_ALWAYS |    /* read when running and on transitions */
+	RO_ODB,                 /* and update ODB */
+	1000,                   /* read every 1 sec */
+	0,                      /* stop run after this event limit */
+	0,                      /* number of sub events */
+	1,                      /* log history */
+	"", "", ""
+      },
+      read_temperature,       /* readout routine */
+    },
     {""}
 };
 
@@ -911,3 +930,29 @@ INT read_buffer_level(char *pevent, INT off) {
   return bk_size(pevent);
 }
 
+
+INT read_temperature(char *pevent, INT off) {
+
+  bk_init32(pevent);
+
+  // Read the temperature for each ADC...
+  DWORD temp;
+  for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725){
+
+    DWORD *pdata;
+    int addr;
+    char bankName[5];
+    sprintf(bankName,"TP%02d", itv1725->GetModuleID());
+    bk_create(pevent, bankName, TID_DWORD, (void **)&pdata);
+    for (int i=0;i<16;i++) {
+     addr = V1725_CHANNEL_TEMPERATURE | (i << 8);
+     itv1725->ReadReg(addr, &temp);
+     *pdata++ =  temp;
+     
+    }
+    bk_close(pevent,pdata);
+    
+  }
+
+  return bk_size(pevent);
+}
