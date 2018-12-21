@@ -999,7 +999,7 @@ int v1725CONET2::InitializeForAcq()
   // Hardcode correct firmware verisons
 	const uint32_t amc_fw_ver = 0x14048c02; 
 	const uint32_t roc_fw_ver = 0x1331040c; 
-  for(int iCh=0;iCh<8;iCh++) {
+  for(int iCh=0;iCh<16;iCh++) {
     addr = 0x108c | (iCh << 8);
     sCAEN = ReadReg_(addr, &version);
     if((iCh != 0) && (prev_chan != version)) {
@@ -1080,9 +1080,40 @@ int v1725CONET2::InitializeForAcq()
 	WriteReg_(V1725_MONITOR_MODE,            0x3); // Buffer Occupancy mode;
 	WriteReg_(V1725_BLT_EVENT_NB,            0x1); // TL? max number of events per BLT is 1?
 	WriteReg_(V1725_VME_CONTROL,             V1725_ALIGN64);
+
+
+	// Start the ADC calibration
+  WriteReg_(V1725_ADC_CALIBRATION , 0);
+	// Now we check to see when the calibration has finished.
+	// by checking register 0x1n88.
+	DWORD temp;
+	for (int i=0;i<16;i++) {
+		addr = V1725_CHANNEL_STATUS | (i << 8);
+		ReadReg_(addr,&temp);
+		printf("Channel (%i) %x Status: %x\n",i,addr,temp);
+		if((temp & 0x4) == 0x4){
+			printf("waiting for ADC calibration to finish...\n");
+			int j;
+			for(j =0; j < 20; i++){
+				sleep(1);
+				printf("temp %x\n",temp);
+				ReadReg_(addr,&temp);
+				if((temp & 0x4) == 0x0){
+					break;
+				}
+			}
+			if(j < 19){
+				ReadReg_(addr,&temp);
+				
+				printf("Took %i seconds to finish calibration. calibration status: %x\n",j+1,(temp & 0x8));
+			}else{
+				cm_msg(MINFO, "InitializeForAcq", "ADC Calibration did not finish!");
+			}					
+		}
+	}
 	
+	printf("Now other settings...");
 	//set specfic channel values
-	// TODO: add ADC calibration
 	// TODO: add right registers for V1725 ZLE
 	// FIXME HERE!
 	for (int iChan=0; iChan<8; iChan++){
