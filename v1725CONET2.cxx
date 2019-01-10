@@ -24,15 +24,15 @@ const char * v1725CONET2::config_str_board[] = {\
     "Acq mode = INT : 3",\
     "Board Configuration = DWORD : 16",\
     "Buffer organization = INT : 10",\
-    "Custom size = INT : 625",\
-    "Channel Mask = DWORD : 255",\
+    "Custom size = INT : 40",\
+    "Channel Mask = DWORD : 0xFFFF",\
     "Trigger Source = DWORD : 1073741824",\
     "Trigger Output = DWORD : 1073741824",\
-    "Post Trigger = DWORD : 576",\
+    "Post Trigger = DWORD : 100",\
     /*"fp_io_ctrl   = DWORD : 0x104", */ \
     "almost_full = DWORD : 512",\
     /*"fp_lvds_io_ctrl = DWORD : 0x22", */  \
-    "AutoTrig_Threshold = DWORD[8] :",\
+    "SelfTrigger_Threshold = DWORD[16] :",\
     "[0] 3870",\
     "[1] 3870",\
     "[2] 3870",\
@@ -41,27 +41,41 @@ const char * v1725CONET2::config_str_board[] = {\
     "[5] 3870",\
     "[6] 3870",\
     "[7] 3870",\
-    "AutoTrig_N_4Bins_Min = DWORD[8] :",\
-    "[0] 2",\
-    "[1] 2",\
-    "[2] 2",\
-    "[3] 2",\
-    "[4] 2",\
-    "[5] 2",\
-    "[6] 2",\
-    "[7] 2",\
-
-    "ZLESignedThresh = INT[8] :",\
-    "[0] -3895",\
-    "[1] -3895",\
-    "[2] -3895",\
-    "[3] -3895",\
-    "[4] -3895",\
-    "[5] -3895",\
-    "[6] -3895",\
-    "[7] -3895",\
-
-    "ZLENBinsBefore = DWORD[8] :",\
+    "[8] 3870",\
+    "[9] 3870",\
+    "[10] 3870",\
+    "[11] 3870",\
+    "[12] 3870",\
+    "[13] 3870",\
+    "[14] 3870",\
+    "[15] 3870",\
+    "SelfTrigger_Logic = DWORD[8] :",\
+    "[0] 3",\
+    "[1] 3",\
+    "[2] 3",\
+    "[3] 3",\
+    "[4] 3",\
+    "[5] 3",\
+    "[6] 3",\
+    "[7] 3",\
+    "ZLESignedThresh = INT[16] :",\
+    "[0] -5",\
+    "[1] -5",\
+    "[2] -5",\
+    "[3] -5",\
+    "[4] -5",\
+    "[5] -5",\
+    "[6] -5",\
+    "[7] -5",\
+    "[8] -5",\
+    "[9] -5",\
+    "[10] -5",\
+    "[11] -5",\
+    "[12] -5",\
+    "[13] -5",\
+    "[14] -5",\
+    "[15] -5",\
+    "ZLENBinsBefore = DWORD[16] :",\
     "[0] 0x5",\
     "[1] 0x5",\
     "[2] 0x5",\
@@ -70,8 +84,15 @@ const char * v1725CONET2::config_str_board[] = {\
     "[5] 0x5",\
     "[6] 0x5",\
     "[7] 0x5",\
-
-    "ZLENBinsAfter = DWORD[8] :",\
+    "[8] 0x5",\
+    "[9] 0x5",\
+    "[10] 0x5",\
+    "[11] 0x5",\
+    "[12] 0x5",\
+    "[13] 0x5",\
+    "[14] 0x5",\
+    "[15] 0x5",\
+    "ZLENBinsAfter = DWORD[16] :",\
     "[0] 0x5",\
     "[1] 0x5",\
     "[2] 0x5",\
@@ -80,8 +101,15 @@ const char * v1725CONET2::config_str_board[] = {\
     "[5] 0x5",\
     "[6] 0x5",\
     "[7] 0x5",\
-
-    "DAC = DWORD[8] :",\
+    "[8] 0x5",\
+    "[9] 0x5",\
+    "[10] 0x5",\
+    "[11] 0x5",\
+    "[12] 0x5",\
+    "[13] 0x5",\
+    "[14] 0x5",\
+    "[15] 0x5",\
+    "DAC = DWORD[16] :",\
     "[0] 10000",\
     "[1] 10000",\
     "[2] 10000",\
@@ -90,6 +118,14 @@ const char * v1725CONET2::config_str_board[] = {\
     "[5] 10000",\
     "[6] 10000",\
     "[7] 10000",\
+    "[8] 10000",\
+    "[9] 10000",\
+    "[10] 10000",\
+    "[11] 10000",\
+    "[12] 10000",\
+    "[13] 10000",\
+    "[14] 10000",\
+    "[15] 10000",\
     NULL
 };
 
@@ -977,12 +1013,12 @@ int v1725CONET2::InitializeForAcq()
 	//  sCAEN = WriteReg_(V1725_SW_CLEAR, 0x1);
   
   // Set register V1725_FP_IO_CONTROL (0x811C) to default settings
-  // (output trigger) will set the board that output the clock latter
+  // (output trigger) will set the board that output the clock later
   sCAEN = WriteReg_(V1725_FP_IO_CONTROL, 0x00000000);
         
   // Setup Busy daisy chaining
   sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x13c); // 0x100:enable new config, 0x3c:LVDS I/O[15..0] output
-  sCAEN = WriteReg_(V1725_FP_LVDS_IO_CRTL,      0x0211); // 0x2211 set the outputs to all output the trigger
+  sCAEN = WriteReg_(V1725_FP_LVDS_IO_CRTL,      0x0211); // 0x211 set the outputs to all output the trigger
 	// for first two groups and the busy for the third group
 
   std::stringstream ss_fw_datatype;
@@ -1007,7 +1043,7 @@ int v1725CONET2::InitializeForAcq()
     }
     prev_chan = version;
   }
-        //  cm_msg(MINFO,"feoV1725","Format: YMDD:XX.YY");
+	//  cm_msg(MINFO,"feoV1725","Format: YMDD:XX.YY");
   if(version != amc_fw_ver)
     cm_msg(MERROR,"InitializeForAcq","Incorrect AMC Firmware Version: 0x%08x, 0x%08x expected", version, amc_fw_ver);
   else
@@ -1056,7 +1092,6 @@ int v1725CONET2::InitializeForAcq()
     break;
   }
 
-
 	//already reset/clear earlier this function, so skip here
 	AcqCtl_(config.acq_mode); 
 	WriteReg_(V1725_BOARD_CONFIG,            config.board_config);
@@ -1080,7 +1115,6 @@ int v1725CONET2::InitializeForAcq()
 	WriteReg_(V1725_MONITOR_MODE,            0x3); // Buffer Occupancy mode;
 	WriteReg_(V1725_BLT_EVENT_NB,            0x1); // TL? max number of events per BLT is 1?
 	WriteReg_(V1725_VME_CONTROL,             V1725_ALIGN64);
-
 
 	// Start the ADC calibration
   WriteReg_(V1725_ADC_CALIBRATION , 0);
@@ -1110,41 +1144,48 @@ int v1725CONET2::InitializeForAcq()
 				cm_msg(MINFO, "InitializeForAcq", "ADC Calibration did not finish!");
 			}					
 		}else{
-			printf("ADC calibration finished already");
+			printf("ADC calibration finished already\n");
 		}
 	}
 	
-	printf("Now other settings...");
+	printf("Now other settings...\n");
 	//set specfic channel values
 	// TODO: add right registers for V1725 ZLE
 	// FIXME HERE!
-	for (int iChan=0; iChan<8; iChan++){
-		WriteReg_(V1725_CHANNEL_THRESHOLD   + (iChan<<8), config.auto_trig_threshold     [iChan]);
-		WriteReg_(V1725_CHANNEL_OUTHRESHOLD + (iChan<<8), config.auto_trig_N_4bins_min [iChan]);
-		if( config.zle_signed_threshold[iChan]>0){
+	for (int iChan=0; iChan<16; iChan++) {
+		WriteReg_(V1725_CHANNEL_THRESHOLD   + (iChan<<8), config.selftrigger_threshold     [iChan]);
+		
+		if( config.zle_signed_threshold[iChan]>0) {
 			WriteReg_(V1725_ZLE_THRESHOLD        + (iChan<<8), config.zle_signed_threshold  [iChan]);
-		}
-		else{
-        WriteReg_(V1725_ZLE_THRESHOLD        + (iChan<<8), (0x80000000 | (-1*config.zle_signed_threshold[iChan])));
+		} else {
+			WriteReg_(V1725_ZLE_THRESHOLD        + (iChan<<8), (0x80000000 | (-1*config.zle_signed_threshold[iChan])));
 		}
 		WriteReg_(V1725_ZS_NSAMP            + (iChan<<8), ((config.zle_bins_before[iChan]<<16) | config.zle_bins_after[iChan]));
 		WriteReg_(V1725_CHANNEL_DAC         + (iChan<<8), config.dac           [iChan]);			
 	}		
 
+	/// Set the trigger logic for each group of two channels
+	for(int iGroup = 0; iGroup < 8; iGroup++){
+		WriteReg_(V1725_CHANNEL_OUTHRESHOLD + (iGroup<<8), config.selftrigger_logic [iGroup]);
+	}
+	
 	// Check finally for Acquisition status
 	sCAEN = ReadReg_(0x8178, &reg);
 	printf("Board error status 0x%x\n",reg);
 	sCAEN = ReadReg_(0x8100, &reg);
 	printf("Board acquisition control 0x%x\n",reg);
-	sCAEN = ReadReg_(0x8104, &reg);
-	printf("Board acquisition status 0x%x\n",reg);
+
+	//	sCAEN = ReadReg_(0x8104, &reg);
+	//	printf("Board acquisition status 0x%x\n",reg);
 	
-	sCAEN = ReadReg_(V1725_ACQUISITION_STATUS, &reg);
+	sCAEN = ReadReg_(V1725_ACQUISITION_STATUS, &reg);  // 0x8104
 	ss_fw_datatype << ", Acq Reg: 0x" << std::hex << reg;
 	cm_msg(MINFO, "InitializeForAcq", ss_fw_datatype.str().c_str());
 	
 	//      cm_msg(MINFO, "AcqInit", "Module %d (Link %d Board %d) Acquisition Status : 0x%x", moduleID_, link_, board_, reg);
-	if ((reg & 0xF0) != 0x80) { // Ie internal clock, PLL locked
+	//	if ((reg & 0xF0) != 0x80) { // If internal clock, PLL locked
+	//-PAA- Check for lock condition only
+	if ((reg & 0x80) != 0x80) { // internal or external clock & PLL locked
 		cm_msg(MERROR, "InitAcq", "Module %d (Link %d Board %d ) not initilized properly acq status:0x%x",  moduleID_, link_, board_, reg);
 		return -1;
 	}

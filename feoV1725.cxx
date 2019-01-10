@@ -109,7 +109,7 @@ controls 2*2 = 4 v1725 boards.  Compile and run:
 #define NBLINKSPERA3818   4   //!< Number of optical links used per A3818
 #define NBLINKSPERFE      1   //!< Number of optical links controlled by each frontend
 #define NB1725PERLINK     1   //!< Number of daisy-chained v1725s per optical link
-#define NBV1725TOTAL      32  //!< Number of v1725 boards in total
+#define NBV1725TOTAL      4  //!< Number of v1725 boards in total
 #define NBCORES           8   //!< Number of cpu cores, for process/thread locking
 #endif
 
@@ -341,12 +341,12 @@ INT frontend_init(){
   
   if((NBV1725TOTAL % (NB1725PERLINK*NBLINKSPERFE)) != 0){
     printf("Incorrect setup: the number of boards controlled by each frontend"
-           " is not a fraction of the total number of boards.");
+           " is not a fraction of the total number of boards. %i %i %i\n",NBV1725TOTAL,NB1725PERLINK,NBLINKSPERFE);
   }
   
   int maxIndex = (NBV1725TOTAL/NB1725PERLINK)/NBLINKSPERFE - 1;
   if(feIndex < 0 || feIndex > maxIndex){
-    printf("Front end index must be between 0 and %d\n", maxIndex);
+    printf("Front end index (%i) must be between 0 and %d\n", feIndex, maxIndex);
     exit(FE_ERR_HW);
   }
   
@@ -447,6 +447,8 @@ INT frontend_exit(){
   return SUCCESS;
 }
 
+//
+//----------------------------------------------------------------------------
 /**
  * \brief   Begin of Run
  *
@@ -456,9 +458,8 @@ INT frontend_exit(){
  * \param   [in]  run_number Number of the run being started
  * \param   [out] error Can be used to write a message string to midas.log
  */
-INT begin_of_run(INT run_number, char *error){
-
-
+INT begin_of_run(INT run_number, char *error)
+{
   set_equipment_status(equipment[0].name, "Starting run...", "#FFFF00");
   cm_msg(MINFO,"BOR", "Start of begin_of_run");
   printf("<<< Start of begin_of_run\n");
@@ -608,7 +609,7 @@ void * link_thread(void * arg)
 
       // Sleep for 5us to avoid hammering the board too much
       usleep(5);
-    } // Done will all the modules
+    } // Done with all the modules
 
     // Escape if run is done -> kill thread
     if(!runInProgress)
@@ -664,7 +665,7 @@ INT end_of_run(INT run_number, char *error)
 
         rb_delete(itv1725->GetRingBufferHandle());
         itv1725->SetRingBufferHandle(-1);
-				itv1725->ResetNumEventsInRB();
+	itv1725->ResetNumEventsInRB();
       }
     }
 
@@ -835,8 +836,8 @@ extern "C" INT poll_event(INT source, INT count, BOOL test)
     if (evtReady && !test)
       //      return 0;
       return 1;
-
-		usleep(1);
+    
+    usleep(1);
   }
   return 0;
 }
@@ -883,8 +884,8 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
 
   sn = SERIAL_NUMBER(pevent);
 
-
   bk_init32(pevent);
+
   for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
     if (! itv1725->IsConnected()) continue;   // Skip unconnected board
 
@@ -906,9 +907,10 @@ INT read_buffer_level(char *pevent, INT off) {
   
   bk_init32(pevent);
   int PLLLockLossID = -1;
-  for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725){
+  for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
     itv1725->FillBufferLevelBank(pevent);
-		// Check the PLL lock
+
+    // Check the PLL lock
     DWORD vmeStat, vmeAcq;
     itv1725->ReadReg(V1725_ACQUISITION_STATUS, &vmeAcq);
     if ((vmeAcq & 0x80) == 0) {
@@ -931,6 +933,8 @@ INT read_buffer_level(char *pevent, INT off) {
 }
 
 
+//                                                                                         
+//----------------------------------------------------------------------------             
 INT read_temperature(char *pevent, INT off) {
 
   bk_init32(pevent);
