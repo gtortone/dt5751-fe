@@ -1017,9 +1017,17 @@ int v1725CONET2::InitializeForAcq()
   sCAEN = WriteReg_(V1725_FP_IO_CONTROL, 0x00000000);
         
   // Setup Busy daisy chaining
-  sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x13c); // 0x100:enable new config, 0x3c:LVDS I/O[15..0] output
+	//  sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x13c);  // 0x100:enable nconfig
+	//                                                            0x3c:LVDS I/O[15..0] output
+  //                                                            0x50000|0x0100:Clk out|enable new config, 0x3c:LVDS I/O[15..0]outputs
+  //                                                            0xD0000|0x0100:Clk out|enable new config, 0x3c:LVDS I/O[15..0]outputs
+  //                                                            0x050000|0x0100:Busy out|enable new config, 0x3c:LVDS I/O[15..0]outputs
+  //                                                            0x150000|0x0100:Lock out|enable new config, 0x3c:LVDS I/O[15..0]outputs
+  sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0xD013C); // Busy out, LVDS I/O[15..0] outputs
+
+	                                                 
   sCAEN = WriteReg_(V1725_FP_LVDS_IO_CRTL,      0x0211); // 0x211 set the outputs to all output the trigger
-	// for first two groups and the busy for the third group
+	// for first two groups and the busy for the third group 
 
   std::stringstream ss_fw_datatype;
   ss_fw_datatype << "Module " << moduleID_ << ", ";
@@ -1116,8 +1124,27 @@ int v1725CONET2::InitializeForAcq()
 	WriteReg_(V1725_BLT_EVENT_NB,            0x1); // TL? max number of events per BLT is 1?
 	WriteReg_(V1725_VME_CONTROL,             V1725_ALIGN64);
 
+	printf("Now other settings...\n");
+	//set specfic channel values
+	// TODO: add right registers for V1725 ZLE
+	// FIXME HERE!
+	for (int iChan=0; iChan<16; iChan++) {
+		WriteReg_(V1725_CHANNEL_THRESHOLD   + (iChan<<8), config.selftrigger_threshold     [iChan]);
+		
+		if( config.zle_signed_threshold[iChan]>0) {
+			WriteReg_(V1725_ZLE_THRESHOLD        + (iChan<<8), config.zle_signed_threshold  [iChan]);
+		} else {
+			WriteReg_(V1725_ZLE_THRESHOLD        + (iChan<<8), (0x80000000 | (-1*config.zle_signed_threshold[iChan])));
+		}
+		WriteReg_(V1725_ZS_NSAMP            + (iChan<<8), ((config.zle_bins_before[iChan]<<16) | config.zle_bins_after[iChan]));
+		WriteReg_(V1725_CHANNEL_DAC         + (iChan<<8), config.dac           [iChan]);			
+	}		
+
+	// Wait for 200ms after channing DAC offsets, before starting calibration. 
+	usleep(200000);
+
 	// Start the ADC calibration
-  WriteReg_(V1725_ADC_CALIBRATION , 0);
+  WriteReg_(V1725_ADC_CALIBRATION , 1);
 	// Now we check to see when the calibration has finished.
 	// by checking register 0x1n88.
 	DWORD temp;
@@ -1147,22 +1174,6 @@ int v1725CONET2::InitializeForAcq()
 			printf("ADC calibration finished already\n");
 		}
 	}
-	
-	printf("Now other settings...\n");
-	//set specfic channel values
-	// TODO: add right registers for V1725 ZLE
-	// FIXME HERE!
-	for (int iChan=0; iChan<16; iChan++) {
-		WriteReg_(V1725_CHANNEL_THRESHOLD   + (iChan<<8), config.selftrigger_threshold     [iChan]);
-		
-		if( config.zle_signed_threshold[iChan]>0) {
-			WriteReg_(V1725_ZLE_THRESHOLD        + (iChan<<8), config.zle_signed_threshold  [iChan]);
-		} else {
-			WriteReg_(V1725_ZLE_THRESHOLD        + (iChan<<8), (0x80000000 | (-1*config.zle_signed_threshold[iChan])));
-		}
-		WriteReg_(V1725_ZS_NSAMP            + (iChan<<8), ((config.zle_bins_before[iChan]<<16) | config.zle_bins_after[iChan]));
-		WriteReg_(V1725_CHANNEL_DAC         + (iChan<<8), config.dac           [iChan]);			
-	}		
 
 	/// Set the trigger logic for each group of two channels
 	for(int iGroup = 0; iGroup < 8; iGroup++){
