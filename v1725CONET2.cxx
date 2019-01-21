@@ -21,7 +21,7 @@ This file contains the class implementation for the v1725 module driver.
 
 //! Configuration string for this board. (ODB: /Equipment/[eq_name]/Settings/[board_name]/)
 const char * v1725CONET2::config_str_board[] = {\
-    "Acq mode = INT : 3",\
+    "Acq mode = INT : 5",\
     "Board Configuration = DWORD : 16",\
     "Buffer organization = INT : 10",\
     "Custom size = INT : 40",\
@@ -29,9 +29,8 @@ const char * v1725CONET2::config_str_board[] = {\
     "Trigger Source = DWORD : 1073741824",\
     "Trigger Output = DWORD : 1073741824",\
     "Post Trigger = DWORD : 100",\
-    /*"fp_io_ctrl   = DWORD : 0x104", */ \
+    "Enable ZLE = DWORD : 0",\
     "almost_full = DWORD : 512",\
-    /*"fp_lvds_io_ctrl = DWORD : 0x22", */  \
     "SelfTrigger_Threshold = DWORD[16] :",\
     "[0] 3870",\
     "[1] 3870",\
@@ -441,11 +440,15 @@ bool v1725CONET2::StartRun()
 	//Re-read the record from ODB, it may have changed
 	int size = sizeof(V1725_CONFIG_SETTINGS);
 	db_get_record(odb_handle_, settings_handle_, &config, &size, 0);
-
 	
+	printf("--------------2---------------------------------dac[0]:0x%x\n", config.dac[0]); 
+
+
 	int status = InitializeForAcq();
 	if (status == -1) return false;  
 	
+	printf("--------------3---------------------------------dac[0]:0x%x\n", config.dac[0]); 
+
   CAENComm_ErrorCode e = AcqCtl_(V1725_RUN_START);
   if (e == CAENComm_Success)
     running_=true;
@@ -761,7 +764,14 @@ bool v1725CONET2::FillEventBank(char * pevent)
 			size_copied = 4;
 		}
   } 
-  
+
+	// Mess with the bank structure; use bit 26 of word 2 to indicate if it is ZLE...
+	if(this->IsZLEData()){
+		uint32_t new_value = (src[1] | 0x4000000);
+		src[1] = new_value;
+	}
+
+	// copy data over.
   memcpy(dest, src, size_copied*sizeof(uint32_t));
 
   this->DecrementNumEventsInRB(); //atomic
@@ -907,6 +917,8 @@ int v1725CONET2::SetBoardRecord(HNDLE h, void(*cb_func)(INT,INT,void*))
     cm_msg(MERROR,"SetBoardRecord","Couldn't get record %s. Return code: %d", set_str, status);
     return status;
   }
+printf("--------------0---------------------------------dac[0]:0x%x\n", config.dac[0]); 
+
 
   settings_loaded_ = true;
   settings_touched_ = true;
@@ -1083,14 +1095,8 @@ int v1725CONET2::InitializeForAcq()
   case RawPack2:
     ss_fw_datatype << "Raw Data";
     break;
-  case RawPack25:
-    ss_fw_datatype << "Raw Data 2.5 Packing";
-    break;
   case ZLEPack2:
     ss_fw_datatype << "ZLE Data";
-    break;
-  case ZLEPack25:
-    ss_fw_datatype << "ZLE Data 2.5 Packing";
     break;
   case UnrecognizedDataFormat:
     ss_fw_datatype << "Unrecognized data format";
@@ -1099,6 +1105,10 @@ int v1725CONET2::InitializeForAcq()
     /* Can't happen */
     break;
   }
+
+	//PAA
+	int size = sizeof(V1725_CONFIG_SETTINGS);
+	db_get_record(odb_handle_, settings_handle_, &config, &size, 0);
 
 	//already reset/clear earlier this function, so skip here
 	AcqCtl_(config.acq_mode); 
@@ -1124,20 +1134,43 @@ int v1725CONET2::InitializeForAcq()
 	WriteReg_(V1725_BLT_EVENT_NB,            0x1); // TL? max number of events per BLT is 1?
 	WriteReg_(V1725_VME_CONTROL,             V1725_ALIGN64);
 
-	printf("Now other settings...\n");
+
+
+	printf("..............................Now other settings...\n");
 	//set specfic channel values
 	// TODO: add right registers for V1725 ZLE
 	// FIXME HERE!
+	usleep(200000);
 	for (int iChan=0; iChan<16; iChan++) {
 		WriteReg_(V1725_CHANNEL_THRESHOLD   + (iChan<<8), config.selftrigger_threshold     [iChan]);
 		
 		if( config.zle_signed_threshold[iChan]>0) {
-			WriteReg_(V1725_ZLE_THRESHOLD        + (iChan<<8), config.zle_signed_threshold  [iChan]);
+			WriteReg_(V1725_ZLE_THRESHOLD     + (iChan<<8), config.zle_signed_threshold  [iChan]);
 		} else {
-			WriteReg_(V1725_ZLE_THRESHOLD        + (iChan<<8), (0x80000000 | (-1*config.zle_signed_threshold[iChan])));
+			WriteReg_(V1725_ZLE_THRESHOLD     + (iChan<<8), (0x80000000 | (-1*config.zle_signed_threshold[iChan])));
 		}
 		WriteReg_(V1725_ZS_NSAMP            + (iChan<<8), ((config.zle_bins_before[iChan]<<16) | config.zle_bins_after[iChan]));
-		WriteReg_(V1725_CHANNEL_DAC         + (iChan<<8), config.dac           [iChan]);			
+
+		printf("---------1 ----------------------------------------dac[0]:0x%x\n", config.dac[0]); 
+
+
+		printf("ichan:%i  dac:0x%x DAC:0x%x\n", iChan, config.dac[iChan],V1725_CHANNEL_DAC+ (iChan<<8)); 
+		DWORD temp;
+
+
+		ReadReg_(V1725_CHANNEL_STATUS | (iChan << 8),&temp);
+		printf("Status %x\n",temp);
+
+		WriteReg_(V1725_CHANNEL_DAC         + (iChan<<8), config.dac[iChan]);			
+		
+		// Disable ZLE if requested
+		if(!config.enable_zle){
+			// Disable ZLE threshold
+			//printf("Disabling ZLE algorithm\n");
+			// This register also defines the polarity of the trigger;
+			// Currently bit 6 = 0, so we are negative pulse for triggering.
+			WriteReg_(V1725_INPUT_CONTROL + (iChan<<8),0x80);
+		}
 	}		
 
 	// Wait for 200ms after channing DAC offsets, before starting calibration. 
@@ -1185,17 +1218,11 @@ int v1725CONET2::InitializeForAcq()
 	printf("Board error status 0x%x\n",reg);
 	sCAEN = ReadReg_(0x8100, &reg);
 	printf("Board acquisition control 0x%x\n",reg);
-
-	//	sCAEN = ReadReg_(0x8104, &reg);
-	//	printf("Board acquisition status 0x%x\n",reg);
 	
 	sCAEN = ReadReg_(V1725_ACQUISITION_STATUS, &reg);  // 0x8104
 	ss_fw_datatype << ", Acq Reg: 0x" << std::hex << reg;
 	cm_msg(MINFO, "InitializeForAcq", ss_fw_datatype.str().c_str());
 	
-	//      cm_msg(MINFO, "AcqInit", "Module %d (Link %d Board %d) Acquisition Status : 0x%x", moduleID_, link_, board_, reg);
-	//	if ((reg & 0xF0) != 0x80) { // If internal clock, PLL locked
-	//-PAA- Check for lock condition only
 	if ((reg & 0x80) != 0x80) { // internal or external clock & PLL locked
 		cm_msg(MERROR, "InitAcq", "Module %d (Link %d Board %d ) not initilized properly acq status:0x%x",  moduleID_, link_, board_, reg);
 		return -1;
@@ -1220,38 +1247,21 @@ int v1725CONET2::InitializeForAcq()
 v1725CONET2::DataType v1725CONET2::GetDataType()
 {
         
-  // Set Device, data type and packing for QT calculation later
+  // Set ZLE or Raw
   int dataType = ((config.board_config >> 11) & 0x1);
-
-  if(((config.board_config >> 16) & 0xF) == 0) {
-    if(dataType == 1) {
-      // 2.5 pack, full data
-      data_type_ = RawPack25;
-			printf("RawPack25 type: %x %x %x\n",dataType, config.board_config, ((config.board_config >> 16) & 0xF));
-      return RawPack25;
-    } else {
-      // 2 pack, full data
-      data_type_ = RawPack2;
-			printf("RawPack2 type: %x %x %x\n",dataType, config.board_config, ((config.board_config >> 16) & 0xF));      
-			return RawPack2;
-    }
-  } else if(((config.board_config >> 16) & 0xF) == 2) {
-    if(dataType == 1) {
-      // 2.5 pack, ZLE data
-      data_type_ = ZLEPack25;
-			printf("ZLEPack25 type: %x %x %x\n",dataType, config.board_config, ((config.board_config >> 16) & 0xF));
-      return ZLEPack25;
-    } else {
-      // 2 pack, ZLE data
-      data_type_ = ZLEPack2;
-			printf("ZLEPack2 type: %x %x %x\n",dataType, config.board_config, ((config.board_config >> 16) & 0xF));
-      return ZLEPack2;
-    } 
-	} else{
-		printf("Unrecognized type: %x %x %x\n",dataType, config.board_config, ((config.board_config >> 16) & 0xF));
-          return UnrecognizedDataFormat;
-
+	if(config.enable_zle){
+		data_type_ = ZLEPack2;
+		printf("ZLEPack2 type: %x %x %x\n",dataType, config.board_config, ((config.board_config >> 16) & 0xF));
+		return ZLEPack2;		
+	}else{
+		data_type_ = RawPack2;
+		printf("RawPack2 type: %x %x %x\n",dataType, config.board_config, ((config.board_config >> 16) & 0xF));      
+		return RawPack2;
 	}
+
+	printf("Unrecognized type: %x %x %x\n",dataType, config.board_config, ((config.board_config >> 16) & 0xF));
+	return UnrecognizedDataFormat;
+
 }
 
 //

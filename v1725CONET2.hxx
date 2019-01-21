@@ -87,6 +87,7 @@ public:
     DWORD     post_trigger;            //!< 0x8114@[31.. 0]
     // Hard code the two fp_* settings to alway on (Alex 21/2/13)
     //    DWORD     fp_io_ctrl;        //!< 0x811C@[31.. 0]
+    DWORD     enable_zle;             //!< 0x816C@[31.. 0]
     DWORD     almost_full;             //!< 0x816C@[31.. 0]
     //    DWORD     fp_lvds_io_ctrl;   //!< 0x81A0@[31.. 0]
     DWORD     selftrigger_threshold[16];//!< 0x1n80@[11.. 0]
