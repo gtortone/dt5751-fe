@@ -15,7 +15,9 @@ sets the digitizer baseline to near zero (~400 DC counts)
 
 ## Other information
 
-
+* This code works for the V1725 firmware that supports ZLE; the register map is
+different for the standard V1725 firmware that only does waveform readout.
+* However, we will usually use the boards without ZLE compression.
 
 
 ## ELOG
