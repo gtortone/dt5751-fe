@@ -20,6 +20,23 @@ different for the standard V1725 firmware that only does waveform readout.
 * However, we will usually use the boards without ZLE compression.
 
 
+
+## Prototype code
+
+The code for the prototype DAQ programs is here:
+
+https://bitbucket.org/ttriumfdaq/dsproto_daq/src/master/
+
+The code for the prototype analyzer programs is here:
+
+https://bitbucket.org/ttriumfdaq/dsproto_analyzer/src/master/
+
+
+
+
+
+## 
+
 ## ELOG
 
 Ongoing work on the DAQ is also documented on the elog 
