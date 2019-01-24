@@ -1,10 +1,21 @@
 # Documentation for the DS-Proto V1725 DAQ
 
-## The MIDAS webserver for the prototype setup can be seen here:
+## MIDAS DAQ Installation
+
+The MIDAS DAQ is installed on a desktop machine currently called 
+
+ds-proto-daq.triumf.ca 
+
+We have a 4-port A3818 CONET2 installed in ds-proto-daq, connected to
+4 V1725s.
+
+The MIDAS webserver for the prototype setup can be seen here:
 
 https://ds-proto-daq.triumf.ca/
 
 (need to distribute username and password somehow)
+
+
 
 ## Useful Information about ODB settings
 
@@ -57,13 +68,14 @@ and cumulative histograms.
 * ana.exe: a batch program that creates most of the same histograms as protoDisplay.exe
 * midas2root.exe: a program to convert the MIDAS data to ROOT Tree.  NOT YET WRITTEN!
 
-### Grab example midas files.
+### MIDAS file location
 
+The MIDAS files are temporarily being served here:
 
+https://ds-proto-daq.triumf.ca/proto_data/
 
+You can grab a file from there...
 
-
-## 
 
 ## ELOG
 
