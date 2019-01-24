@@ -1,5 +1,10 @@
 # Documentation for the DS-Proto V1725 DAQ
 
+## The MIDAS webserver for the prototype setup can be seen here:
+
+https://ds-proto-daq.triumf.ca/
+
+(need to distribute username and password somehow)
 
 ## Useful Information about ODB settings
 
@@ -21,7 +26,7 @@ different for the standard V1725 firmware that only does waveform readout.
 
 
 
-## Prototype code
+## Prototype code locations
 
 The code for the prototype DAQ programs is here:
 
@@ -30,6 +35,29 @@ https://bitbucket.org/ttriumfdaq/dsproto_daq/src/master/
 The code for the prototype analyzer programs is here:
 
 https://bitbucket.org/ttriumfdaq/dsproto_analyzer/src/master/
+
+## Simple data analysis
+
+### Build analyzer code
+
+The analyzer program is based on [ROOTANA](https://bitbucket.org/tmidas/rootana/src/master/)
+which is a package for looking at MIDAS data online (as it is being taken) or offline (from MIDAS
+files).
+
+To build the analyzer code, you need to first build ROOTANA (and have ROOT available); follow instructions
+on ROOTANA page to build it.  Once you have build ROOTANA, do the following
+
+    git clone https://bitbucket.org/ttriumfdaq/dsproto_analyzer
+    make
+
+The following executables will be built:
+
+* protoDisplay.exe: a graphical display (based on ROOT plotting tools) that shows V1725 waveforms
+and cumulative histograms.
+* ana.exe: a batch program that creates most of the same histograms as protoDisplay.exe
+* midas2root.exe: a program to convert the MIDAS data to ROOT Tree.  NOT YET WRITTEN!
+
+### Grab example midas files.
 
 
 
