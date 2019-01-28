@@ -1,0 +1,24 @@
+{ 
+  "V792" : { 
+    "MaxChannels" : 16,
+    "WebserverName" : "V1725"
+  },  
+  "V1720" : { 
+    "MaxChannels" : 8,
+    "WebserverName" : "V1720"
+  },
+    "V1720 Correlations" : { 
+    "MaxChannels" : 8,
+    "WebserverName" : "V1720_Correlations"
+  },  
+  "V1720 Pulse Height Comparison" : { 
+    "WebserverName" : "V1720PHCompare"
+  },
+  "V1720 Comparison" : { 
+    "WebserverName" : {"Pulse Height Comparison" : "V1720PHCompare",
+                       "Time Comparison" : "V1720TimeCompare"}
+  },
+  "DisplaySettings" : {
+    "DisplayStyle" : "root"
+  }
+} 

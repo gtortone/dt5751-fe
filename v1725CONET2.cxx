@@ -441,13 +441,8 @@ bool v1725CONET2::StartRun()
 	int size = sizeof(V1725_CONFIG_SETTINGS);
 	db_get_record(odb_handle_, settings_handle_, &config, &size, 0);
 	
-	printf("--------------2---------------------------------dac[0]:0x%x\n", config.dac[0]); 
-
-
 	int status = InitializeForAcq();
 	if (status == -1) return false;  
-	
-	printf("--------------3---------------------------------dac[0]:0x%x\n", config.dac[0]); 
 
   CAENComm_ErrorCode e = AcqCtl_(V1725_RUN_START);
   if (e == CAENComm_Success)
@@ -511,7 +506,6 @@ CAENComm_ErrorCode v1725CONET2::AcqCtl_(uint32_t operation)
 
   switch (operation) {
   case V1725_RUN_START:
-                printf("Reg: 0x%x\n", V1725_ACQUISITION_CONTROL);
     sCAEN = CAENComm_Write32(device_handle_, V1725_ACQUISITION_CONTROL, (reg | 0x4));
     break;
   case V1725_RUN_STOP:
@@ -917,9 +911,6 @@ int v1725CONET2::SetBoardRecord(HNDLE h, void(*cb_func)(INT,INT,void*))
     cm_msg(MERROR,"SetBoardRecord","Couldn't get record %s. Return code: %d", set_str, status);
     return status;
   }
-printf("--------------0---------------------------------dac[0]:0x%x\n", config.dac[0]); 
-
-
   settings_loaded_ = true;
   settings_touched_ = true;
 
@@ -1027,7 +1018,8 @@ int v1725CONET2::InitializeForAcq()
   // Set register V1725_FP_IO_CONTROL (0x811C) to default settings
   // (output trigger) will set the board that output the clock later
   sCAEN = WriteReg_(V1725_FP_IO_CONTROL, 0x00000000);
-        
+	usleep(200000);
+
   // Setup Busy daisy chaining
 	//  sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x13c);  // 0x100:enable nconfig
 	//                                                            0x3c:LVDS I/O[15..0] output
@@ -1035,7 +1027,7 @@ int v1725CONET2::InitializeForAcq()
   //                                                            0xD0000|0x0100:Clk out|enable new config, 0x3c:LVDS I/O[15..0]outputs
   //                                                            0x050000|0x0100:Busy out|enable new config, 0x3c:LVDS I/O[15..0]outputs
   //                                                            0x150000|0x0100:Lock out|enable new config, 0x3c:LVDS I/O[15..0]outputs
-  sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0xD013C); // Busy out, LVDS I/O[15..0] outputs
+  sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x4D013C); // Busy out, LVDS I/O[15..0] outputs
 
 	                                                 
   sCAEN = WriteReg_(V1725_FP_LVDS_IO_CRTL,      0x0211); // 0x211 set the outputs to all output the trigger
@@ -1150,9 +1142,6 @@ int v1725CONET2::InitializeForAcq()
 			WriteReg_(V1725_ZLE_THRESHOLD     + (iChan<<8), (0x80000000 | (-1*config.zle_signed_threshold[iChan])));
 		}
 		WriteReg_(V1725_ZS_NSAMP            + (iChan<<8), ((config.zle_bins_before[iChan]<<16) | config.zle_bins_after[iChan]));
-
-		printf("---------1 ----------------------------------------dac[0]:0x%x\n", config.dac[0]); 
-
 
 		printf("ichan:%i  dac:0x%x DAC:0x%x\n", iChan, config.dac[iChan],V1725_CHANNEL_DAC+ (iChan<<8)); 
 		DWORD temp;

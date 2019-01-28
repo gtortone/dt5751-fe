@@ -1,0 +1,375 @@
+
+<!DOCTYPE HTML >
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>Rootana Display</title>
+  <script language="javascript" type="text/javascript" src="mhttpd.js"></script>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css">
+  <script src="plotly-latest.min.js"></script>
+  <script language="javascript" type="text/javascript" src="rootana_functions.js"></script>
+<style type="text/css">
+input[type=number]{
+    width: 60px;
+}
+#graphdiv21 {min-width:100%} 
+#graphdiv21 {min-height:250px}
+#graphdiv22 {min-width:100%}
+#graphdiv22 {min-height:250px}
+#graphdiv {min-width:100%}
+#graphdiv {min-height:500px}
+#plotlydiv {min-width:100%}
+#plotlydiv {min-height:500px}
+
+
+</style>
+<script src="dygraph-combined.js"></script>
+<script>
+
+// Function to disable updating.
+gIsPaused = false;
+function pause_resume(){
+
+ if(gIsPaused){
+   gIsPaused = false;
+   document.getElementById("pause_button").value = "Pause"; 
+   document.getElementById("readstatus").innerHTML = ""; 
+   document.getElementById("channel_number").disabled = false;
+   document.getElementById("overlay_number").disabled = false;
+   document.getElementById("HistoDisplay").disabled = false;
+   document.getElementById("v792_select").disabled = false;
+   document.getElementById("v1720_select").disabled = false;
+   document.getElementById("v1720C_select").disabled = false;
+
+ }else{
+   gIsPaused = true;
+   document.getElementById("pause_button").value = "Resume"; 
+   document.getElementById("readstatus").innerHTML = "Paused";
+   document.getElementById("channel_number").disabled = true;
+   document.getElementById("overlay_number").disabled = true;
+   document.getElementById("HistoDisplay").disabled = true;
+   document.getElementById("v792_select").disabled = true;
+   document.getElementById("v1720_select").disabled = true;
+   document.getElementById("v1720C_select").disabled = true;
+ }
+
+}
+
+
+gRunOngoing = false;
+var gStatusInflight = false;
+function midasStatus(){
+
+  // don't make another request if the last request is still outstanding.
+  if(gStatusInflight){
+    return;
+  }
+
+  gStatusInflight = true;
+
+  mjsonrpc_db_get_values(["/Runinfo"]).then(function(rpc) {    
+    var runinfo= rpc.result.data[0];
+    document.getElementById("current_run").innerHTML = "Current run is " + runinfo["run number"];
+    if(runinfo.state == 3){
+      document.getElementById("daq_running").innerHTML = "DAQ is running"
+      gRunOngoing = true;
+    }else{
+      document.getElementById("daq_running").innerHTML = "DAQ run is stopped"
+      gRunOngoing = false;
+    }
+    gStatusInflight = false; // finished async routine
+  }).catch(function(error) {
+    if (error.request) {
+      var s = mjsonrpc_decode_error(error);
+      console.log("mjsonrpc_error_alert: " + s);
+    } else {
+       console.log("mjsonroc_error_alert: " + error);
+    }
+
+  });
+
+
+}
+
+
+  var gHistoName = "V792_0_";
+  var gMaxChannel = 32;
+
+function disableOverlayState(state){
+  var displayEl = document.getElementById('HistoDisplay');
+  for(var i = 0; i < displayEl.options.length; i++){
+    if(displayEl.options[i].value == "Overlay"){
+      displayEl.options[i].disabled = state;
+    }
+  }
+
+}
+
+
+  function usev792(){
+    gHistoName = "V792_0_";
+    gMaxChannel = 32;
+    document.getElementById("channel_number").max = 32;
+    document.getElementById("channel_number").value = 0;
+    document.getElementById("v792_select").style.backgroundColor = "lightgreen";
+    document.getElementById("v1720_select").style.backgroundColor = "white";
+    document.getElementById("v1720C_select").style.backgroundColor = "white";
+    disableOverlayState(false);
+  }
+
+  function usev1720(){
+    gHistoName = "V1720_";
+    gMaxChannel = 8;
+    document.getElementById("channel_number").value = 0;
+    document.getElementById("channel_number").max = 8;
+    document.getElementById("v792_select").style.backgroundColor = "white";
+    document.getElementById("v1720_select").style.backgroundColor = "lightgreen";
+    document.getElementById("v1720C_select").style.backgroundColor = "white";
+    disableOverlayState(false);
+  }
+
+  function usev1720C(){
+    gHistoName = "V1720_Correlations_";
+    gMaxChannel = 8;
+    document.getElementById("channel_number").value = 0;
+    document.getElementById("channel_number").max = 8;
+    document.getElementById("v792_select").style.backgroundColor = "white";
+    document.getElementById("v1720_select").style.backgroundColor = "white";
+    document.getElementById("v1720C_select").style.backgroundColor = "lightgreen";
+    document.getElementById("HistoDisplay").options[0].selected = true;
+    disableOverlayState(true);
+    
+  }
+
+function reset_histogram(){
+
+  // don't update if paused.
+  if(gIsPaused){
+    return;
+  }
+  
+  var channel = Number(document.getElementById("channel_number").value);
+
+  var scan_type = document.getElementById("HistoDisplay").value;
+  switch (scan_type) {
+      case "Single":
+        rootanaResetHistogram(gHistoName+channel);
+        break;
+     case "Overlay":
+       var numberOverlay = Number(document.getElementById("overlay_number").value);
+       for(var ii = 0; ii < numberOverlay; ii++){
+         rootanaResetHistogram(gHistoName+Number(channel+ii));
+       }
+       break;
+     case "Multiple":
+        rootanaResetHistogram(gHistoName+channel);
+        if(Number(channel) < 31){
+          rootanaResetHistogram(gHistoName+Number(channel+1));
+        }else{
+          rootanaResetHistogram(gHistoName+"0");
+        }
+        break;
+   }
+}
+
+
+
+
+function setRootanaDirectory(webdir_end){
+   
+  var webdir = location.protocol + '//' + location.host + "/" + webdir_end + "/";
+  console.log("Setting to " +webdir);
+  rootana_dir = webdir;
+
+}
+                             
+
+  function updatePlots(deleteDygraph){
+
+   // update the MIDAS status
+   //var status = midasStatus()
+   // don't bother updating if run is not ongoing.
+   if(gRunOngoing == false){
+     document.getElementById("readstatus").innerHTML = "No updates when run stopped.";
+     document.getElementById("readstatus").style.color = "black";
+     document.getElementById("datetime").innerHTML = Date();
+     return;
+   }
+ 
+   // don't update if paused.
+   if(gIsPaused){
+     return;
+   }
+
+
+   var channel = Number(document.getElementById("channel_number").value);
+   var scan_type = document.getElementById("HistoDisplay").value;
+
+   switch (scan_type) {
+      case "Single":
+        plotAllHistograms("single",["graphdiv"],[gHistoName+channel],deleteDygraph);
+        break;
+     case "Overlay":
+       var numberOverlay = Number(document.getElementById("overlay_number").value);
+       var histograms = [];
+       for(var ii = 0; ii < numberOverlay; ii++){
+         var index = channel + ii;
+         if(index < gMaxChannel){
+           histograms.push(gHistoName+index);
+         }
+       }          
+       plotAllHistograms("overlay",["graphdiv"],histograms,deleteDygraph);
+       break;
+     case "Multiple":
+        // create lists of histograms and divs.
+        var histograms = []; var divnames = [];
+        histograms.push(gHistoName+channel); divnames.push("graphdiv21")
+        histograms.push(gHistoName+Number(channel+1)); divnames.push("graphdiv22")
+        plotAllHistograms("multiple",divnames,histograms,deleteDygraph);
+        break;
+   }
+
+  
+    document.getElementById("datetime").innerHTML = Date();
+  }
+
+
+function ShowParams() {
+   var scan_type = document.getElementById("HistoDisplay").value;
+   <!--document.getElementById("params").innerHTML = "You chose: " + scan_type; -->
+
+   switch (scan_type) {
+      case "Single":
+        document.getElementById("OverlayParams").style.display = "none";
+        document.getElementById("MultipleParams").style.display ="none";
+        document.getElementById("graphdiv").style.display ="block";
+        document.getElementById("graphdiv21").style.display ="none";
+        document.getElementById("graphdiv22").style.display ="none";
+        break;
+     case "Overlay":
+        document.getElementById("OverlayParams").style.display = "block";
+        document.getElementById("MultipleParams").style.display ="none";
+        document.getElementById("graphdiv").style.display ="block";
+        document.getElementById("graphdiv21").style.display ="none";
+        document.getElementById("graphdiv22").style.display ="none";
+        break;
+     case "Multiple":
+        document.getElementById("OverlayParams").style.display = "none";
+        document.getElementById("MultipleParams").style.display ="block";
+        document.getElementById("graphdiv").style.display ="none";
+        document.getElementById("graphdiv21").style.display ="block";
+        document.getElementById("graphdiv22").style.display ="block";
+        break;
+     default:
+        break;
+   }
+   updatePlots(true);
+}
+var gIntervalID = 0; 
+gIntervalID = setInterval(updatePlots,5000);
+setInterval(midasStatus,5000);   
+function changeUpdateTime() {
+   <!-- Delete old update interval -->
+   clearInterval(gIntervalID);
+
+   <!-- set new interval -->   
+   var currentUpdateTime = Number(document.getElementById("updatePeriod").value);
+   gIntervalID = setInterval(updatePlots,currentUpdateTime);
+}
+
+</script>
+
+
+</head>
+<!-- call to find_active_root_directory will take a moment to do the first read of ROOT tree; so wait 2sec before doing first call to plot -->
+<body onload="setRootanaDirectory('rootana');find_active_root_directory(false); midasStatus();updatePlots(false); setTimeout(updatePlots(false),1000);">
+  <div class="container-fluid">
+    
+    <!--- Top banner --> 
+    <div class="page-header">
+      <font size="6"><b>Rootana Display</b></font>
+      <button id="v792_select" style="background-color: lightgreen" onclick="usev792();ShowParams();updatePlots(true);"> 
+        V792 </button>
+      <button id="v1720_select"  onclick="usev1720();ShowParams();updatePlots(true);"> 
+        V1720 </button>
+      <button id="v1720C_select"  onclick="usev1720C();ShowParams();updatePlots(true);"> 
+        V1720 Correlations </button>
+      
+    </div>
+
+
+    <!--- Main display --> 
+    <div class="row">
+      
+      <!--- Control buttons --> 
+      <div class="col-md-3" >
+          <b>Display Control </b><br><br>
+          <input type="button" id="pause_button" onclick="pause_resume();" value="Pause" ></input><br>
+          <input type="button" id="reset_button" onclick="reset_histogram();" value="Reset This Histogram(s)" ></input>
+          <input type="button" id="reset_button" onclick="rootanaResetAllHistograms();" value="Reset All Histograms" ></input><br>
+
+          Channel:
+          <input type="number" id="channel_number" min="0" max="31" value="0" onchange="updatePlots(true);"><p>
+          Select Display Type
+          <select id="HistoDisplay" onchange="ShowParams()">
+            <option value="Single">Single</option>
+            <option value="Overlay">Overlay </option>
+            <option value="Multiple">Multiple </option>
+        </select><p>
+          <div id="OverlayParams" style="display:none"> 
+            Overlay N histos (2-8):
+            <input type="number" id="overlay_number" min="2" max="8" value="2" onchange="updatePlots(true);"><p>
+              <br>
+          </div>
+          <div id="MultipleParams" style="display:none"> 
+          </div>
+
+          <p> Refresh period (ms):
+            <input type="number" id="updatePeriod" min="100" max="100000" value="5000" onchange="changeUpdateTime();"><p>
+          
+          <br> <b>MIDAS Status</b><br>
+          <ul>
+            <li id="daq_running"></li>
+            <li id="current_run"></li>
+          </ul>
+          <br><br>
+          <br> <b>Links</b><br>
+          <a href="https://midastestdaq.triumf.ca">MIDAS page</a> <br>
+          <a href="https://midastestdaq.triumf.ca/rootana/">Root Online Browser</a> <br>
+          
+
+          <br><br>
+
+
+      </div>
+      
+      <!--- Main graphs --> 
+      <div class="col-md-8" >
+        
+        <div id="graphdiv" ></div>
+        <div id="graphdiv21" style="display:none"></div>
+        <div id="graphdiv22" style="display:none"></div>
+        
+        <div id="OverlayParams22" style="display:none"> 
+        </div>
+        
+        
+      </div>
+      
+      
+    </div>
+    
+  
+
+  </div>
+  
+  <!--- Status --> 
+  <p>
+  <p>Read back status: <span id="readstatus"></span> <p>
+  Last updated: <span id="datetime"></span>
+
+</body>
+
+</html>

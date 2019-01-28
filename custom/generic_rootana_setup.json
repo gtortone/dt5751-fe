@@ -1,0 +1,21 @@
+{ 
+  "V1725 Module 0" : { 
+    "MaxChannels" : 16,
+    "WebserverName" : "V1725_0"
+  },
+  "V1725 Module 1" : { 
+    "MaxChannels" : 16,
+    "WebserverName" : "V1725_1"
+  },
+  "V1725 Module 2" : { 
+    "MaxChannels" : 16,
+    "WebserverName" : "V1725_2"
+  },
+  "V1725 Module 3" : { 
+    "MaxChannels" : 16,
+    "WebserverName" : "V1725_3"
+  },
+  "DisplaySettings" : {
+    "DisplayStyle" : "root"
+  }
+} 
