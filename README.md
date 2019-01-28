@@ -68,7 +68,7 @@ and cumulative histograms.
 * ana.exe: a batch program that creates most of the same histograms as protoDisplay.exe
 * midas2root.exe: a program to convert the MIDAS data to ROOT Tree.  NOT YET WRITTEN!
 
-### MIDAS file location
+### Accessing MIDAS files
 
 The MIDAS files are temporarily being served here:
 
