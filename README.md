@@ -13,9 +13,19 @@ The MIDAS webserver for the prototype setup can be seen here:
 
 https://ds-proto-daq.triumf.ca/
 
-(need to distribute username and password somehow)
+Username is 'dsproto' and the password is the regular Indico password.
 
 
+## Online analyzer
+
+There is a javascript-based analyzer that can be used to see the waveforms and
+histograms in real time:
+
+https://ds-proto-daq.triumf.ca/CS/webdisplay
+
+The same plots are also available with the built-in JSROOT display provided by ROOT:
+
+https://ds-proto-daq.triumf.ca/rootana/
 
 ## Useful Information about ODB settings
 
@@ -74,7 +84,14 @@ The MIDAS files are temporarily being served here:
 
 https://ds-proto-daq.triumf.ca/proto_data/
 
-You can grab a file from there...
+You can grab a file from there.  For instance, grab the file run00183sub000.mid.gz which has at least
+some pulses in it.
+
+Now you can examine this file by doing
+
+    protoDisplay.exe run00183sub000.mid.gz
+
+
 
 
 ## ELOG
