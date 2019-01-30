@@ -57,13 +57,17 @@ The code for the prototype analyzer programs is here:
 
 https://bitbucket.org/ttriumfdaq/dsproto_analyzer/src/master/
 
+
 ## Simple data analysis
 
 ### Build analyzer code
 
 The analyzer program is based on [ROOTANA](https://bitbucket.org/tmidas/rootana/src/master/)
 which is a package for looking at MIDAS data online (as it is being taken) or offline (from MIDAS
-files).
+files).  The analyzer code has been compiled and run on Centos-7 (using ROOT 6.12)
+and MacOS 10.13 (using ROOT 6.10).
+It should work on other linux variants and other ROOT versions,
+though there might be some minor compiler problems to fix.
 
 To build the analyzer code, you need to first build ROOTANA (and have ROOT available); follow instructions
 on ROOTANA page to build it.  Once you have build ROOTANA, do the following
