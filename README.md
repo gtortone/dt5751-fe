@@ -78,6 +78,11 @@ and cumulative histograms.
 * ana.exe: a batch program that creates most of the same histograms as protoDisplay.exe
 * midas2root.exe: a program to convert the MIDAS data to ROOT Tree.  NOT YET WRITTEN!
 
+Some of the other important classes are:
+
+* TV1725RawData: this class does the decoding of the V1725 banks happens.
+* TV1725Waveform: this class makes the plots of the V1725 waveforms.
+
 ### Accessing MIDAS files
 
 The MIDAS files are temporarily being served here:
@@ -90,7 +95,6 @@ some pulses in it.
 Now you can examine this file by doing
 
     protoDisplay.exe run00183sub000.mid.gz
-
 
 
 
