@@ -14,7 +14,7 @@
 #PATH := /home/deap/packages/newgcc/bin:$(PATH)
 
 # Hardware setup
-NBLINKSPERA3818=1 # Number of optical links used per A3818
+NBLINKSPERA3818=4 # Number of optical links used per A3818
 NBLINKSPERFE=4 # Number of optical links controlled by each frontend
 NB1725PERLINK=1 # Number of daisy-chained v1725s per optical link
 NBV1725TOTAL=4 # Number of v1725 boards in total

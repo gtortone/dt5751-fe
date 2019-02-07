@@ -608,7 +608,7 @@ void * link_thread(void * arg)
       } // CheckEvent
 
       // Sleep for 5us to avoid hammering the board too much
-      usleep(5);
+      usleep(1);
     } // Done with all the modules
 
     // Escape if run is done -> kill thread
@@ -822,12 +822,11 @@ extern "C" INT poll_event(INT source, INT count, BOOL test)
   register int i;
 
   for (i = 0; i < count; i++) {
-
+    
     //ready for readout only when data is present in all ring buffers
     bool evtReady = true;
-    for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725){
-
-      if(itv1725->IsConnected() && (itv1725->GetNumEventsInRB() == 0)){
+    for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
+      if(itv1725->IsConnected() && (itv1725->GetNumEventsInRB() == 0)) {
         evtReady = false;
       }
     }
@@ -837,7 +836,7 @@ extern "C" INT poll_event(INT source, INT count, BOOL test)
       //      return 0;
       return 1;
     
-    usleep(1);
+    usleep(20);
   }
   return 0;
 }

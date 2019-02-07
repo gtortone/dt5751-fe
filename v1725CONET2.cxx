@@ -1143,12 +1143,12 @@ int v1725CONET2::InitializeForAcq()
 		}
 		WriteReg_(V1725_ZS_NSAMP            + (iChan<<8), ((config.zle_bins_before[iChan]<<16) | config.zle_bins_after[iChan]));
 
-		printf("ichan:%i  dac:0x%x DAC:0x%x\n", iChan, config.dac[iChan],V1725_CHANNEL_DAC+ (iChan<<8)); 
+		//		printf("ichan:%i  dac:0x%x DAC:0x%x\n", iChan, config.dac[iChan],V1725_CHANNEL_DAC+ (iChan<<8)); 
 		DWORD temp;
 
 
 		ReadReg_(V1725_CHANNEL_STATUS | (iChan << 8),&temp);
-		printf("Status %x\n",temp);
+		//		printf("Status %x\n",temp);
 
 		WriteReg_(V1725_CHANNEL_DAC         + (iChan<<8), config.dac[iChan]);			
 		
@@ -1173,13 +1173,13 @@ int v1725CONET2::InitializeForAcq()
 	for (int i=0;i<16;i++) {
 		addr = V1725_CHANNEL_STATUS | (i << 8);
 		ReadReg_(addr,&temp);
-		printf("Channel (%i) %x Status: %x\n",i,addr,temp);
+		//		printf("Channel (%i) %x Status: %x\n",i,addr,temp);
 		if((temp & 0x4) == 0x4){
 			printf("waiting for ADC calibration to finish...\n");
 			int j;
 			for(j =0; j < 20; i++){
 				sleep(1);
-				printf("temp %x\n",temp);
+				//				printf("temp %x\n",temp);
 				ReadReg_(addr,&temp);
 				if((temp & 0x4) == 0x0){
 					break;
@@ -1193,10 +1193,12 @@ int v1725CONET2::InitializeForAcq()
 				cm_msg(MINFO, "InitializeForAcq", "ADC Calibration did not finish!");
 			}					
 		}else{
-			printf("ADC calibration finished already\n");
+			//			printf("ADC calibration finished already\n");
 		}
 	}
 
+	printf("Module[...] : ADC calibration finished already\n");
+	
 	/// Set the trigger logic for each group of two channels
 	for(int iGroup = 0; iGroup < 8; iGroup++){
 		WriteReg_(V1725_CHANNEL_OUTHRESHOLD + (iGroup<<8), config.selftrigger_logic [iGroup]);

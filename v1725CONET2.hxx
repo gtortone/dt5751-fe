@@ -43,9 +43,6 @@ namespace TMath {
      { return a >= b ? a : b; }
 };
 
-
-
-o
 /**
  * Driver class for the v1725 module using the CAEN CONET2 (optical) interface.
  * Contains all the methods necessary to:
