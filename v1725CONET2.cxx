@@ -636,7 +636,7 @@ bool v1725CONET2::Poll(DWORD *val)
 }
 
 //! Maximum size of data to read using BLT (32-bit) cycle
-#define MAX_BLT_READ_SIZE_BYTES 10000
+#define MAX_BLT_READ_SIZE_BYTES 130000
 
 //
 //--------------------------------------------------------------------------------
