@@ -1027,11 +1027,12 @@ int v1725CONET2::InitializeForAcq()
   //                                                            0xD0000|0x0100:Clk out|enable new config, 0x3c:LVDS I/O[15..0]outputs
   //                                                            0x050000|0x0100:Busy out|enable new config, 0x3c:LVDS I/O[15..0]outputs
   //                                                            0x150000|0x0100:Lock out|enable new config, 0x3c:LVDS I/O[15..0]outputs
-  sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x4D013C); // Busy out, LVDS I/O[15..0] outputs
+  sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x4D013D); // Busy out, LVDS I/O[15..0] outputs
 
 	                                                 
-  sCAEN = WriteReg_(V1725_FP_LVDS_IO_CRTL,      0x0211); // 0x211 set the outputs to all output the trigger
-	// for first two groups and the busy for the third group 
+  sCAEN = WriteReg_(V1725_FP_LVDS_IO_CRTL,      0x1100); // this configures the V1725 to output the trigger primitives from 
+	// the 8 trigger pairs to the upper 8 LVDS outputs.
+	// The configuration 0x0011 should work to send the same signals to the lower 8 LVDS outputs, but this doesn't work.
 
   std::stringstream ss_fw_datatype;
   ss_fw_datatype << "Module " << moduleID_ << ", ";
