@@ -86,6 +86,7 @@ Some of the other important classes are:
 
 * TV1725RawData: this class does the decoding of the V1725 banks happens.
 * TV1725Waveform: this class makes the plots of the V1725 waveforms.
+* TChannelHistograms: set of classes for histograms of channel baselines and baseline RMS
 
 ### Accessing MIDAS files
 
@@ -99,8 +100,6 @@ some pulses in it.
 Now you can examine this file by doing
 
     protoDisplay.exe run00183sub000.mid.gz
-
-
 
 ## ELOG
 
