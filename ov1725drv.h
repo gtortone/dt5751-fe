@@ -21,7 +21,6 @@ CAENComm_ErrorCode ov1725_ChannelSet(int handle, uint32_t channel, uint32_t what
 CAENComm_ErrorCode ov1725_ChannelGet(int handle, uint32_t channel, uint32_t what, uint32_t *data);
 CAENComm_ErrorCode ov1725_ChannelGet(int handle, uint32_t channel, uint32_t what, uint32_t *data);
 CAENComm_ErrorCode ov1725_ChannelThresholdSet(int handle, uint32_t channel, uint32_t threshold);
-CAENComm_ErrorCode ov1725_ChannelOUThresholdSet(int handle, uint32_t channel, uint32_t threshold);
 CAENComm_ErrorCode ov1725_ChannelDACSet(int handle, uint32_t channel, uint32_t dac);
 CAENComm_ErrorCode ov1725_ChannelDACGet(int handle, uint32_t channel, uint32_t *dac);
 CAENComm_ErrorCode ov1725_AcqCtl(int handle, uint32_t operation);

@@ -29,7 +29,6 @@ CAENComm_ErrorCode ov1725_ChannelSet(int handle, uint32_t channel, uint32_t what
   uint32_t reg, mask;
 
   if (what == V1725_CHANNEL_THRESHOLD)   mask = 0x0FFF;
-  if (what == V1725_CHANNEL_OUTHRESHOLD) mask = 0x0FFF;
   if (what == V1725_CHANNEL_DAC)         mask = 0xFFFF;
   reg = what | (channel << 8);
   return CAENComm_Write32(handle, reg, (that & 0xFFF));
@@ -41,7 +40,6 @@ CAENComm_ErrorCode ov1725_ChannelGet(int handle, uint32_t channel, uint32_t what
   uint32_t reg, mask;
 
   if (what == V1725_CHANNEL_THRESHOLD)   mask = 0x0FFF;
-  if (what == V1725_CHANNEL_OUTHRESHOLD) mask = 0x0FFF;
   if (what == V1725_CHANNEL_DAC)         mask = 0xFFFF;
   reg = what | (channel << 8);
   return CAENComm_Read32(handle, reg, data);
@@ -56,14 +54,6 @@ CAENComm_ErrorCode ov1725_ChannelThresholdSet(int handle, uint32_t channel, uint
   return CAENComm_Write32(handle, reg,(threshold & 0xFFF));
 }
 
-/*****************************************************************/
-CAENComm_ErrorCode ov1725_ChannelOUThresholdSet(int handle, uint32_t channel, uint32_t threshold)
-{
-  uint32_t reg;
-  reg = V1725_CHANNEL_OUTHRESHOLD | (channel << 8);
-  printf("reg:0x%x, outhreshold:%x\n", reg, threshold);
-  return CAENComm_Write32(handle, reg, (threshold & 0xFFF));
-}
 
 /*****************************************************************/
 CAENComm_ErrorCode ov1725_ChannelDACSet(int handle, uint32_t channel, uint32_t dac)

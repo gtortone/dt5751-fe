@@ -1200,10 +1200,9 @@ int v1725CONET2::InitializeForAcq()
 
 	printf("Module[...] : ADC calibration finished already\n");
 	
-	/// Set the trigger logic for each group of two channels
-	for(int iGroup = 0; iGroup < 8; iGroup++){
-		WriteReg_(V1725_CHANNEL_OUTHRESHOLD + (iGroup<<8), config.selftrigger_logic [iGroup]);
-	}
+	// Set the trigger logic for each group of two channels; 
+	// 3 meansa trigger on either channel will trigger the group
+	WriteReg_(V1725_SELFTRIGGER_LOGIC, 3);
 	
 	// Check finally for Acquisition status
 	sCAEN = ReadReg_(0x8178, &reg);

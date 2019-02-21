@@ -18,7 +18,8 @@
 #define V1725_BOARD_CFG_BIT_CLR             0x8008      /* write only; D32 */
  
 #define V1725_BUFFER_ORGANIZATION             0x800C      /* R/W       ; D32 */ 
-#define V1725_CUSTOM_SIZE                     0x8020      /* R/W       ; D32 */ 
+#define V1725_CUSTOM_SIZE                     0x8020      /* R/W       ; D32 */
+#define V1725_SELFTRIGGER_LOGIC               0x8068      /* R/W       ; D32 */ 
 #define V1725_ADC_CALIBRATION                 0x809C      /* R/W       ; D32 */ 
 #define V1725_ACQUISITION_CONTROL             0x8100      /* R/W       ; D32 */ 
 #define V1725_ACQUISITION_STATUS              0x8104      /* read  only; D32 */ 
@@ -66,7 +67,6 @@
 #define V1725_INPUT_CONTROL                   0x1064      /* For channel 0 */
 #define V1725_PULSE_WIDTH                     0x1070      /* For channel 0 */
 #define V1725_CHANNEL_THRESHOLD               0x1060      /* For channel 0 */
-#define V1725_CHANNEL_OUTHRESHOLD             0x1084      /* For channel 0 */
 #define V1725_CHANNEL_STATUS                  0x1088      /* For channel 0 */
 #define V1725_FPGA_FWREV                      0x108C      /* For channel 0 */
 #define V1725_BUFFER_OCCUPANCY                0x1094      /* For channel 0 */

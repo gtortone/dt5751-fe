@@ -591,7 +591,7 @@ void * link_thread(void * arg)
         if (status == DB_TIMEOUT) {
           cm_msg(MERROR,"link_thread", "Got wp timeout for thread %d (module %d).  Is the ring buffer full?",
                  link, moduleID);
-          cm_msg(MERROR,"link_thread", "Exiting thread %d", link);
+          cm_msg(MERROR,"link_thread", "Exiting thread %d with error", link);
           thread_retval[link] = -1;
           pthread_exit((void*)&thread_retval[link]);
         }
@@ -601,7 +601,7 @@ void * link_thread(void * arg)
           
         } else {
           cm_msg(MERROR,"link_thread", "Readout routine error on thread %d (module %d)", link, moduleID);
-          cm_msg(MERROR,"link_thread", "Exiting thread %d", link);
+          cm_msg(MERROR,"link_thread", "Exiting thread %d with error", link);
           thread_retval[link] = -1;
           pthread_exit((void*)&thread_retval[link]);
         }
@@ -663,6 +663,8 @@ INT end_of_run(INT run_number, char *error)
           cm_msg(MERROR, "EOR",
                  "Could not stop the run for module %d", itv1725->GetModuleID());
 
+	printf("Number of events in ring buffer for module-%i: %i\n",itv1725->GetModuleID(),itv1725->GetNumEventsInRB());
+
         rb_delete(itv1725->GetRingBufferHandle());
         itv1725->SetRingBufferHandle(-1);
 	itv1725->ResetNumEventsInRB();
@@ -672,7 +674,7 @@ INT end_of_run(INT run_number, char *error)
     // Info about event in HW buffer
     result = ov1725[0].Poll(&eStored);
     if(eStored != 0x0) {
-      cm_msg(MERROR, "EOR", "Events left in the v1725: %d",eStored);
+      cm_msg(MERROR, "EOR", "Events left in the v1725-%i: %d",itv1725->GetModuleID(),eStored);
     }
 
   }
