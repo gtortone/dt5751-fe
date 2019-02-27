@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html class="mcss">
+<head>
+   <meta charset="UTF-8">
+   <link rel="stylesheet" href="midas.css">
+   <script src="controls.js"></script>
+   <script src="midas.js"></script>
+   <script src="mhttpd.js"></script>
+   <title>V1725 Setup</title>
+
+   <style>
+      .mtable td { padding: 10px; }
+   </style>
+
+   <script>
+
+   var gStatusInflight = false;
+   function statusPeriodicUpdate(){
+      
+      // don't make another request if the last request is still outstanding.
+      if(gStatusInflight) return;     
+      gStatusInflight = true;
+      
+      // Get beamline values; also get the current number of periods and cycles.
+      mjsonrpc_send_request([
+	 mjsonrpc_make_request("db_get_values",{"paths":["/Equipment/V1725_Data00/Settings/Board0"]}),
+      ]).then(function (rpc) {         
+	 
+	 var board0 = rpc[0].result.data[0];
+	 
+	 //console.log("Board " + board0.selftrigger_threshold[0]);
+	 //console.log("Board " + board0['custom size']);
+	    
+	 gStatusInflight = false; // finished async routine
+
+      }).catch(function(error) {
+	 if (error.request) {
+	    var s = mjsonrpc_decode_error(error);
+	    console.log("mjsonrpc_error_alert: " + s);
+	 } else {
+	    console.log("mjsonroc_error_alert: " + error);
+	 }
+      });
+   }
+ 
+   function set_parameter(odbkey){
+      var paths = [];
+      for (var i =0; i < 4; i++){
+	 console.log(i)
+	 paths.push("/Equipment/V1725_Data00/Settings/Board"+i+"/"+odbkey);
+      }
+      tvalue = document.getElementById(odbkey).value
+      console.log(paths.length);
+      mjsonrpc_db_paste(paths, [tvalue,tvalue,tvalue,tvalue]).then(function(rpc) {
+	 result=rpc.result;	      
+      }).catch(function(error) {
+          mjsonrpc_error_alert(error);
+      });
+   }
+  
+</script>
+
+</head>
+
+<body class="mcss" onload="mhttpd_init('V1725 Setup');setInterval(statusPeriodicUpdate,3000);statusPeriodicUpdate()">
+
+<!-- header and side navigation will be filled in mhttpd_init -->
+<div id="mheader"></div>
+<div id="msidenav"></div>
+
+<div id="mmain">
+
+  <table class="mtable">
+    <tr>
+      <th colspan="6" class="mtableheader">V1725 Board Setup</th>
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+      <th colspan="4" >Readback</th>     
+    </tr>
+    <tr>
+      <td>
+        Custom Size
+      </td>
+      <td>       
+        <input id="Custom size" onblur="set_parameter('Custom size')"></input>
+      </td>
+      <td >       
+        <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Custom size" ></div> 
+      </td>
+      <td >       
+        <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Custom size" ></div> 
+      </td>
+      <td >       
+        <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Custom size" ></div> 
+      </td>
+      <td >       
+        <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Custom size" ></div> 
+      </td>
+    </tr>
+    <tr>
+      <td>
+	Post Trigger
+      </td>
+      <td>       
+          <input id="Post Trigger" onblur="set_parameter('Post Trigger')"></input>
+	</td>
+	<td >       
+          <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Post Trigger" ></div> 
+	</td>
+	<td >       
+          <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Post Trigger" ></div> 
+	</td>
+	<td >       
+          <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Post Trigger" ></div> 
+	</td>
+	<td >       
+          <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Post Trigger" ></div> 
+	</td>
+    </tr>
+    <tr>
+      <td>
+        Channel Mask
+      </td>
+      <td>       
+      </td>
+      <td >       
+        <div name="modbvalue" data-format="x" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Channel Mask" ></div> 
+      </td>
+      <td >       
+        <div name="modbvalue" data-format="x" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Channel Mask" ></div> 
+      </td>
+      <td >       
+        <div name="modbvalue" data-format="x" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Channel Mask" ></div> 
+      </td>
+      <td >       
+        <div name="modbvalue" data-format="x" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Channel Mask" ></div> 
+      </td>
+
+
+    </tr>
+  </table>
+
+  <br>
+
+Notes:
+
+  <ul>
+    <li> The number of saved samples is = "Custom Size" * 4 </li>
+  </ul>
+
+  Links to full set of ODB parameters:
+
+  <ul>
+    <li>  <a href="/Equipment/V1725_Data00/Settings/Board0"> Board 0 </a></li>
+    <li>  <a href="/Equipment/V1725_Data00/Settings/Board1"> Board 1 </a></li>
+    <li>  <a href="/Equipment/V1725_Data00/Settings/Board2"> Board 2 </a></li>
+    <li>  <a href="/Equipment/V1725_Data00/Settings/Board3"> Board 3 </a></li>
+  </ul>
+
+</div>
+
+
+</body>
+</html>
+
