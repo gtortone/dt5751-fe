@@ -116,6 +116,13 @@ LIBCAENCOMM=-lCAENComm
 # CAENVME
 #LIBCAENVME=-L$(CAENVME_LIB) -lCAENVME
 LIBCAENVME=-lCAENVME
+
+# ZMQ
+LIBZMQ=-lzmq
+
+# ALLLIBS
+LIBALL= $(LIBMIDAS) $(LIBCAENCOMM) $(LIBCAENVME) $(LIBZMQ)
+
 #
 # All includes
 # INCS = -I. -I./include -I$(MIDAS_INC) -I$(MIDAS_DRV) -I$(CAENVME_DIR)/include -I$(CAENCOMM_DIR)/include
@@ -147,10 +154,10 @@ ov1725.o : ov1725.c
 ####################################################################
 
 feoV1725mt.exe: $(MIDAS_LIB)/mfe.o  feoV1725.o ov1725.o v1725CONET2.o
-	$(CXX) $(OSFLAGS) feoV1725.o v1725CONET2.o ov1725.o $(MIDAS_LIB)/mfe.o $(LIBMIDAS) $(LIBCAENCOMM) $(LIBCAENVME) -o $@ $(LDFLAGS)
+	$(CXX) $(OSFLAGS) feoV1725.o v1725CONET2.o ov1725.o $(MIDAS_LIB)/mfe.o $(LIBALL) -o $@ $(LDFLAGS)
 
 feoV1725.o : feoV1725.cxx v1725CONET2.o
-	$(CXX) $(CFLAGS) $(OSFLAGS) $(INCS) -Ife -c $< -o $@
+	$(CXX) $(CFLAGS) $(OSFLAGS) $(INCS) -I. -Ife -c $< -o $@
 
 v1725CONET2.o : v1725CONET2.cxx
 	$(CXX) $(CFLAGS) $(OSFLAGS) $(INCS) -Ife -c $< -o $@

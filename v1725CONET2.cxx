@@ -442,14 +442,15 @@ bool v1725CONET2::StartRun()
 	db_get_record(odb_handle_, settings_handle_, &config, &size, 0);
 	
 	int status = InitializeForAcq();
-	if (status == -1) return false;  
+	if (status == -1){std::cout << "Failed to Acq " << std::endl; return false;  }
 
   CAENComm_ErrorCode e = AcqCtl_(V1725_RUN_START);
-  if (e == CAENComm_Success)
+  if (e == CAENComm_Success){
     running_=true;
-  else
+	}else{
+		std::cout << "Failed to start run... " << std::endl;
     return false;
-	
+	}	
   return true;
 }
 
@@ -636,7 +637,7 @@ bool v1725CONET2::Poll(DWORD *val)
 }
 
 //! Maximum size of data to read using BLT (32-bit) cycle
-#define MAX_BLT_READ_SIZE_BYTES 130000
+#define MAX_BLT_READ_SIZE_BYTES 1200000
 
 //
 //--------------------------------------------------------------------------------
@@ -658,7 +659,7 @@ bool v1725CONET2::ReadEvent(void *wp)
 
 	// Block read to get all data from board.  
   sCAEN = ReadReg_(V1725_EVENT_SIZE, &size_remaining_dwords);
-  
+  printf("Data packet size: %i\n",size_remaining_dwords);
   while ((size_remaining_dwords > 0) && (sCAEN == CAENComm_Success)) {
     
     //calculate amount of data to be read in this iteration
@@ -815,7 +816,10 @@ bool v1725CONET2::FillBufferLevelBank(char * pevent)
     /* If the almost full register is set to 0,
      * the busy signal comes out only when all the
      * 1024 buffers are used */
-    busy = (eStored == 1024) ? 1 : 0;
+		// PAA - for buffer Org 0xa
+		// busy = (eStored == 1024) ? 1 : 0;
+		// PAA - for buffer Org 0x7
+    busy = (eStored == 128) ? 1 : 0;
   }
   else {
     busy = (eStored >= almostFull) ? 1 : 0;

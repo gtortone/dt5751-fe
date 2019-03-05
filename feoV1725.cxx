@@ -101,6 +101,9 @@ controls 2*2 = 4 v1725 boards.  Compile and run:
 #include "midas.h"
 #include "v1725CONET2.hxx"
 
+#include <zmq.h>
+//#include <zmq.hpp>
+
 // __________________________________________________________________
 // --- General feov1725 parameters
 
@@ -169,6 +172,7 @@ INT read_event_from_ring_bufs(char *pevent, INT off);
 INT read_buffer_level(char *pevent, INT off);
 INT read_temperature(char *pevent, INT off);
 void * link_thread(void *);
+void *subscriber;
 
 // __________________________________________________________________
 /*-- Equipment list ------------------------------------------------*/
@@ -422,6 +426,25 @@ INT frontend_init(){
     printf("ERROR setting cpu affinity for main thread: %s\n", strerror(errno));
   }
 
+  //-begin - ZMQ----------------------------------------------------------
+#if (0)
+  zmq::context_t context(1);
+  zmq::socket_t socket (context, ZMQ_SUB);
+  std::cout << "This Subscriber connecting to ChronoBox Publisher... ";
+  socket.bind ("tcp://*:5555");
+  std::cout << " Done" << std::endl;
+#endif
+#if (1)
+  //  Socket to talk to clients
+  void *context = zmq_ctx_new ();
+  subscriber = zmq_socket (context, ZMQ_SUB);
+  int rc = zmq_bind (subscriber, "tcp://*:5555");
+  // Without message
+  zmq_setsockopt (subscriber, ZMQ_SUBSCRIBE, "", 0);
+  printf (" This subscriber is connecting to the ChronoBox Publisher context: %p *subscriber: %p rc:%d \n", context, subscriber, rc);
+#endif
+  //-end - ZMQ----------------------------------------------------------
+
   return SUCCESS;
 }
 
@@ -575,6 +598,7 @@ void * link_thread(void * arg)
       // Check if event in hardware to read
       if (itv1725_thread[link]->CheckEvent()){
 
+
         /* If we've reached 75% of the ring buffer space, don't read
          * the next event.  Wait until the ring buffer level goes down.
          * It is better to let the v1725 buffer fill up instead of
@@ -585,7 +609,7 @@ void * link_thread(void * arg)
         if(rb_level > (int)(event_buffer_size*0.75)) {
           continue;
         }
-        
+       
         // Ok to read data
         status = rb_get_wp(rb_handle, &wp, 100);
         if (status == DB_TIMEOUT) {
@@ -598,7 +622,6 @@ void * link_thread(void * arg)
         
         // Read data
         if(itv1725_thread[link]->ReadEvent(wp)) {
-          
         } else {
           cm_msg(MERROR,"link_thread", "Readout routine error on thread %d (module %d)", link, moduleID);
           cm_msg(MERROR,"link_thread", "Exiting thread %d with error", link);
@@ -608,7 +631,7 @@ void * link_thread(void * arg)
       } // CheckEvent
 
       // Sleep for 5us to avoid hammering the board too much
-      usleep(1);
+      usleep(1); 
     } // Done with all the modules
 
     // Escape if run is done -> kill thread
@@ -616,7 +639,8 @@ void * link_thread(void * arg)
       break;
   }
   
-  cm_msg(MINFO,"link_thread", "Exiting thread %d", link);
+  cm_msg(MINFO,"link_thread", "Exiting thread %d clean...", link);
+  std::cout << "Exiting thread " << link << " clean " << std::endl;
   thread_retval[link] = 0;
   pthread_exit((void*)&thread_retval[link]);
 }
@@ -880,13 +904,29 @@ extern "C" INT interrupt_configure(INT cmd, INT source, POINTER_T adr)
  * Get data from all ring buffers and compose the MIDAS banks.
  */
 INT read_event_from_ring_bufs(char *pevent, INT off) {
-
+  DWORD *pdata;
+  
   if (!runInProgress) return 0;
-
+  
   sn = SERIAL_NUMBER(pevent);
-
+  
   bk_init32(pevent);
-
+  
+  // Get the ChronoBox bank
+  bk_create(pevent, "ZMQ0", TID_DWORD, (void **)&pdata);
+  // Use ZMQ_DONTWAIT to prevent blocking.
+  int stat = zmq_recv (subscriber, pdata, 1000, ZMQ_DONTWAIT);
+  // PAA - As long as you don't close the bank, the bank won't be recorder
+  if (stat > 0) {
+    printf ("stat: %d  pdata[0]: %d ... ", stat, pdata[0]);
+    printf("composing ZMQ bank\n");
+    // May want to compare the CB-S/N and TS to the expected values
+    // ...
+    pdata += stat/sizeof(uint32_t); 
+    stat = bk_close(pevent, pdata);
+  }
+  
+  // Get the V1725
   for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
     if (! itv1725->IsConnected()) continue;   // Skip unconnected board
 
@@ -900,7 +940,6 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
     cm_msg(MINFO,"read_trigger_event", "******** Event size is 0, SN: %d", sn);
   return ev_size;
 }
-
 
 //                                                                                         
 //----------------------------------------------------------------------------             
@@ -957,7 +996,39 @@ INT read_temperature(char *pevent, INT off) {
     }
     bk_close(pevent,pdata);
     
-  }
+    //- ZMQ test ----------------------------
+    // Receiving ZMQ data
+    //    zmq::message_t cb_data;
+    //    subscriber.recv(&cb_data);
+    //    printf("cb_data: %d\n", cb_data
+    //    char msg[255] = {'\0'};
 
+    /*
+    uint32_t rcvbuf[100];
+    int stat = zmq_recv (subscriber, rcvbuf, sizeof(rcvbuf), ZMQ_DONTWAIT);
+    if (stat > 0) {
+    printf ("stat: %d - rcvbuf[0]: %d ... ", stat, rcvbuf[0]);
+    printf("composing ZMQ bank\n");
+    bk_create(pevent, "ZMQ0", TID_DWORD, (void **)&pdata);
+    memcpy(pdata, rcvbuf, stat);
+    pdata += stat/sizeof(uint32_t);
+    bk_close(pevent, pdata);
+    */
+    
+    /*
+    bk_create(pevent, "ZMQ0", TID_DWORD, (void **)&pdata);
+    int stat = zmq_recv (subscriber, pdata, 1000, ZMQ_DONTWAIT);
+    // PAA - As long as you don't close the bank, the bank list & event is unchanged.
+    if (stat > 0) {
+      printf ("stat: %d  pdata[0]: %d ... ", stat, pdata[0]);
+      printf("composing ZMQ bank\n");
+      pdata += stat/sizeof(uint32_t); 
+      stat = bk_close(pevent, pdata);
+      printf("bk_close size:%d\n", stat);
+    }
+    */
+    
+    //- ZMQ test ----------------------------
+  }
   return bk_size(pevent);
 }
