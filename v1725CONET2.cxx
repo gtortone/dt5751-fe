@@ -1023,14 +1023,13 @@ int v1725CONET2::InitializeForAcq()
   sCAEN = WriteReg_(V1725_FP_IO_CONTROL, 0x00000000);
 	usleep(200000);
 
-  // Setup Busy daisy chaining
-	//  sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x13c);  // 0x100:enable nconfig
+  // V1725_FP_IO_CONTROL configuration
+	//                                                            0x1: TTL trigger levels 
 	//                                                            0x3c:LVDS I/O[15..0] output
-  //                                                            0x50000|0x0100:Clk out|enable new config, 0x3c:LVDS I/O[15..0]outputs
-  //                                                            0xD0000|0x0100:Clk out|enable new config, 0x3c:LVDS I/O[15..0]outputs
-  //                                                            0x050000|0x0100:Busy out|enable new config, 0x3c:LVDS I/O[15..0]outputs
-  //                                                            0x150000|0x0100:Lock out|enable new config, 0x3c:LVDS I/O[15..0]outputs
-  sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x4D013D); // Busy out, LVDS I/O[15..0] outputs
+	//                                                            0x100:enable new config
+  //                                                            0xD0000: Busy signal from motherboard outputted on TRG-OUT
+  //                                                            0x400000: store extended timetag in bank. 
+  sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x4D013D); 
 
 	                                                 
   sCAEN = WriteReg_(V1725_FP_LVDS_IO_CRTL,      0x1100); // this configures the V1725 to output the trigger primitives from 
