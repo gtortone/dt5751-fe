@@ -148,7 +148,7 @@ BOOL frontend_call_loop = FALSE;
 //! a frontend status page is displayed with this frequency in ms
 INT display_period = 000;
 //! maximum event size produced by this frontend
-INT max_event_size = 32 * 222800;
+INT max_event_size = 32 * 422800;
 //! maximum event size for fragmented events (EQ_FRAGMENTED)
 INT max_event_size_frag = 5 * 1024 * 1024;
 //! buffer size to hold events

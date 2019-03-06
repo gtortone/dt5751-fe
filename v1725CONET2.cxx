@@ -659,8 +659,7 @@ bool v1725CONET2::ReadEvent(void *wp)
 
 	// Block read to get all data from board.  
   sCAEN = ReadReg_(V1725_EVENT_SIZE, &size_remaining_dwords);
-  printf("Data packet size: %i\n",size_remaining_dwords);
-  while ((size_remaining_dwords > 0) && (sCAEN == CAENComm_Success)) {
+    while ((size_remaining_dwords > 0) && (sCAEN == CAENComm_Success)) {
     
     //calculate amount of data to be read in this iteration
     to_read_dwords = (size_remaining_dwords > MAX_BLT_READ_SIZE_BYTES/sizeof(DWORD)) ?
@@ -730,7 +729,7 @@ bool v1725CONET2::FillEventBank(char * pevent)
   bk_create(pevent, bankName, TID_DWORD, (void **)&dest);
 
 
-  uint32_t limit_size = (32*222800-bk_size(pevent))/4; // what space is left in the event (in DWORDS)  
+  uint32_t limit_size = (32*422800-bk_size(pevent))/4; // what space is left in the event (in DWORDS)  
   if (size_words > limit_size) {
 //    printf("Event with size: %u (Module %02d) bigger than max %u, event truncated\n", size_words, this->GetModuleID(), limit_size);
     cm_msg(MERROR,"FillEventBank","Event with size: %u (Module %02d) bigger than max %u, event truncated", size_words, this->GetModuleID(), limit_size);
@@ -1050,8 +1049,8 @@ int v1725CONET2::InitializeForAcq()
   uint32_t version = 0;
   uint32_t prev_chan = 0;
   // Hardcode correct firmware verisons
-	const uint32_t amc_fw_ver = 0x14048c02; 
-	const uint32_t roc_fw_ver = 0x1331040c; 
+	const uint32_t amc_fw_ver = 0x19010007;  // 0x14048c02; for ZLE
+	const uint32_t roc_fw_ver = 0x17200410;  // 0x1331040c; for ZLE
   for(int iCh=0;iCh<16;iCh++) {
     addr = 0x108c | (iCh << 8);
     sCAEN = ReadReg_(addr, &version);

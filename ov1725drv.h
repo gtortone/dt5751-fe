@@ -3,7 +3,7 @@
   Name:         ov1725drv.h
   Created by:   T. Lindner
                     implementation of the CAENCommLib functions
-  Contents:     v1725 16-channel 250 MHz 12-bit ADC
+  Contents:     v1725 16-channel 250 MHz 12-bit ADC  (standard RAW firmware)
 
   $Id$
                 
@@ -15,7 +15,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "CAENComm.h"
-#include "v1725.h"
+#include "v1725Raw.h"
 
 CAENComm_ErrorCode ov1725_ChannelSet(int handle, uint32_t channel, uint32_t what, uint32_t that);
 CAENComm_ErrorCode ov1725_ChannelGet(int handle, uint32_t channel, uint32_t what, uint32_t *data);

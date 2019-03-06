@@ -2,7 +2,7 @@
 /*                                                                         */
 /*  Filename: V1725.h                                                      */
 /*                                                                         */
-/*  Function: headerfile for V1725                                         */
+/*  Function: headerfile for V1725 (ZLE firmware)                          */
 /*                                                                         */
 /* ----------------------------------------------------------------------- */
 /* $Id$                                                                    */
