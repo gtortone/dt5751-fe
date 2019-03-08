@@ -1,10 +1,21 @@
 { 
-  "V1725 Waveforms" : { 
-    "MaxChannels" : 16,
-    "MaxModules" : 4,
-    "WebserverName" : "V1725"
-  },
-  "DisplaySettings" : {
-    "DisplayStyle" : "root"
-  }
+    "V1725 Waveforms" : { 
+	"MaxChannels" : 16,
+	"MaxModules" : 4,
+	"WebserverName" : "V1725"
+    },
+    "Pulse Heights" : { 
+	"MaxChannels" : 16,
+	"MaxModules" : 4,
+	"WebserverName" : "PulseHeight"
+    },
+    "Summary Histograms" : { 
+	"WebserverName" : {"Baseline" : "Baseline_Summary",
+			   "Baseline RMS" : "Baseline_RMS_Summary",
+			   "Pulses Vs Time" : "Pulses_Vs_Time"}
+    },
+    "DisplaySettings" : {
+	"DisplayStyle" : "root"
+    }
+
 } 
