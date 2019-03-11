@@ -690,7 +690,7 @@ bool v1725CONET2::ReadEvent(void *wp)
 
 //
 //--------------------------------------------------------------------------------
-bool v1725CONET2::FillEventBank(char * pevent)
+bool v1725CONET2::FillEventBank(char * pevent, uint32_t &timestamp)
 {
   if (! this->IsConnected()) {
     cm_msg(MERROR,"FillEventBank","Board %d disconnected", this->GetModuleID());
@@ -715,6 +715,7 @@ bool v1725CONET2::FillEventBank(char * pevent)
 
   uint32_t size_words = *src & 0x0FFFFFFF;
   uint32_t size_copied = size_words;
+	timestamp = src[3];
 
   // >>> create data bank
   char bankName[5];

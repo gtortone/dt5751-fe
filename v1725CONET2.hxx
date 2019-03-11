@@ -126,7 +126,7 @@ public:
   bool WriteReg(DWORD, DWORD);
   bool CheckEvent();
   bool ReadEvent(void *);
-  bool FillEventBank(char *);
+  bool FillEventBank(char *, uint32_t &timestamp);
   bool FillBufferLevelBank(char *);
   bool IsZLEData();
 

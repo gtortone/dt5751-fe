@@ -911,7 +911,10 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
   sn = SERIAL_NUMBER(pevent);
   
   bk_init32(pevent);
-  
+
+  // Keep track of timestamps
+  std::vector<uint32_t> timestamps;  
+
   // Get the ChronoBox bank
   bk_create(pevent, "ZMQ0", TID_DWORD, (void **)&pdata);
   // Use ZMQ_DONTWAIT to prevent blocking.
@@ -927,13 +930,23 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
   }
   
   // Get the V1725
+  
   for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
     if (! itv1725->IsConnected()) continue;   // Skip unconnected board
 
     // >>> Fill Event bank
-    itv1725->FillEventBank(pevent);
-
+    uint32_t timestamp;
+    itv1725->FillEventBank(pevent,timestamp);
+    timestamps.push_back(timestamp);
   }
+
+  // Check the timestamps
+  if(timestamps.size() > 1){
+    for(int i = 1; i < timestamps.size(); i++){
+      printf("%i 0x%x 0x%x 0x%x\n",i, timestamps[0],timestamps[i],timestamps[0]-timestamps[i]);
+    }    
+  }
+
 
   INT ev_size = bk_size(pevent);
   if(ev_size == 0)
