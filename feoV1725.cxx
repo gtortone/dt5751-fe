@@ -168,6 +168,7 @@ INT resume_run(INT run_number, char *error);
 INT frontend_loop();
 extern void interrupt_routine(void);  //!< Interrupt Service Routine
 
+BOOL wait_buffer_empty(int transition, BOOL first);
 INT read_event_from_ring_bufs(char *pevent, INT off);
 INT read_buffer_level(char *pevent, INT off);
 INT read_temperature(char *pevent, INT off);
@@ -284,6 +285,22 @@ void seq_callback(INT h, INT hseq, void *info){
     }
   }
 }
+
+// Start the chronobox run going.  TRUE=start run, FALSE=stop run)
+INT chronobox_start_stop(bool start){
+
+  int status;
+  if(start){
+    status = system("esper-tool write -d true 192.168.1.3 mod_tdm run");
+    printf("Started chronobox run; status = %i\n",status);
+  }else{
+    status = system("esper-tool write -d false 192.168.1.3 mod_tdm run");
+    printf("Stopped chronobox run; status = %i\n",status);
+  }
+
+  return status;
+}
+
 
 //
 //-------------------------------------------------------------------
@@ -426,6 +443,9 @@ INT frontend_init(){
     printf("ERROR setting cpu affinity for main thread: %s\n", strerror(errno));
   }
 
+  // Setup a deferred transition to wait till the V1725 buffer is empty.
+  cm_register_deferred_transition(TR_STOP, wait_buffer_empty);
+
   //-begin - ZMQ----------------------------------------------------------
 #if (0)
   zmq::context_t context(1);
@@ -490,6 +510,9 @@ INT begin_of_run(INT run_number, char *error)
   int rb_handle;
   int status;
   
+  /// Make sure the chronobox is stopped
+  chronobox_start_stop(false);
+
   runInProgress = true;
   {
     // Reset the PLL lock loss flag in ODB
@@ -538,6 +561,11 @@ INT begin_of_run(INT run_number, char *error)
       cm_msg(MERROR,"feov1725:BOR", "Couldn't create thread for link %d. Return code: %d", i, status);
     }
   }
+
+  /// Sleep 1 second and start chronobox
+  sleep(1);
+  chronobox_start_stop(true);
+
   
   set_equipment_status(equipment[0].name, "Started run", "#00ff00");
   printf(">>> End of begin_of_run\n\n");
@@ -644,6 +672,34 @@ void * link_thread(void * arg)
   thread_retval[link] = 0;
   pthread_exit((void*)&thread_retval[link]);
 }
+
+// Check how many events we have in the ring buffer
+BOOL wait_buffer_empty(int transition, BOOL first)
+ {
+
+   if(first){ 
+     printf("\nDeferred transition.  First call of wait_buffer_empty. Stopping run\n");
+     chronobox_start_stop(false);
+     sleep(1);
+     return FALSE;
+   }
+
+   bool haveEventsInBuffer = false;
+   for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
+     if(itv1725->IsConnected() && (itv1725->GetNumEventsInRB() != 0)) {
+       haveEventsInBuffer = true;
+     }
+   }
+
+   // Stay in deferred transition till all events are cleared
+   if(haveEventsInBuffer){
+     printf("Deferred transition: still have events\n");
+     return FALSE;
+   }
+
+   printf("Deferred transition: cleared all events\n");
+   return TRUE;
+ }
 
 //
 //----------------------------------------------------------------------------
@@ -943,10 +999,10 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
   // Check the timestamps
   if(timestamps.size() > 1){
     for(int i = 1; i < timestamps.size(); i++){
-      printf("%i 0x%x 0x%x 0x%x\n",i, timestamps[0],timestamps[i],timestamps[0]-timestamps[i]);
+      if(0)printf("%i 0x%x 0x%x 0x%x\n",i, timestamps[0],timestamps[i],timestamps[0]-timestamps[i]);
     }    
   }
-
+  // esper-tool write -d false 192.168.1.3 mod_tdm run
 
   INT ev_size = bk_size(pevent);
   if(ev_size == 0)
