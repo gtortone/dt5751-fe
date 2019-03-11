@@ -659,7 +659,7 @@ bool v1725CONET2::ReadEvent(void *wp)
 
 	// Block read to get all data from board.  
   sCAEN = ReadReg_(V1725_EVENT_SIZE, &size_remaining_dwords);
-    while ((size_remaining_dwords > 0) && (sCAEN == CAENComm_Success)) {
+	while ((size_remaining_dwords > 0) && (sCAEN == CAENComm_Success)) {
     
     //calculate amount of data to be read in this iteration
     to_read_dwords = (size_remaining_dwords > MAX_BLT_READ_SIZE_BYTES/sizeof(DWORD)) ?
@@ -671,7 +671,7 @@ bool v1725CONET2::ReadEvent(void *wp)
                                  << ", pdata=" << pdata
                                  << ", to_read_dwords=" << to_read_dwords
                                  << ", dwords_read returned " << dwords_read << ");" << std::endl;
-    
+  
     //increment pointers/counters
     dwords_read_total += dwords_read;
     size_remaining_dwords -= dwords_read;

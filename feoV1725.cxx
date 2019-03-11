@@ -155,6 +155,7 @@ INT max_event_size_frag = 5 * 1024 * 1024;
 INT event_buffer_size = 30 * max_event_size + 10000;
 
 bool runInProgress = false; //!< run is in progress
+bool stopRunInProgress = false; //!< 
 uint32_t timestamp_offset[NBLINKSPERFE*NB1725PERLINK]; //!< trigger time stamp offsets
 
 // __________________________________________________________________
@@ -294,6 +295,7 @@ INT chronobox_start_stop(bool start){
     status = system("esper-tool write -d true 192.168.1.3 mod_tdm run");
     printf("Started chronobox run; status = %i\n",status);
   }else{
+    printf("Stopping chronobox run; status = %i\n",status);
     status = system("esper-tool write -d false 192.168.1.3 mod_tdm run");
     printf("Stopped chronobox run; status = %i\n",status);
   }
@@ -438,7 +440,7 @@ INT frontend_init(){
 
   cpu_set_t mask;
   CPU_ZERO(&mask);
-  CPU_SET(0, &mask);  //Main thread to core 0
+  CPU_SET(5, &mask);  //Main thread to core 5
   if( sched_setaffinity(0, sizeof(mask), &mask) < 0 ){
     printf("ERROR setting cpu affinity for main thread: %s\n", strerror(errno));
   }
@@ -513,6 +515,7 @@ INT begin_of_run(INT run_number, char *error)
   /// Make sure the chronobox is stopped
   chronobox_start_stop(false);
 
+  stopRunInProgress = false; 
   runInProgress = true;
   {
     // Reset the PLL lock loss flag in ODB
@@ -596,8 +599,8 @@ void * link_thread(void * arg)
      * threads (links) 0,1,2,3 will go on cores 1,2,3,4
      * ex 2: NBCORES 4, 4 threads:
      * threads (links) 0,1,2,3 will go on cores 1,2,3,1     */
-    CPU_SET((link % (NBCORES-1)) + 1, &mask);
-    printf("core setting: NBCORES:%d link:%d core %d\n", NBCORES, link,(link % (NBCORES-1)) + 1);
+    CPU_SET((link + 1), &mask);
+    printf("core setting: NBCORES:%d link:%d core %d\n", NBCORES, link,(link + 1));
     break;
   }
   if( sched_setaffinity(0, sizeof(mask), &mask) < 0 ){
@@ -624,7 +627,7 @@ void * link_thread(void * arg)
       moduleID = itv1725_thread[link]->GetModuleID();
 
       // Check if event in hardware to read
-      if (itv1725_thread[link]->CheckEvent()){
+      if (!stopRunInProgress && itv1725_thread[link]->CheckEvent()){
 
 
         /* If we've reached 75% of the ring buffer space, don't read
@@ -667,7 +670,6 @@ void * link_thread(void * arg)
       break;
   }
   
-  cm_msg(MINFO,"link_thread", "Exiting thread %d clean...", link);
   std::cout << "Exiting thread " << link << " clean " << std::endl;
   thread_retval[link] = 0;
   pthread_exit((void*)&thread_retval[link]);
@@ -679,7 +681,12 @@ BOOL wait_buffer_empty(int transition, BOOL first)
 
    if(first){ 
      printf("\nDeferred transition.  First call of wait_buffer_empty. Stopping run\n");
+     // Some funny business here... need to pause the readout on the threads before
+     // making the chronobox stop call... some sort of contention for the system resources.
+     stopRunInProgress = true; 
+     usleep(500);
      chronobox_start_stop(false);
+     stopRunInProgress = false; 
      sleep(1);
      return FALSE;
    }
@@ -726,6 +733,7 @@ INT end_of_run(INT run_number, char *error)
   if(runInProgress){  //skip actions if we weren't running
 
     runInProgress = false;  //Signal threads to quit
+    
 
     // Do not quit parent before children processes, wait for the proper
     // child exit first.
