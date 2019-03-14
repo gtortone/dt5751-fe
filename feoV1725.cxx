@@ -109,10 +109,10 @@ controls 2*2 = 4 v1725 boards.  Compile and run:
 
 
 #ifndef NBLINKSPERA3818
-#define NBLINKSPERA3818   4   //!< Number of optical links used per A3818
+#define NBLINKSPERA3818   1   //!< Number of optical links used per A3818
 #define NBLINKSPERFE      1   //!< Number of optical links controlled by each frontend
 #define NB1725PERLINK     1   //!< Number of daisy-chained v1725s per optical link
-#define NBV1725TOTAL      4  //!< Number of v1725 boards in total
+#define NBV1725TOTAL      1  //!< Number of v1725 boards in total
 #define NBCORES           8   //!< Number of cpu cores, for process/thread locking
 #endif
 
@@ -156,6 +156,7 @@ INT event_buffer_size = 30 * max_event_size + 10000;
 
 bool runInProgress = false; //!< run is in progress
 bool stopRunInProgress = false; //!< 
+bool eor_transition_called = false; // already called EOR
 uint32_t timestamp_offset[NBLINKSPERFE*NB1725PERLINK]; //!< trigger time stamp offsets
 
 // __________________________________________________________________
@@ -453,17 +454,18 @@ INT frontend_init(){
   zmq::context_t context(1);
   zmq::socket_t socket (context, ZMQ_SUB);
   std::cout << "This Subscriber connecting to ChronoBox Publisher... ";
-  socket.bind ("tcp://*:5555");
+  socket.connect ("tcp://chronobox:5555");
   std::cout << " Done" << std::endl;
 #endif
 #if (1)
   //  Socket to talk to clients
   void *context = zmq_ctx_new ();
   subscriber = zmq_socket (context, ZMQ_SUB);
-  int rc = zmq_bind (subscriber, "tcp://*:5555");
+  int rc = zmq_connect (subscriber, "tcp://chronobox:5555");
   // Without message
   zmq_setsockopt (subscriber, ZMQ_SUBSCRIBE, "", 0);
-  printf (" This subscriber is connecting to the ChronoBox Publisher context: %p *subscriber: %p rc:%d \n", context, subscriber, rc);
+  printf (" This subscriber is connecting to the ChronoBox Publisher context: %p *subscriber: %p rc:%d \n"
+	  , context, subscriber, rc);
 #endif
   //-end - ZMQ----------------------------------------------------------
 
@@ -516,6 +518,8 @@ INT begin_of_run(INT run_number, char *error)
   chronobox_start_stop(false);
 
   stopRunInProgress = false; 
+  eor_transition_called = false;
+
   runInProgress = true;
   {
     // Reset the PLL lock loss flag in ODB
@@ -1007,7 +1011,25 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
   // Check the timestamps
   if(timestamps.size() > 1){
     for(int i = 1; i < timestamps.size(); i++){
-      if(0)printf("%i 0x%x 0x%x 0x%x\n",i, timestamps[0],timestamps[i],timestamps[0]-timestamps[i]);
+      uint32_t diff1 = timestamps[0]-timestamps[i];
+      uint32_t diff2 = timestamps[i]-timestamps[0];
+      uint32_t diff = (diff1 < diff2) ? diff1 : diff2;
+
+      if(diff > 10){ // allow at most 10 timestamps difference
+
+	// Only print the error message once
+	if(!eor_transition_called){
+	  cm_msg(MERROR,"read_trigger_event", "Error in timestamp matching between V1725 0 and %i.  Timestamps (val val diff): 0x%x 0x%x 0x%x\n", 
+		 i, timestamps[0],timestamps[i],diff);
+	  printf("%i 0x%x 0x%x 0x%x 0x%x \n",i, timestamps[0],timestamps[i],timestamps[0]-timestamps[i],diff);
+	  
+	  // Stop the run!
+	  if(1) cm_transition(TR_STOP, 0, NULL, 0, TR_DETACH, 0);
+	  eor_transition_called = true;
+	}
+	//eor_transition_called = true;
+      
+      }
     }    
   }
   // esper-tool write -d false 192.168.1.3 mod_tdm run
@@ -1054,13 +1076,13 @@ INT read_buffer_level(char *pevent, INT off) {
 //----------------------------------------------------------------------------             
 INT read_temperature(char *pevent, INT off) {
 
+  DWORD *pdata;
   bk_init32(pevent);
 
   // Read the temperature for each ADC...
   DWORD temp;
   for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725){
 
-    DWORD *pdata;
     int addr;
     char bankName[5];
     sprintf(bankName,"TP%02d", itv1725->GetModuleID());
@@ -1072,40 +1094,19 @@ INT read_temperature(char *pevent, INT off) {
      
     }
     bk_close(pevent,pdata);
-    
-    //- ZMQ test ----------------------------
-    // Receiving ZMQ data
-    //    zmq::message_t cb_data;
-    //    subscriber.recv(&cb_data);
-    //    printf("cb_data: %d\n", cb_data
-    //    char msg[255] = {'\0'};
-
-    /*
-    uint32_t rcvbuf[100];
-    int stat = zmq_recv (subscriber, rcvbuf, sizeof(rcvbuf), ZMQ_DONTWAIT);
-    if (stat > 0) {
-    printf ("stat: %d - rcvbuf[0]: %d ... ", stat, rcvbuf[0]);
+  }   
+  //- ZMQ test ----------------------------
+  
+  bk_create(pevent, "ZMQ0", TID_DWORD, (void **)&pdata);
+  int stat = zmq_recv (subscriber, pdata, 1000, ZMQ_DONTWAIT);
+  // PAA - As long as you don't close the bank, the bank list & event is unchanged.
+  if (stat > 0) {
+    printf ("stat: %d  pdata[0]: %d ... ", stat, pdata[0]);
     printf("composing ZMQ bank\n");
-    bk_create(pevent, "ZMQ0", TID_DWORD, (void **)&pdata);
-    memcpy(pdata, rcvbuf, stat);
-    pdata += stat/sizeof(uint32_t);
-    bk_close(pevent, pdata);
-    */
-    
-    /*
-    bk_create(pevent, "ZMQ0", TID_DWORD, (void **)&pdata);
-    int stat = zmq_recv (subscriber, pdata, 1000, ZMQ_DONTWAIT);
-    // PAA - As long as you don't close the bank, the bank list & event is unchanged.
-    if (stat > 0) {
-      printf ("stat: %d  pdata[0]: %d ... ", stat, pdata[0]);
-      printf("composing ZMQ bank\n");
-      pdata += stat/sizeof(uint32_t); 
-      stat = bk_close(pevent, pdata);
-      printf("bk_close size:%d\n", stat);
-    }
-    */
-    
-    //- ZMQ test ----------------------------
+    pdata += stat/sizeof(uint32_t); 
+    stat = bk_close(pevent, pdata);
+    printf("bk_close size:%d\n", stat);
   }
+  
   return bk_size(pevent);
 }

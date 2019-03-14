@@ -8,10 +8,10 @@
 
 int main (void)
 {
-    printf ("Connecting to server...\n");
+    printf ("Connecting to port 5557...\n");
     void *context = zmq_ctx_new ();
     void *publisher = zmq_socket (context, ZMQ_PUB);
-    zmq_connect (publisher, "tcp://localhost:5557");
+    zmq_connect (publisher, "tcp://*:5557");
 
     int request_nbr, bb;
     for (request_nbr = 0; request_nbr != 10000000; request_nbr++) {
