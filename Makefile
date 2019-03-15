@@ -59,6 +59,11 @@ CFLAGS = -g -Wall -pthread $(HWFLAGS)
 LDFLAGS = -g -lm -lz -lutil -lnsl -lpthread -lrt -lc 
 endif
 
+# Special compile options for V1720s at TRIUMF test setup.
+ifeq ($(NO_V1725),1)
+OSFLAGS += -DNO_V1725
+endif
+
 #-----------------------------------------
 # optimize?
 

@@ -1030,10 +1030,10 @@ int v1725CONET2::InitializeForAcq()
 	//                                                            0x100:enable new config
   //                                                            0xD0000: Busy signal from motherboard outputted on TRG-OUT
   //                                                            0x400000: store extended timetag in bank. 
-  sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x4D013D); 
-
+	sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x4D013D); 
 	                                                 
   sCAEN = WriteReg_(V1725_FP_LVDS_IO_CRTL,      0x1100); // this configures the V1725 to output the trigger primitives from 
+
 	// the 8 trigger pairs to the upper 8 LVDS outputs.
 	// The configuration 0x0011 should work to send the same signals to the lower 8 LVDS outputs, but this doesn't work.
 
@@ -1060,9 +1060,12 @@ int v1725CONET2::InitializeForAcq()
     prev_chan = version;
   }
 	//  cm_msg(MINFO,"feoV1725","Format: YMDD:XX.YY");
+
+#ifndef NO_V1725
   if(version != amc_fw_ver)
     cm_msg(MERROR,"InitializeForAcq","Incorrect AMC Firmware Version: 0x%08x, 0x%08x expected", version, amc_fw_ver);
   else
+#endif
     ss_fw_datatype << "AMC FW: 0x" << std::hex << version << ", ";
 
   // read ROC firmware revision
@@ -1074,7 +1077,9 @@ int v1725CONET2::InitializeForAcq()
     ss_fw_datatype << "ROC FW: 0x" << std::hex << version << ", ";
     break;
   default:
+#ifndef NO_V1725
     cm_msg(MERROR,"InitializeForAcq","Incorrect ROC Firmware Version: 0x%08x, 0x%08x expected", version, roc_fw_ver);
+#endif
     break;
   }
 
@@ -1083,7 +1088,7 @@ int v1725CONET2::InitializeForAcq()
   sCAEN = ReadReg_(V1725_BOARD_INFO, &version);
   if((version & 0xFF) != v1725_board_type)
     cm_msg(MINFO,"InitializeForAcq","*** WARNING *** Trying to use a v1725 frontend with another"
-        " type of board.  Results will be unexpected!");
+		" type of board (0x%x).   Results will be unexpected! ",version);
 
 
 //  ss_fw_datatype << this->GetChannelConfig();
@@ -1131,13 +1136,17 @@ int v1725CONET2::InitializeForAcq()
 	WriteReg_(V1725_VME_CONTROL,             V1725_ALIGN64);
 
 
-
 	printf("..............................Now other settings...\n");
 	//set specfic channel values
 	// TODO: add right registers for V1725 ZLE
 	// FIXME HERE!
 	usleep(200000);
+#ifdef NO_V1725
+	for (int iChan=0; iChan<8; iChan++) {
+#else
 	for (int iChan=0; iChan<16; iChan++) {
+#endif
+
 		WriteReg_(V1725_CHANNEL_THRESHOLD   + (iChan<<8), config.selftrigger_threshold     [iChan]);
 		
 		if( config.zle_signed_threshold[iChan]>0) {
@@ -1146,15 +1155,12 @@ int v1725CONET2::InitializeForAcq()
 			WriteReg_(V1725_ZLE_THRESHOLD     + (iChan<<8), (0x80000000 | (-1*config.zle_signed_threshold[iChan])));
 		}
 		WriteReg_(V1725_ZS_NSAMP            + (iChan<<8), ((config.zle_bins_before[iChan]<<16) | config.zle_bins_after[iChan]));
-
-		//		printf("ichan:%i  dac:0x%x DAC:0x%x\n", iChan, config.dac[iChan],V1725_CHANNEL_DAC+ (iChan<<8)); 
 		DWORD temp;
 
 
-		ReadReg_(V1725_CHANNEL_STATUS | (iChan << 8),&temp);
-		//		printf("Status %x\n",temp);
-
 		WriteReg_(V1725_CHANNEL_DAC         + (iChan<<8), config.dac[iChan]);			
+		//ReadReg_(V1725_CHANNEL_STATUS | (iChan << 8),&temp);
+		//printf("DAC (0x%x)after %x ,,, config %x %x \n",V1725_CHANNEL_DAC         + (iChan<<8),temp,config.dac[iChan],iChan);
 		
 		// Disable ZLE if requested
 		if(!config.enable_zle){
@@ -1169,6 +1175,7 @@ int v1725CONET2::InitializeForAcq()
 	// Wait for 200ms after channing DAC offsets, before starting calibration. 
 	usleep(200000);
 
+#ifdef NO_V1725
 	// Start the ADC calibration
   WriteReg_(V1725_ADC_CALIBRATION , 1);
 	// Now we check to see when the calibration has finished.
@@ -1202,10 +1209,10 @@ int v1725CONET2::InitializeForAcq()
 	}
 
 	printf("Module[...] : ADC calibration finished already\n");
-	
 	// Set the trigger logic for each group of two channels; 
 	// 3 meansa trigger on either channel will trigger the group
 	WriteReg_(V1725_SELFTRIGGER_LOGIC, 3);
+#endif	
 	
 	// Check finally for Acquisition status
 	sCAEN = ReadReg_(0x8178, &reg);
