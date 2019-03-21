@@ -1148,6 +1148,12 @@ int v1725CONET2::InitializeForAcq()
 #endif
 
 		WriteReg_(V1725_CHANNEL_THRESHOLD   + (iChan<<8), config.selftrigger_threshold     [iChan]);
+
+#ifdef NO_V1725  // registers are different for V1720
+		WriteReg_(0x1080 + (iChan<<8), config.selftrigger_threshold     [iChan]);  // threshold
+		WriteReg_(0x1084 + (iChan<<8), 1);  // number of samples over threshold = 4
+#endif
+	
 		
 		if( config.zle_signed_threshold[iChan]>0) {
 			WriteReg_(V1725_ZLE_THRESHOLD     + (iChan<<8), config.zle_signed_threshold  [iChan]);
