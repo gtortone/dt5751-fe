@@ -177,6 +177,7 @@ INT read_temperature(char *pevent, INT off);
 void * link_thread(void *);
 void *subscriber;
 
+
 // __________________________________________________________________
 /*-- Equipment list ------------------------------------------------*/
 #undef USE_INT
@@ -263,6 +264,7 @@ std::vector<v1725CONET2>::iterator itv1725_thread[NBLINKSPERFE];  //!< Link thre
 pthread_t tid[NBLINKSPERFE];                            //!< Thread ID
 int thread_retval[NBLINKSPERFE] = {0};                  //!< Thread return value
 int thread_link[NBLINKSPERFE];                          //!< Link number associated with each thread
+bool is_first_event = true;
 
 /********************************************************************/
 /********************************************************************/
@@ -450,14 +452,7 @@ INT frontend_init(){
   cm_register_deferred_transition(TR_STOP, wait_buffer_empty);
 
   //-begin - ZMQ----------------------------------------------------------
-#if (0)
-  zmq::context_t context(1);
-  zmq::socket_t socket (context, ZMQ_SUB);
-  std::cout << "This Subscriber connecting to ChronoBox Publisher... ";
-  socket.connect ("tcp://chronobox:5555");
-  std::cout << " Done" << std::endl;
-#endif
-#if (1)
+  
   //  Socket to talk to clients
   void *context = zmq_ctx_new ();
   subscriber = zmq_socket (context, ZMQ_SUB);
@@ -466,7 +461,10 @@ INT frontend_init(){
   zmq_setsockopt (subscriber, ZMQ_SUBSCRIBE, "", 0);
   printf (" This subscriber is connecting to the ChronoBox Publisher context: %p *subscriber: %p rc:%d \n"
 	  , context, subscriber, rc);
-#endif
+
+  // Need to discard the first ZMQ bank.
+  is_first_event = true;
+
   //-end - ZMQ----------------------------------------------------------
 
   return SUCCESS;
@@ -568,6 +566,9 @@ INT begin_of_run(INT run_number, char *error)
       cm_msg(MERROR,"feov1725:BOR", "Couldn't create thread for link %d. Return code: %d", i, status);
     }
   }
+
+  // Need to discard the first ZMQ bank.
+  is_first_event = true;
 
   /// Sleep 1 second and start chronobox
   sleep(1);
@@ -984,15 +985,25 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
   std::vector<uint32_t> timestamps;  
 
   // Get the ChronoBox bank
+  // If this is the first event, then read ZMQ buffer an extra time; want to discard first event.
+  if(is_first_event){
+    uint32_t rcvbuf [100];
+    int stat0 = zmq_recv (subscriber, rcvbuf, sizeof(rcvbuf), ZMQ_DONTWAIT); 
+    if(!stat){
+      cm_msg(MERROR,"read_trigger_event", "ZMQ read error on first event. %i\n",stat0); 
+    }
+    is_first_event = false;
+  }
+
   bk_create(pevent, "ZMQ0", TID_DWORD, (void **)&pdata);
   // Use ZMQ_DONTWAIT to prevent blocking.
-  int stat = zmq_recv (subscriber, pdata, 1000, ZMQ_DONTWAIT);
+  int stat = zmq_recv (subscriber, pdata, 1000, ZMQ_DONTWAIT); 
   // PAA - As long as you don't close the bank, the bank won't be recorder
   if (stat > 0) {
-    //printf ("stat: %d  pdata[0]: %d ... ", stat, pdata[0]);
-    //printf("composing ZMQ bank\n");
-    // May want to compare the CB-S/N and TS to the expected values
-    // ...
+    //printf("ZMQ: %x %x %x %x %x\n",pdata[0],pdata[1],pdata[2],pdata[3],pdata[4]); 
+    // Save the timestamp for ZMQ bank
+    timestamps.push_back((pdata[3]& 0x7fffffff)); // Save the ZMQ timestamp
+
     pdata += stat/sizeof(uint32_t); 
     stat = bk_close(pevent, pdata);
   }
@@ -1005,8 +1016,10 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
     // >>> Fill Event bank
     uint32_t timestamp;
     itv1725->FillEventBank(pevent,timestamp);
-    timestamps.push_back(timestamp);
+    // Save timestamp for ZLE bank.
+    timestamps.push_back((timestamp & 0x7fffffff));
   }
+
 
   // Check the timestamps
   if(timestamps.size() > 1){
@@ -1014,9 +1027,13 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
       uint32_t diff1 = timestamps[0]-timestamps[i];
       uint32_t diff2 = timestamps[i]-timestamps[0];
       uint32_t diff = (diff1 < diff2) ? diff1 : diff2;
+      double fdiff = diff*0.00000008;
 
-      if(diff > 10){ // allow at most 10 timestamps difference
+      //      printf("%i 0x%x 0x%x 0x%x 0x%x %f \n",i, timestamps[0],timestamps[i],timestamps[0]-timestamps[i],diff,fdiff);
 
+#ifndef DISABLE_TIMESTAMP_CHECK
+      if(diff > 100){ // allow at most 100 timestamps difference
+	
 	// Only print the error message once
 	if(!eor_transition_called){
 	  cm_msg(MERROR,"read_trigger_event", "Error in timestamp matching between V1725 0 and %i.  Timestamps (val val diff): 0x%x 0x%x 0x%x\n", 
@@ -1027,12 +1044,11 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
 	  if(1) cm_transition(TR_STOP, 0, NULL, 0, TR_DETACH, 0);
 	  eor_transition_called = true;
 	}
-	//eor_transition_called = true;
-      
       }
+#endif
+
     }    
   }
-  // esper-tool write -d false 192.168.1.3 mod_tdm run
 
   INT ev_size = bk_size(pevent);
   if(ev_size == 0)
