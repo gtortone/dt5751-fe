@@ -989,8 +989,8 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
   int stat = zmq_recv (subscriber, pdata, 1000, ZMQ_DONTWAIT);
   // PAA - As long as you don't close the bank, the bank won't be recorder
   if (stat > 0) {
-    printf ("stat: %d  pdata[0]: %d ... ", stat, pdata[0]);
-    printf("composing ZMQ bank\n");
+    //printf ("stat: %d  pdata[0]: %d ... ", stat, pdata[0]);
+    //printf("composing ZMQ bank\n");
     // May want to compare the CB-S/N and TS to the expected values
     // ...
     pdata += stat/sizeof(uint32_t); 
@@ -1095,18 +1095,18 @@ INT read_temperature(char *pevent, INT off) {
     }
     bk_close(pevent,pdata);
   }   
-  //- ZMQ test ----------------------------
   
-  bk_create(pevent, "ZMQ0", TID_DWORD, (void **)&pdata);
-  int stat = zmq_recv (subscriber, pdata, 1000, ZMQ_DONTWAIT);
-  // PAA - As long as you don't close the bank, the bank list & event is unchanged.
-  if (stat > 0) {
-    printf ("stat: %d  pdata[0]: %d ... ", stat, pdata[0]);
-    printf("composing ZMQ bank\n");
-    pdata += stat/sizeof(uint32_t); 
-    stat = bk_close(pevent, pdata);
-    printf("bk_close size:%d\n", stat);
+  if(0){
+    bk_create(pevent, "ZMQ0", TID_DWORD, (void **)&pdata);
+    int stat = zmq_recv (subscriber, pdata, 1000, ZMQ_DONTWAIT);
+    // PAA - As long as you don't close the bank, the bank list & event is unchanged.
+    if (stat > 0) {
+      printf ("stat: %d  pdata[0]: %d ... ", stat, pdata[0]);
+      printf("composing ZMQ bank\n");
+      pdata += stat/sizeof(uint32_t); 
+      stat = bk_close(pevent, pdata);
+      printf("bk_close size:%d\n", stat);
+    }
   }
-  
   return bk_size(pevent);
 }
