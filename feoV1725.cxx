@@ -1050,7 +1050,7 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
 #endif
 
     }    
-    printf("\n");
+
   }
 
   INT ev_size = bk_size(pevent);

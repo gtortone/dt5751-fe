@@ -19,7 +19,8 @@
  
 #define V1725_BUFFER_ORGANIZATION             0x800C      /* R/W       ; D32 */ 
 #define V1725_CUSTOM_SIZE                     0x8020      /* R/W       ; D32 */
-#define V1725_SELFTRIGGER_LOGIC               0x8068      /* R/W       ; D32 */ 
+//#define V1725_SELFTRIGGER_LOGIC               0x8068      /* R/W       ; D32 */ 
+#define V1725_SELFTRIGGER_LOGIC               0x8084      /* R/W       ; D32 */ 
 #define V1725_ADC_CALIBRATION                 0x809C      /* R/W       ; D32 */ 
 #define V1725_ACQUISITION_CONTROL             0x8100      /* R/W       ; D32 */ 
 #define V1725_ACQUISITION_STATUS              0x8104      /* read  only; D32 */ 
