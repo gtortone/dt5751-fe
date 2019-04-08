@@ -998,9 +998,10 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
   bk_create(pevent, "ZMQ0", TID_DWORD, (void **)&pdata);
   // Use ZMQ_DONTWAIT to prevent blocking.
   int stat = zmq_recv (subscriber, pdata, 1000, ZMQ_DONTWAIT); 
+  //  printf("stat:d\n", stat);
   // PAA - As long as you don't close the bank, the bank won't be recorder
   if (stat > 0) {
-    //printf("ZMQ: %x %x %x %x %x\n",pdata[0],pdata[1],pdata[2],pdata[3],pdata[4]); 
+    //printf("ZMQ: %x %x %x %x %x",pdata[0],pdata[1],pdata[2],pdata[3],pdata[4]); 
     // Save the timestamp for ZMQ bank
     timestamps.push_back((pdata[3]& 0x7fffffff)); // Save the ZMQ timestamp
 
@@ -1027,12 +1028,13 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
       uint32_t diff1 = timestamps[0]-timestamps[i];
       uint32_t diff2 = timestamps[i]-timestamps[0];
       uint32_t diff = (diff1 < diff2) ? diff1 : diff2;
-      double fdiff = diff*0.00000008;
+      double fdiff = diff*0.000000008;
 
-      //      printf("%i 0x%x 0x%x 0x%x 0x%x %f \n",i, timestamps[0],timestamps[i],timestamps[0]-timestamps[i],diff,fdiff);
+      ///printf("idx:%i sze:%i CB:0x%x [%i]:0x%x %i %f %f \n",i, timestamps.size(), timestamps[0], i,  timestamps[i], diff, timestamps[i]*0.000000008,fdiff);
 
-#ifndef DISABLE_TIMESTAMP_CHECK
-      if(diff > 100){ // allow at most 100 timestamps difference
+#if(1)
+//#ifndef DISABLE_TIMESTAMP_CHECK
+      if(diff > 5000){ // allow at most 5000 timestamps difference
 	
 	// Only print the error message once
 	if(!eor_transition_called){
@@ -1041,13 +1043,14 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
 	  printf("%i 0x%x 0x%x 0x%x 0x%x \n",i, timestamps[0],timestamps[i],timestamps[0]-timestamps[i],diff);
 	  
 	  // Stop the run!
-	  if(1) cm_transition(TR_STOP, 0, NULL, 0, TR_DETACH, 0);
+	  cm_transition(TR_STOP, 0, NULL, 0, TR_DETACH, 0);
 	  eor_transition_called = true;
 	}
       }
 #endif
 
     }    
+    printf("\n");
   }
 
   INT ev_size = bk_size(pevent);
