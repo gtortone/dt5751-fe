@@ -1030,7 +1030,7 @@ int v1725CONET2::InitializeForAcq()
 	//                                                            0x100:enable new config
   //                                                            0xD0000: Busy signal from motherboard outputted on TRG-OUT
   //                                                            0x400000: store extended timetag in bank. 
-	sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x4D013D); 
+	sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x4D013C);  // PAA - C:NIM, D:TTL
 	                                                 
   sCAEN = WriteReg_(V1725_FP_LVDS_IO_CRTL,      0x1100); // this configures the V1725 to output the trigger primitives from 
 
@@ -1181,7 +1181,7 @@ int v1725CONET2::InitializeForAcq()
 	// Wait for 200ms after channing DAC offsets, before starting calibration. 
 	usleep(200000);
 
-#ifdef NO_V1725
+#ifndef NO_V1725
 	// Start the ADC calibration
   WriteReg_(V1725_ADC_CALIBRATION , 1);
 	// Now we check to see when the calibration has finished.
