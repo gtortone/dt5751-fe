@@ -19,11 +19,10 @@ This file contains the class definition for the v1725 module driver.
 #include <atomic>
 #include <vector>
 
-extern "C" {
 #include <CAENComm.h>
 #include <CAENVMElib.h>
 #include "ov1725drv.h"
-}
+
 #include "midas.h"
 #include "msystem.h"
 

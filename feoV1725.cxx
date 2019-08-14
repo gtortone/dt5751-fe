@@ -99,6 +99,7 @@ controls 2*2 = 4 v1725 boards.  Compile and run:
 #include <memory>
 
 #include "midas.h"
+#include "mfe.h"
 #include "v1725CONET2.hxx"
 
 #include <zmq.h>
@@ -121,7 +122,7 @@ controls 2*2 = 4 v1725 boards.  Compile and run:
 
 #define  EQ_EVID   1                //!< Event ID
 #define  EQ_TRGMSK 0                //!< Trigger mask (overwritten in code)
-                                    //!< based on feIndex (see _init) 
+                                    //!< based on feIndex (see _init)
 #define  FE_NAME   "feov1725MTI"       //!< Frontend name
 
 #define UNUSED(x) ((void)(x)) //!< Suppress compiler warnings
@@ -132,17 +133,12 @@ const bool SYNCEVENTS_DEBUG = true;
 extern HNDLE hDB;   //!< main ODB handle
 //extern BOOL debug;  //!< debug printouts
 
-/* make frontend functions callable from the C framework */
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /*-- Globals -------------------------------------------------------*/
 
 //! The frontend name (client name) as seen by other MIDAS clients
-char *frontend_name = (char*)FE_NAME;
+char const *frontend_name = (char*)FE_NAME;
 //! The frontend file name, don't change it
-char *frontend_file_name = (char*)__FILE__;
+char const *frontend_file_name = (char*)__FILE__;
 //! frontend_loop is called periodically if this variable is TRUE
 BOOL frontend_call_loop = FALSE;
 //! a frontend status page is displayed with this frequency in ms
@@ -155,7 +151,7 @@ INT max_event_size_frag = 5 * 1024 * 1024;
 INT event_buffer_size = 30 * max_event_size + 10000;
 
 bool runInProgress = false; //!< run is in progress
-bool stopRunInProgress = false; //!< 
+bool stopRunInProgress = false; //!<
 bool eor_transition_called = false; // already called EOR
 uint32_t timestamp_offset[NBLINKSPERFE*NB1725PERLINK]; //!< trigger time stamp offsets
 
@@ -253,10 +249,6 @@ EQUIPMENT equipment[] =
     {""}
 };
 
-#ifdef __cplusplus
-}
-#endif
-
 std::vector<v1725CONET2> ov1725; //!< objects for the v1725 modules controlled by this frontend
 std::vector<v1725CONET2>::iterator itv1725;  //!< Main thread iterator
 std::vector<v1725CONET2>::iterator itv1725_thread[NBLINKSPERFE];  //!< Link threads iterators
@@ -298,7 +290,7 @@ INT chronobox_start_stop(bool start){
     status = system("esper-tool write -d true 192.168.1.3 mod_tdm run");
     printf("Started chronobox run; status = %i\n",status);
   }else{
-    printf("Stopping chronobox run; status = %i\n",status);
+    printf("Stopping chronobox run\n");
     status = system("esper-tool write -d false 192.168.1.3 mod_tdm run");
     printf("Stopped chronobox run; status = %i\n",status);
   }
@@ -327,7 +319,7 @@ INT frontend_init(){
 		return FE_ERR_HW;
 	}
 
-  
+
   set_equipment_status(equipment[0].name, "Initializing...", "#FFFF00");
   printf("<<< Begin of Init\n");
 
@@ -341,7 +333,7 @@ INT frontend_init(){
     dummy=-1;
     db_set_value(hDB, 0, Path, &(dummy), sizeof(INT), 1, TID_INT);
   }
-  
+
   {
     // Correct the Trigger mask based on the frontend index, update ODB
     // Used for sorting the threads, and for logger filtering
@@ -349,7 +341,7 @@ INT frontend_init(){
     equipment[0].info.trigger_mask = (2<<feIndex);
     snprintf(sEpath, sizeof(sEpath), "Equipment/%s/Common/Trigger mask", equipment[0].name);
     db_set_value(hDB, 0, sEpath, &(equipment[0].info.trigger_mask), sizeof(WORD), 1, TID_WORD);
-    
+
     // Correct the Buffer level equipment Event ID based on the frontend index, update ODB
     equipment[1].info.event_id += feIndex;
     snprintf(sEpath, sizeof(sEpath), "Equipment/%s/Common/Event ID", equipment[1].name);
@@ -362,33 +354,33 @@ INT frontend_init(){
   int nExpected = 0; //Number of v1725 boards we expect to activate
   int nActive = 0;   //Number of v1725 boards activated at the end of frontend_init
   std::vector<std::pair<int,int> > errBoards;  //v1725 boards which we couldn't connect to
-  
+
   nExpected = NB1725PERLINK*NBLINKSPERFE;
-  
+
   if((NBV1725TOTAL % (NB1725PERLINK*NBLINKSPERFE)) != 0){
     printf("Incorrect setup: the number of boards controlled by each frontend"
            " is not a fraction of the total number of boards. %i %i %i\n",NBV1725TOTAL,NB1725PERLINK,NBLINKSPERFE);
   }
-  
+
   int maxIndex = (NBV1725TOTAL/NB1725PERLINK)/NBLINKSPERFE - 1;
   if(feIndex < 0 || feIndex > maxIndex){
     printf("Front end index (%i) must be between 0 and %d\n", feIndex, maxIndex);
     exit(FE_ERR_HW);
   }
-  
+
   int firstLink = (feIndex % (NBLINKSPERA3818 / NBLINKSPERFE)) * NBLINKSPERFE;
   int lastLink = firstLink + NBLINKSPERFE - 1;
   for (int iLink=firstLink; iLink <= lastLink; iLink++) {
     for (int iBoard=0; iBoard < NB1725PERLINK; iBoard++) {
       printf("==== feIndex:%d, Link:%d, Board:%d ====\n", feIndex, iLink, iBoard);
-      
+
       // Compose unique module ID
       int moduleID = feIndex*NBLINKSPERFE*NB1725PERLINK + (iLink-firstLink)*NB1725PERLINK + iBoard;
-      
+
       // Create module objects
       ov1725.emplace_back(feIndex, iLink, iBoard, moduleID, hDB);
       ov1725.back().SetVerbosity(0);
-      
+
       // Open Optical interface
       switch(ov1725.back().Connect()){
       case v1725CONET2::ConnectSuccess:
@@ -405,7 +397,7 @@ INT frontend_init(){
         //Can't happen
         break;
       }
-      
+
       if(!((iLink == lastLink) && (iBoard == (NB1725PERLINK-1)))){
         printf("Sleeping for %d milliseconds before next board\n", SLEEP_TIME_BETWEEN_CONNECTS);
         ss_sleep(SLEEP_TIME_BETWEEN_CONNECTS);
@@ -419,7 +411,7 @@ INT frontend_init(){
   int nInitOk = 0;
   for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
     if (! itv1725->IsConnected()) continue;   // Skip unconnected board
-    
+
     // Setup ODB record (create if necessary)
     itv1725->SetBoardRecord(hDB,seq_callback);
     // Set history ODB record (create if necessary)
@@ -428,10 +420,10 @@ INT frontend_init(){
     int status = itv1725->InitializeForAcq();
     nInitOk += status;
   }
-  
+
   // Abort if board status not Ok.
   if (nInitOk != 0) return FE_ERR_HW;
-  
+
   printf(">>> End of Init. %d active v1725. Expected %d\n\n", nActive, nExpected);
 
   if(nActive == nExpected){
@@ -452,7 +444,7 @@ INT frontend_init(){
   cm_register_deferred_transition(TR_STOP, wait_buffer_empty);
 
   //-begin - ZMQ----------------------------------------------------------
-  
+
   //  Socket to talk to clients
   void *context = zmq_ctx_new ();
   subscriber = zmq_socket (context, ZMQ_SUB);
@@ -508,14 +500,14 @@ INT begin_of_run(INT run_number, char *error)
   set_equipment_status(equipment[0].name, "Starting run...", "#FFFF00");
   cm_msg(MINFO,"BOR", "Start of begin_of_run");
   printf("<<< Start of begin_of_run\n");
-  
+
   int rb_handle;
   int status;
-  
+
   /// Make sure the chronobox is stopped
   chronobox_start_stop(false);
 
-  stopRunInProgress = false; 
+  stopRunInProgress = false;
   eor_transition_called = false;
 
   runInProgress = true;
@@ -537,17 +529,17 @@ INT begin_of_run(INT run_number, char *error)
       // PLL loss lock reset by the VME_STATUS read!
       itv1725->ReadReg(V1725_VME_STATUS, &vmeStat);
       usleep(100);
-      itv1725->ReadReg(V1725_ACQUISITION_STATUS, &vmeAcq); // Test the PLL again 
+      itv1725->ReadReg(V1725_ACQUISITION_STATUS, &vmeAcq); // Test the PLL again
       if ((vmeAcq & 0x80) == 0) {
         cm_msg(MERROR,"BeginOfRun","V1725 PLL lock still lost Board: %d (vmeAcq=0x%x)"
                ,itv1725->GetModuleID(), vmeAcq);
         return FE_ERR_HW;
       }
     }
-    
+
     bool go = itv1725->StartRun();
     if (go == false) return FE_ERR_HW;
-    
+
     //Create ring buffer for board
     status = rb_create(event_buffer_size, max_event_size, &rb_handle);
     if(status == DB_SUCCESS){
@@ -557,7 +549,7 @@ INT begin_of_run(INT run_number, char *error)
       cm_msg(MERROR, "feov1725:BOR", "Failed to create rb for board %d", itv1725->GetModuleID());
     }
   }
-  
+
   // Create one thread per optical link
   for(int i=0; i<NBLINKSPERFE; ++i){
     thread_link[i] = i;
@@ -574,10 +566,10 @@ INT begin_of_run(INT run_number, char *error)
   sleep(1);
   chronobox_start_stop(true);
 
-  
+
   set_equipment_status(equipment[0].name, "Started run", "#00ff00");
   printf(">>> End of begin_of_run\n\n");
-  
+
   return SUCCESS;
 }
 
@@ -638,14 +630,14 @@ void * link_thread(void * arg)
         /* If we've reached 75% of the ring buffer space, don't read
          * the next event.  Wait until the ring buffer level goes down.
          * It is better to let the v1725 buffer fill up instead of
-         * the ring buffer, as this the v1725 will generate the HW busy to the 
+         * the ring buffer, as this the v1725 will generate the HW busy to the
          * DTM.
          */
         rb_get_buffer_level(rb_handle, &rb_level);
         if(rb_level > (int)(event_buffer_size*0.75)) {
           continue;
         }
-       
+
         // Ok to read data
         status = rb_get_wp(rb_handle, &wp, 100);
         if (status == DB_TIMEOUT) {
@@ -655,7 +647,7 @@ void * link_thread(void * arg)
           thread_retval[link] = -1;
           pthread_exit((void*)&thread_retval[link]);
         }
-        
+
         // Read data
         if(itv1725_thread[link]->ReadEvent(wp)) {
         } else {
@@ -667,34 +659,40 @@ void * link_thread(void * arg)
       } // CheckEvent
 
       // Sleep for 5us to avoid hammering the board too much
-      usleep(1); 
+      usleep(1);
     } // Done with all the modules
 
     // Escape if run is done -> kill thread
     if(!runInProgress)
       break;
   }
-  
+
   std::cout << "Exiting thread " << link << " clean " << std::endl;
   thread_retval[link] = 0;
   pthread_exit((void*)&thread_retval[link]);
 }
 
+int wait_counter = 0;
 // Check how many events we have in the ring buffer
 BOOL wait_buffer_empty(int transition, BOOL first)
  {
 
-   if(first){ 
+   if(first){
      printf("\nDeferred transition.  First call of wait_buffer_empty. Stopping run\n");
      // Some funny business here... need to pause the readout on the threads before
      // making the chronobox stop call... some sort of contention for the system resources.
-     stopRunInProgress = true; 
+     stopRunInProgress = true;
      usleep(500);
      chronobox_start_stop(false);
-     stopRunInProgress = false; 
+     stopRunInProgress = false;
      sleep(1);
+     wait_counter = 0;
      return FALSE;
    }
+
+   // Stop the deferred transition after 100 checks.  If not finished, will never finish.
+   wait_counter++;
+   if(wait_counter > 100) return TRUE;
 
    bool haveEventsInBuffer = false;
    for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
@@ -738,7 +736,7 @@ INT end_of_run(INT run_number, char *error)
   if(runInProgress){  //skip actions if we weren't running
 
     runInProgress = false;  //Signal threads to quit
-    
+
 
     // Do not quit parent before children processes, wait for the proper
     // child exit first.
@@ -771,6 +769,17 @@ INT end_of_run(INT run_number, char *error)
     }
 
   }
+
+  // Clear out all the events in the ZMQ buffer:
+  uint32_t rcvbuf [100];
+  int total_extra = 0;
+  int stat;
+  stat = zmq_recv (subscriber, rcvbuf, sizeof(rcvbuf), ZMQ_DONTWAIT);
+  while(stat > 0){
+    total_extra++;
+    stat = zmq_recv (subscriber, rcvbuf, sizeof(rcvbuf), ZMQ_DONTWAIT);
+  }
+  if(total_extra >0) cm_msg(MINFO, "EOR", "Events left in the chronobox: %d",total_extra);
 
   printf(">>> End Of end_of_run\n\n");
   set_equipment_status(equipment[0].name, "Ended run", "#00ff00");
@@ -862,7 +871,7 @@ INT resume_run(INT run_number, char *error)
     if (! itv1725->IsConnected()) continue;   // Skip unconnected board
 
     // Done in frontend_init, or StartRun if settings have changed
-    // itv1725->InitializeForAcq(); 
+    // itv1725->InitializeForAcq();
 
     bool go = itv1725->StartRun();
     if (go == false) return FE_ERR_HW;
@@ -911,13 +920,13 @@ INT frontend_loop()
 
 // ___________________________________________________________________
 // Event polling; only ready for readout only when data is present in all ring buffers
-extern "C" INT poll_event(INT source, INT count, BOOL test)
+INT poll_event(INT source, INT count, BOOL test)
 {
 
   register int i;
 
   for (i = 0; i < count; i++) {
-    
+
     //ready for readout only when data is present in all ring buffers
     bool evtReady = true;
     for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
@@ -930,7 +939,7 @@ extern "C" INT poll_event(INT source, INT count, BOOL test)
     if (evtReady && !test)
       //      return 0;
       return 1;
-    
+
     usleep(20);
   }
   return 0;
@@ -950,7 +959,7 @@ extern "C" INT poll_event(INT source, INT count, BOOL test)
  *
  * \return  Midas status code
  */
-extern "C" INT interrupt_configure(INT cmd, INT source, POINTER_T adr)
+INT interrupt_configure(INT cmd, INT source, POINTER_T adr)
 {
   switch (cmd) {
   case CMD_INTERRUPT_ENABLE:
@@ -974,43 +983,69 @@ extern "C" INT interrupt_configure(INT cmd, INT source, POINTER_T adr)
  */
 INT read_event_from_ring_bufs(char *pevent, INT off) {
   DWORD *pdata;
-  
+
   if (!runInProgress) return 0;
-  
+
   sn = SERIAL_NUMBER(pevent);
-  
+
   bk_init32(pevent);
 
   // Keep track of timestamps
-  std::vector<uint32_t> timestamps;  
+  std::vector<uint32_t> timestamps;
 
   // Get the ChronoBox bank
   // If this is the first event, then read ZMQ buffer an extra time; want to discard first event.
   if(is_first_event){
     uint32_t rcvbuf [100];
-    int stat0 = zmq_recv (subscriber, rcvbuf, sizeof(rcvbuf), ZMQ_DONTWAIT); 
-    if(!stat){
-      cm_msg(MERROR,"read_trigger_event", "ZMQ read error on first event. %i\n",stat0); 
+    int stat0 = zmq_recv (subscriber, rcvbuf, sizeof(rcvbuf), ZMQ_DONTWAIT);
+    if(!stat0){
+      cm_msg(MERROR,"read_trigger_event", "ZMQ read error on first event. %i\n",stat0);
     }
     is_first_event = false;
+    printf("Flushed first event from chronobox\n");
   }
+
+  int stat = -1;
 
   bk_create(pevent, "ZMQ0", TID_DWORD, (void **)&pdata);
-  // Use ZMQ_DONTWAIT to prevent blocking.
-  int stat = zmq_recv (subscriber, pdata, 1000, ZMQ_DONTWAIT); 
-  //  printf("stat:d\n", stat);
-  // PAA - As long as you don't close the bank, the bank won't be recorder
-  if (stat > 0) {
-    //printf("ZMQ: %x %x %x %x %x",pdata[0],pdata[1],pdata[2],pdata[3],pdata[4]); 
-    // Save the timestamp for ZMQ bank
-    timestamps.push_back((pdata[3]& 0x7fffffff)); // Save the ZMQ timestamp
 
-    pdata += stat/sizeof(uint32_t); 
-    stat = bk_close(pevent, pdata);
+  // Try to receive ZMQ data from chronobox.
+  // Use ZMQ_DONTWAIT to prevent blocking.
+  // But retry several times in case message is delayed.
+  float zmq_timeout_ms = 100;
+  float zmq_retry_wait_ms = 1;
+  float zmq_time = 0;
+
+  while (zmq_time < zmq_timeout_ms) {
+    stat = zmq_recv (subscriber, pdata, 1000, ZMQ_DONTWAIT);
+
+    if (stat > 0) {
+      break;
+    }
+
+    zmq_time += zmq_retry_wait_ms;
+    usleep(1000 * zmq_retry_wait_ms);
   }
-  
+
+    if (stat > 0) {
+
+      //printf("ZMQ: %x %x %x %x %x",pdata[0],pdata[1],pdata[2],pdata[3],pdata[4]);
+      // Save the timestamp for ZMQ bank
+      timestamps.push_back((pdata[3]& 0x7fffffff)); // Save the ZMQ timestamp
+      pdata += stat/sizeof(uint32_t);
+      stat = bk_close(pevent, pdata);
+    }else{
+      // There should be ZMQ data for each bank.  If not, stop the run.
+      if(!eor_transition_called){
+	cm_msg(MERROR,"read_trigger_event", "Error: did not receive a ZMQ bank after %f ms.  Stopping run.", zmq_timeout_ms);
+	cm_transition(TR_STOP, 0, NULL, 0, TR_DETACH, 0);
+	eor_transition_called = true;
+      }
+    }
+    //  }
+
   // Get the V1725
-  
+
   for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
     if (! itv1725->IsConnected()) continue;   // Skip unconnected board
 
@@ -1024,24 +1059,24 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
 
   // Check the timestamps
   if(timestamps.size() > 1){
-    for(int i = 1; i < timestamps.size(); i++){
+    for(unsigned int i = 1; i < timestamps.size(); i++){
       uint32_t diff1 = timestamps[0]-timestamps[i];
       uint32_t diff2 = timestamps[i]-timestamps[0];
       uint32_t diff = (diff1 < diff2) ? diff1 : diff2;
       double fdiff = diff*0.000000008;
 
-      ///printf("idx:%i sze:%i CB:0x%x [%i]:0x%x %i %f %f \n",i, timestamps.size(), timestamps[0], i,  timestamps[i], diff, timestamps[i]*0.000000008,fdiff);
+      printf("idx:%i sze:%zu CB:0x%x [%i]:0x%x %i %f %f \n",i, timestamps.size(), timestamps[0], i,  timestamps[i], diff, timestamps[i]*0.000000008,fdiff);
 
-#if(1)
+#if(0)
 //#ifndef DISABLE_TIMESTAMP_CHECK
       if(diff > 5000){ // allow at most 5000 timestamps difference
-	
+
 	// Only print the error message once
 	if(!eor_transition_called){
-	  cm_msg(MERROR,"read_trigger_event", "Error in timestamp matching between V1725 0 and %i.  Timestamps (val val diff): 0x%x 0x%x 0x%x\n", 
+	  cm_msg(MERROR,"read_trigger_event", "Error in timestamp matching between event fragments 0 and %i.  Timestamps (val val diff): 0x%x 0x%x 0x%x\n",
 		 i, timestamps[0],timestamps[i],diff);
 	  printf("%i 0x%x 0x%x 0x%x 0x%x \n",i, timestamps[0],timestamps[i],timestamps[0]-timestamps[i],diff);
-	  
+
 	  // Stop the run!
 	  cm_transition(TR_STOP, 0, NULL, 0, TR_DETACH, 0);
 	  eor_transition_called = true;
@@ -1049,7 +1084,7 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
       }
 #endif
 
-    }    
+    }
 
   }
 
@@ -1059,10 +1094,10 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
   return ev_size;
 }
 
-//                                                                                         
-//----------------------------------------------------------------------------             
+//
+//----------------------------------------------------------------------------
 INT read_buffer_level(char *pevent, INT off) {
-  
+
   bk_init32(pevent);
   int PLLLockLossID = -1;
   for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
@@ -1078,7 +1113,7 @@ INT read_buffer_level(char *pevent, INT off) {
       itv1725->ReadReg(V1725_VME_STATUS, &vmeStat);
     }
   }
-  
+
   // Set ODB flag if PLL lock lost
   if (PLLLockLossID > -1){
     char Path[255];
@@ -1086,13 +1121,13 @@ INT read_buffer_level(char *pevent, INT off) {
     db_set_value(hDB, 0, Path, &(PLLLockLossID), sizeof(INT), 1, TID_INT);
     // PLL loss lock reset by the VME_STATUS read!
   }
-  printf(" | ");  
+  printf(" | ");
   return bk_size(pevent);
 }
 
 
-//                                                                                         
-//----------------------------------------------------------------------------             
+//
+//----------------------------------------------------------------------------
 INT read_temperature(char *pevent, INT off) {
 
   DWORD *pdata;
@@ -1110,11 +1145,11 @@ INT read_temperature(char *pevent, INT off) {
      addr = V1725_CHANNEL_TEMPERATURE | (i << 8);
      itv1725->ReadReg(addr, &temp);
      *pdata++ =  temp;
-     
+
     }
     bk_close(pevent,pdata);
-  }   
-  
+  }
+
   if(0){
     bk_create(pevent, "ZMQ0", TID_DWORD, (void **)&pdata);
     int stat = zmq_recv (subscriber, pdata, 1000, ZMQ_DONTWAIT);
@@ -1122,10 +1157,11 @@ INT read_temperature(char *pevent, INT off) {
     if (stat > 0) {
       printf ("stat: %d  pdata[0]: %d ... ", stat, pdata[0]);
       printf("composing ZMQ bank\n");
-      pdata += stat/sizeof(uint32_t); 
+      pdata += stat/sizeof(uint32_t);
       stat = bk_close(pevent, pdata);
       printf("bk_close size:%d\n", stat);
     }
   }
   return bk_size(pevent);
 }
+

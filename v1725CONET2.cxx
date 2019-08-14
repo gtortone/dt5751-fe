@@ -1030,7 +1030,7 @@ int v1725CONET2::InitializeForAcq()
 	//                                                            0x100:enable new config
   //                                                            0xD0000: Busy signal from motherboard outputted on TRG-OUT
   //                                                            0x400000: store extended timetag in bank. 
-	sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x4D013C);  // PAA - C:NIM, D:TTL
+	sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x4D013D);  // PAA - C:NIM, D:TTL
 	                                                 
   sCAEN = WriteReg_(V1725_FP_LVDS_IO_CRTL,      0x1100); // this configures the V1725 to output the trigger primitives from 
 
