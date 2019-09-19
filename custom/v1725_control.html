@@ -23,55 +23,320 @@
       
       // Get beamline values; also get the current number of periods and cycles.
       mjsonrpc_send_request([
-	 mjsonrpc_make_request("db_get_values",{"paths":["/Equipment/V1725_Data00/Settings/Board0"]}),
+         mjsonrpc_make_request("db_get_values",{"paths":["/Equipment/V1725_Data00/Settings/Board0"]}),
       ]).then(function (rpc) {         
-	 
-	 var board0 = rpc[0].result.data[0];
-	 
-	 //console.log("Board " + board0.selftrigger_threshold[0]);
-	 //console.log("Board " + board0['custom size']);
-	    
-	 gStatusInflight = false; // finished async routine
+         
+         var board0 = rpc[0].result.data[0];
+         
+         //console.log("Board " + board0.selftrigger_threshold[0]);
+         //console.log("Board " + board0['custom size']);
+            
+         gStatusInflight = false; // finished async routine
 
       }).catch(function(error) {
-	 if (error.request) {
-	    var s = mjsonrpc_decode_error(error);
-	    console.log("mjsonrpc_error_alert: " + s);
-	 } else {
-	    console.log("mjsonroc_error_alert: " + error);
-	 }
+         if (error.request) {
+            var s = mjsonrpc_decode_error(error);
+            console.log("mjsonrpc_error_alert: " + s);
+         } else {
+            console.log("mjsonroc_error_alert: " + error);
+         }
       });
    }
  
    function set_parameter(odbkey){
       var paths = [];
-      tvalue = document.getElementById(odbkey).value
+      var tvalue = document.getElementById(odbkey.replace(" ", "_")).value
+      
+      if (tvalue == "") {
+    	  return;
+      }
+      
       var values = [];
       for (var i =0; i < 4; i++){
-	 console.log(i)
-	 if(odbkey == "SelfTrigger_Threshold"){
-	    for (var j=0; j < 16; j++){
-	       paths.push("/Equipment/V1725_Data00/Settings/Board"+i+"/"+odbkey+"["+j+"]");
-	       values.push(tvalue);
-	    }
-	 }else{
-	    paths.push("/Equipment/V1725_Data00/Settings/Board"+i+"/"+odbkey);
-	    values.push(tvalue);
-	 }
+         if(odbkey == "SelfTrigger_Threshold"){
+            for (var j=0; j < 16; j++){
+               paths.push("/Equipment/V1725_Data00/Settings/Board"+i+"/"+odbkey+"["+j+"]");
+               values.push(tvalue);
+            }
+         }else{
+            paths.push("/Equipment/V1725_Data00/Settings/Board"+i+"/"+odbkey);
+            values.push(tvalue);
+         }
       }
-      console.log(paths.length);
+      
       mjsonrpc_db_paste(paths, values).then(function(rpc) {
-	 result=rpc.result;	      
+         result=rpc.result;              
       }).catch(function(error) {
           mjsonrpc_error_alert(error);
       });
+   }
+
+   function get_board_params() {
+	   var sampling_rate, sram_samples_per_chan, cs_factor, pt_factor;
+	   var board_type = document.getElementById("board_type").value;
+     if (board_type == 0) {
+       sampling_rate = 250e6;
+       sram_samples_per_chan = 640e3;
+       cs_factor = 10;
+       pt_factor = 2;
+     }
+     if (board_type == 1) {
+       sampling_rate = 250e6;
+       sram_samples_per_chan = 512e6;
+       cs_factor = 10;
+       pt_factor = 2;
+     }
+     if (board_type == 2) {
+       sampling_rate = 250e6;
+       sram_samples_per_chan = 1e6;
+       cs_factor = 2;
+       pt_factor = 4;
+     }
+     if (board_type == 3) {
+       sampling_rate = 250e6;
+       sram_samples_per_chan = 8e6;
+       cs_factor = 2;
+       pt_factor = 4;
+     }
+     if (board_type == 4) {
+       sampling_rate = 250e6;
+       sram_samples_per_chan = 1e6 * 1.25;
+       cs_factor = 2 * 1.25;
+       pt_factor = 4;
+     }
+     if (board_type == 5) {
+       sampling_rate = 250e6;
+       sram_samples_per_chan = 8e6 * 1.25;
+       cs_factor = 2 * 1.25;
+       pt_factor = 4;
+     }
+     return [sampling_rate, sram_samples_per_chan, cs_factor, pt_factor];
+   }
+
+   function get_board_sampling_rate_Hz() {
+     return get_board_params()[0];
+   }
+   
+   function get_board_sram_samples_per_chan() {
+     return get_board_params()[1];
+   }
+
+   function get_board_custom_size_factor() {
+     return get_board_params()[2];
+   }
+
+   function get_board_post_trigger_factor() {
+     return get_board_params()[3];
+   }
+   
+   function us_to_cs(length_us) {
+     return us_to_samples(length_us) / get_board_custom_size_factor();
+   }
+   
+   function us_to_pt(length_us) {
+     return us_to_samples(length_us) / get_board_post_trigger_factor();
+   }
+   
+   function us_to_samples(length_us) {
+     return length_us * get_board_sampling_rate_Hz() / 1e6;
+   }
+   
+   function samples_to_us(num_samples) {
+     return num_samples * 1e6 / get_board_sampling_rate_Hz();
+   }
+   
+   function cs_to_us(custom_size) {
+     return samples_to_us(custom_size * get_board_custom_size_factor());
+   }
+   
+   function pt_to_us(post_trigger) {
+     return samples_to_us(post_trigger * get_board_post_trigger_factor());
+   }
+   
+   function buffer_code_details(buffer_code) {
+	   // buffer_code is 0x0 - 0xA. See V1725 docs for register 0x800C.
+	   var num_buffers = 1 << buffer_code;
+	   var num_samples = get_board_sram_samples_per_chan() / num_buffers;
+	   return [num_samples, num_buffers]
+   }
+   
+   function buffer_config_for_wf_length(length_us) {
+	   var num_samples = us_to_samples(length_us);
+	   var custom_size = us_to_cs(length_us);
+	   var details;
+	   var buffer_code;
+	   
+	   for (buffer_code = 0xA; buffer_code >= 0; buffer_code -= 1) {
+		   details = buffer_code_details(buffer_code);
+		   if (details[0] > num_samples) {
+			   break; // Found a buffer org that's big enough.
+		   }
+		   if (buffer_code == 0) {
+			   return undefined; // User asked for wf length that's too long.
+		   }
+	   }
+	   
+	   var almost_full = details[1] / 2;
+	   return [custom_size, buffer_code, almost_full];
+   }
+   
+   function register_listeners() {
+     var boxes = document.getElementsByClassName("chrono_mask");
+     
+     for (var i = 0; i < boxes.length; i++) {
+       boxes[i].onclick = function(){calculate_chrono_mask();};
+     }
+     
+     boxes = document.getElementsByClassName("v1725_mask");
+     
+     for (var i = 0; i < boxes.length; i++) {
+       boxes[i].onclick = function(){calculate_v1725_mask();};
+     }
+     
+     boxes = document.getElementsByClassName("customsize");
+
+     for (var i = 0; i < boxes.length; i++) {
+       boxes[i].onchange = function(){update_wf_lengths_readback();};
+     }
+     
+     boxes = document.getElementsByClassName("posttrigger");
+
+     for (var i = 0; i < boxes.length; i++) {
+       boxes[i].onchange = function(){update_post_trigger_readback();};
+     }
+     
+	   calculate_v1725_mask();
+	   calculate_chrono_mask();
+     update_wf_lengths_readback();
+     update_post_trigger_readback();
+   }
+   
+   function set_wf_length() {
+     var us = document.getElementById("wf_length").value;
+     
+     if (!us) {
+       return;
+     }
+     
+     var settings = buffer_config_for_wf_length(parseFloat(us));
+     
+     if (settings == undefined) {
+       alert("Failed to find a configuration for that waveform length!");
+     } else {
+       document.getElementById("Custom_size").value = settings[0];
+       document.getElementById("Buffer_Organization").value = settings[1];
+       document.getElementById("almost_full").value = settings[2];
+
+       set_parameter("Custom size");
+       set_parameter("Buffer Organization");
+       set_parameter("almost_full");
+
+       document.getElementById("Custom_size").value = "";
+       document.getElementById("Buffer_Organization").value = "";
+       document.getElementById("almost_full").value = "";
+     }
+   }
+   
+   function set_pt_length() {
+     var us = document.getElementById("pt_length").value;
+     
+     if (!us) {
+       return;
+     }
+     
+     document.getElementById("Post_Trigger").value = us_to_pt(us);
+     set_parameter("Post Trigger");
+     document.getElementById("Post_Trigger").value = "";
+   }
+   
+   function update_wf_lengths_readback() {
+     var boxes = document.getElementsByClassName("customsize");
+
+     for (var i = 0; i < boxes.length; i++) {
+       var board = boxes[i].dataset["board"];
+       var cs = parseInt(boxes[i].innerHTML);
+       
+       if (cs != cs) {
+    	   continue;
+       }
+       
+       var us = cs_to_us(cs);
+       document.getElementById("wf_length_"+board).innerHTML = us;
+     }
+   }
+   
+   function update_post_trigger_readback() {
+     var boxes = document.getElementsByClassName("posttrigger");
+
+     for (var i = 0; i < boxes.length; i++) {
+       var board = boxes[i].dataset["board"];
+       var pt = parseInt(boxes[i].innerHTML);
+       
+       if (pt != pt) {
+         continue;
+       }
+       
+       var us = pt_to_us(pt);
+       document.getElementById("pt_length_"+board).innerHTML = us;
+     }
+   }
+   
+   function calculate_v1725_mask() {
+     var boxes = document.getElementsByClassName("v1725_mask");
+     var mask = 0;
+     
+     for (var i = 0; i < boxes.length; i++) {
+       if (boxes[i].checked) {
+         mask += (1 << boxes[i].value);
+       }
+     }
+   
+     document.getElementById("v1725_mask_result").innerHTML = "0x" + mask.toString(16);
+   }
+   
+   function select_all_v1725(checked) {
+     var boxes = document.getElementsByClassName("v1725_mask");
+     
+     for (var i = 0; i < boxes.length; i++) {
+        boxes[i].checked = checked;
+      }
+      
+      calculate_v1725_mask();
+   }
+   
+   function calculate_chrono_mask() {
+     var boxes = document.getElementsByClassName("chrono_mask");
+     var mask = 0;
+     
+     for (var i = 0; i < boxes.length; i++) {
+       if (boxes[i].checked) {
+    	   // Sigh, JS uses signed ints for bitshifts...
+    	   if (boxes[i].value == 31) {
+    		   mask += 0x80000000;
+    	   } else {
+    		   mask += (1 << boxes[i].value);
+    	   }
+       }
+     }
+   
+     document.getElementById("chrono_mask_result").innerHTML = "0x" + mask.toString(16);
+   }
+   
+   function select_all_chrono(checked) {
+     var boxes = document.getElementsByClassName("chrono_mask");
+     
+     for (var i = 0; i < boxes.length; i++) {
+        boxes[i].checked = checked;
+      }
+      
+      calculate_chrono_mask();
    }
   
 </script>
 
 </head>
 
-<body class="mcss" onload="mhttpd_init('V1725 Setup');setInterval(statusPeriodicUpdate,3000);statusPeriodicUpdate()">
+<body class="mcss" onload="mhttpd_init('V1725 Setup');setInterval(statusPeriodicUpdate,3000);statusPeriodicUpdate();register_listeners();">
 
 <!-- header and side navigation will be filled in mhttpd_init -->
 <div id="mheader"></div>
@@ -90,22 +355,54 @@
     </tr>
     <tr>
       <td>
+        Waveform Length (us)<br/>
+        <small>
+          Setting this affects <i>Custom Size</i>, <i>Almost Full</i> and <i>Buffer Organization</i>.<br/>
+          Choose the correct board type first.
+        </small><br/>
+        <select id="board_type" onchange="update_wf_lengths_readback();update_post_trigger_readback()">
+          <option value="0" selected>V1725, 640kS/chan memory</option>
+          <option value="1">V1725, 5.12MS/chan memory</option>
+          <option value="2">V1720, 1MS/chan memory</option>
+          <option value="3">V1720, 8MS/chan memory</option>
+          <option value="4">V1720, 1MS/chan memory, Pack2.5</option>
+          <option value="5">V1720, 8MS/chan memory, Pack2.5</option>
+        </select>
+      </td>
+      <td>
+        <input id="wf_length" onblur="set_wf_length()">
+      </td>
+      <td>
+        <span id="wf_length_0"></span>us
+      </td>
+      <td>
+        <span id="wf_length_1"></span>us
+      </td>
+      <td>
+        <span id="wf_length_2"></span>us
+      </td>
+      <td>
+        <span id="wf_length_3"></span>us
+      </td>
+    </tr>
+    <tr>
+      <td>
         Custom Size
       </td>
       <td>       
-        <input id="Custom size" onblur="set_parameter('Custom size')"></input>
+        <input id="Custom_size" onblur="set_parameter('Custom size')"></input>
       </td>
       <td >       
-        <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Custom size" ></div> 
+        <div class="modbvalue customsize" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Custom size" ></div> 
       </td>
       <td >       
-        <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Custom size" ></div> 
+        <div class="modbvalue customsize" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Custom size" ></div> 
       </td>
       <td >       
-        <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Custom size" ></div> 
+        <div class="modbvalue customsize" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Custom size" ></div> 
       </td>
       <td >       
-        <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Custom size" ></div> 
+        <div class="modbvalue customsize" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Custom size" ></div> 
       </td>
     </tr>
     <tr>
@@ -116,16 +413,16 @@
         <input id="almost_full" onblur="set_parameter('almost_full')"></input>
       </td>
       <td >       
-        <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/almost_full" ></div> 
+        <div class="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/almost_full" ></div> 
       </td>
       <td >       
-        <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/almost_full" ></div> 
+        <div class="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/almost_full" ></div> 
       </td>
       <td >       
-        <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/almost_full" ></div> 
+        <div class="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/almost_full" ></div> 
       </td>
       <td >       
-        <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/almost_full" ></div> 
+        <div class="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/almost_full" ></div> 
       </td>
     </tr>
     <tr>
@@ -133,20 +430,64 @@
         Buffer Organization
       </td>
       <td>       
-        <input id="Buffer Organization" onblur="set_parameter('Buffer Organization')"></input>
+        <input id="Buffer_Organization" onblur="set_parameter('Buffer Organization')"></input>
       </td>
       <td >       
-        <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Buffer Organization" ></div> 
+        <div class="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Buffer Organization" ></div> 
       </td>
       <td >       
-        <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Buffer Organization" ></div> 
+        <div class="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Buffer Organization" ></div> 
       </td>
       <td >       
-        <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Buffer Organization" ></div> 
+        <div class="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Buffer Organization" ></div> 
       </td>
       <td >       
-        <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Buffer Organization" ></div> 
+        <div class="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Buffer Organization" ></div> 
       </td>
+    </tr>
+    <tr>
+      <td>
+        Post Trigger (us)<br/>
+        <small>
+          Setting this affects <i>Post Trigger</i>.<br/>
+          Choose the correct board type first (above).
+        </small><br/>
+      </td>
+      <td>
+        <input id="pt_length" onblur="set_pt_length()">
+      </td>
+      <td>
+        <span id="pt_length_0"></span>us
+      </td>
+      <td>
+        <span id="pt_length_1"></span>us
+      </td>
+      <td>
+        <span id="pt_length_2"></span>us
+      </td>
+      <td>
+        <span id="pt_length_3"></span>us
+      </td>
+    </tr>
+    <tr>
+      <td>
+        Post Trigger
+      </td>
+      <td>       
+          <input id="Post_Trigger" onblur="set_parameter('Post Trigger')"></input>
+        </td>
+        <td >       
+          <div class="modbvalue posttrigger" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Post Trigger" ></div> 
+        </td>
+        <td >       
+          <div class="modbvalue posttrigger" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Post Trigger" ></div> 
+        </td>
+        <td >       
+          <div class="modbvalue posttrigger" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Post Trigger" ></div> 
+        </td>
+        <td >       
+          <div class="modbvalue posttrigger" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Post Trigger" ></div> 
+        </td>
     </tr>
     <tr>
       <td>
@@ -156,37 +497,17 @@
         <input id="SelfTrigger_Threshold" onblur="set_parameter('SelfTrigger_Threshold')"></input>
       </td>
       <td >       
-        <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Threshold" ></div> 
+        <div class="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Threshold" ></div> 
       </td>
       <td >       
-        <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Threshold" ></div> 
+        <div class="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Threshold" ></div> 
       </td>
       <td >       
-        <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Threshold" ></div> 
+        <div class="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Threshold" ></div> 
       </td>
       <td >       
-        <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Threshold" ></div> 
+        <div class="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Threshold" ></div> 
       </td>
-    </tr>
-    <tr>
-      <td>
-	Post Trigger
-      </td>
-      <td>       
-          <input id="Post Trigger" onblur="set_parameter('Post Trigger')"></input>
-	</td>
-	<td >       
-          <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Post Trigger" ></div> 
-	</td>
-	<td >       
-          <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Post Trigger" ></div> 
-	</td>
-	<td >       
-          <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Post Trigger" ></div> 
-	</td>
-	<td >       
-          <div name="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Post Trigger" ></div> 
-	</td>
     </tr>
     <tr>
       <td>
@@ -195,16 +516,16 @@
       <td>       
       </td>
       <td >       
-        <div name="modbvalue" data-format="x" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Channel Mask" ></div> 
+        <div class="modbvalue" data-format="x" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Channel Mask" ></div> 
       </td>
       <td >       
-        <div name="modbvalue" data-format="x" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Channel Mask" ></div> 
+        <div class="modbvalue" data-format="x" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Channel Mask" ></div> 
       </td>
       <td >       
-        <div name="modbvalue" data-format="x" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Channel Mask" ></div> 
+        <div class="modbvalue" data-format="x" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Channel Mask" ></div> 
       </td>
       <td >       
-        <div name="modbvalue" data-format="x" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Channel Mask" ></div> 
+        <div class="modbvalue" data-format="x" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Channel Mask" ></div> 
       </td>
 
 
@@ -212,6 +533,93 @@
   </table>
 
   <br>
+
+  <table class="mtable">
+    <tr>
+      <th colspan="6" class="mtableheader">Channel Mask Calculator</th>
+    </tr>
+    <tr>
+      <th>V1725 Mask Calculator</th>
+      <th>Chronobox Mask Calculator</th>
+    </tr>
+    <tr>
+      <td>
+        <input type="button" value="Select all" onclick="select_all_v1725(true);">
+        <input type="button" value="Select none" onclick="select_all_v1725(false);"><br/>
+        <input type="checkbox" id="v1725_mask_0" value="0" class="v1725_mask"><label for="v1725_mask_0">Ch 0</label><br/>
+        <input type="checkbox" id="v1725_mask_1" value="1" class="v1725_mask"><label for="v1725_mask_1">Ch 1</label><br/>
+        <input type="checkbox" id="v1725_mask_2" value="2" class="v1725_mask"><label for="v1725_mask_2">Ch 2</label><br/>
+        <input type="checkbox" id="v1725_mask_3" value="3" class="v1725_mask"><label for="v1725_mask_3">Ch 3</label><br/>
+        <input type="checkbox" id="v1725_mask_4" value="4" class="v1725_mask"><label for="v1725_mask_4">Ch 4</label><br/>
+        <input type="checkbox" id="v1725_mask_5" value="5" class="v1725_mask"><label for="v1725_mask_5">Ch 5</label><br/>
+        <input type="checkbox" id="v1725_mask_6" value="6" class="v1725_mask"><label for="v1725_mask_6">Ch 6</label><br/>
+        <input type="checkbox" id="v1725_mask_7" value="7" class="v1725_mask"><label for="v1725_mask_7">Ch 7</label><br/>
+        <input type="checkbox" id="v1725_mask_8" value="8" class="v1725_mask"><label for="v1725_mask_8">Ch 8</label><br/>
+        <input type="checkbox" id="v1725_mask_9" value="9" class="v1725_mask"><label for="v1725_mask_9">Ch 9</label><br/>
+        <input type="checkbox" id="v1725_mask_10" value="10" class="v1725_mask"><label for="v1725_mask_10">Ch 10</label><br/>
+        <input type="checkbox" id="v1725_mask_11" value="11" class="v1725_mask"><label for="v1725_mask_11">Ch 11</label><br/>
+        <input type="checkbox" id="v1725_mask_12" value="12" class="v1725_mask"><label for="v1725_mask_12">Ch 12</label><br/>
+        <input type="checkbox" id="v1725_mask_13" value="13" class="v1725_mask"><label for="v1725_mask_13">Ch 13</label><br/>
+        <input type="checkbox" id="v1725_mask_14" value="14" class="v1725_mask"><label for="v1725_mask_14">Ch 14</label><br/>
+        <input type="checkbox" id="v1725_mask_15" value="15" class="v1725_mask"><label for="v1725_mask_15">Ch 15</label><br/>
+        Mask = <span id="v1725_mask_result">0x0</span>
+      </td>
+      <td>
+        <input type="button" value="Select all" onclick="select_all_chrono(true);">
+        <input type="button" value="Select none" onclick="select_all_chrono(false);"><br/>
+        <table>
+          <tr>
+            <td>
+              Board 0<br/>
+              <input type="checkbox" id="chrono_mask_0_0" value="0" class="chrono_mask"><label for="chrono_mask_0_0">Ch 0+1</label><br/>
+              <input type="checkbox" id="chrono_mask_0_1" value="1" class="chrono_mask"><label for="chrono_mask_0_1">Ch 2+3</label><br/>
+              <input type="checkbox" id="chrono_mask_0_2" value="2" class="chrono_mask"><label for="chrono_mask_0_2">Ch 4+5</label><br/>
+              <input type="checkbox" id="chrono_mask_0_3" value="3" class="chrono_mask"><label for="chrono_mask_0_3">Ch 6+7</label><br/>
+              <input type="checkbox" id="chrono_mask_0_4" value="4" class="chrono_mask"><label for="chrono_mask_0_4">Ch 8+9</label><br/>
+              <input type="checkbox" id="chrono_mask_0_5" value="5" class="chrono_mask"><label for="chrono_mask_0_5">Ch 10+11</label><br/>
+              <input type="checkbox" id="chrono_mask_0_6" value="6" class="chrono_mask"><label for="chrono_mask_0_6">Ch 12+13</label><br/>
+              <input type="checkbox" id="chrono_mask_0_7" value="7" class="chrono_mask"><label for="chrono_mask_0_7">Ch 14+15</label>              
+            </td>
+            <td>
+              Board 1<br/>
+              <input type="checkbox" id="chrono_mask_1_0" value="8" class="chrono_mask"><label for="chrono_mask_1_0">Ch 0+1</label><br/>
+              <input type="checkbox" id="chrono_mask_1_1" value="9" class="chrono_mask"><label for="chrono_mask_1_1">Ch 2+3</label><br/>
+              <input type="checkbox" id="chrono_mask_1_2" value="10" class="chrono_mask"><label for="chrono_mask_1_2">Ch 4+5</label><br/>
+              <input type="checkbox" id="chrono_mask_1_3" value="11" class="chrono_mask"><label for="chrono_mask_1_3">Ch 6+7</label><br/>
+              <input type="checkbox" id="chrono_mask_1_4" value="12" class="chrono_mask"><label for="chrono_mask_1_4">Ch 8+9</label><br/>
+              <input type="checkbox" id="chrono_mask_1_5" value="13" class="chrono_mask"><label for="chrono_mask_1_5">Ch 10+11</label><br/>
+              <input type="checkbox" id="chrono_mask_1_6" value="14" class="chrono_mask"><label for="chrono_mask_1_6">Ch 12+13</label><br/>
+              <input type="checkbox" id="chrono_mask_1_7" value="15" class="chrono_mask"><label for="chrono_mask_1_7">Ch 14+15</label>              
+            </td>
+            <td>
+              Board 2<br/>
+              <input type="checkbox" id="chrono_mask_2_0" value="16" class="chrono_mask"><label for="chrono_mask_2_0">Ch 0+1</label><br/>
+              <input type="checkbox" id="chrono_mask_2_1" value="17" class="chrono_mask"><label for="chrono_mask_2_1">Ch 2+3</label><br/>
+              <input type="checkbox" id="chrono_mask_2_2" value="18" class="chrono_mask"><label for="chrono_mask_2_2">Ch 4+5</label><br/>
+              <input type="checkbox" id="chrono_mask_2_3" value="19" class="chrono_mask"><label for="chrono_mask_2_3">Ch 6+7</label><br/>
+              <input type="checkbox" id="chrono_mask_2_4" value="20" class="chrono_mask"><label for="chrono_mask_2_4">Ch 8+9</label><br/>
+              <input type="checkbox" id="chrono_mask_2_5" value="21" class="chrono_mask"><label for="chrono_mask_2_5">Ch 10+11</label><br/>
+              <input type="checkbox" id="chrono_mask_2_6" value="22" class="chrono_mask"><label for="chrono_mask_2_6">Ch 12+13</label><br/>
+              <input type="checkbox" id="chrono_mask_2_7" value="23" class="chrono_mask"><label for="chrono_mask_2_7">Ch 14+15</label>              
+            </td>
+            <td>
+              Board 3<br/>
+              <input type="checkbox" id="chrono_mask_3_0" value="24" class="chrono_mask"><label for="chrono_mask_3_0">Ch 0+1</label><br/>
+              <input type="checkbox" id="chrono_mask_3_1" value="25" class="chrono_mask"><label for="chrono_mask_3_1">Ch 2+3</label><br/>
+              <input type="checkbox" id="chrono_mask_3_2" value="26" class="chrono_mask"><label for="chrono_mask_3_2">Ch 4+5</label><br/>
+              <input type="checkbox" id="chrono_mask_3_3" value="27" class="chrono_mask"><label for="chrono_mask_3_3">Ch 6+7</label><br/>
+              <input type="checkbox" id="chrono_mask_3_4" value="28" class="chrono_mask"><label for="chrono_mask_3_4">Ch 8+9</label><br/>
+              <input type="checkbox" id="chrono_mask_3_5" value="29" class="chrono_mask"><label for="chrono_mask_3_5">Ch 10+11</label><br/>
+              <input type="checkbox" id="chrono_mask_3_6" value="30" class="chrono_mask"><label for="chrono_mask_3_6">Ch 12+13</label><br/>
+              <input type="checkbox" id="chrono_mask_3_7" value="31" class="chrono_mask"><label for="chrono_mask_3_7">Ch 14+15</label>              
+            </td>
+          </tr>
+        </table><br/>
+        Mask = <span id="chrono_mask_result">0x0</span>
+      </td>
+    </tr>
+  </table>
+  
 
 Notes:
 
