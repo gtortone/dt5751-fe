@@ -180,7 +180,24 @@
 	   return [custom_size, buffer_code, almost_full];
    }
    
+   function disable_board_type_selection() {
+     document.getElementById("board_type").disabled = true;
+	   var divs = document.getElementsByClassName("board_type_help");
+	   for (var i = 0; i < divs.length; i++) {
+		   divs[i].style.display = "none";
+	   }
+   }
+   
    function register_listeners() {
+     if (window.location.href.indexOf("cern") != -1) {
+       document.getElementById("board_type").value = 1;
+       disable_board_type_selection();
+     }
+     if (window.location.href.indexOf("daq18.triumf.ca") != -1) {
+       document.getElementById("board_type").value = 4;
+       disable_board_type_selection();
+     }
+	   
      var boxes = document.getElementsByClassName("chrono_mask");
      
      for (var i = 0; i < boxes.length; i++) {
@@ -203,6 +220,12 @@
 
      for (var i = 0; i < boxes.length; i++) {
        boxes[i].onchange = function(){update_post_trigger_readback();};
+     }
+     
+     boxes = document.getElementsByClassName("blur_on_enter");
+     
+     for (var i = 0; i < boxes.length; i++) {
+    	 boxes[i].onkeyup = function(e){if(e.keyCode==13){e.target.blur();}}
      }
      
 	   calculate_v1725_mask();
@@ -349,28 +372,32 @@
       <th colspan="6" class="mtableheader">V1725 Board Setup</th>
     </tr>
     <tr>
-      <td></td>
-      <td></td>
-      <th colspan="4" >Readback</th>     
+      <th>Parameter</th>
+      <th>New value</th>
+      <th colspan="4" >Readback (boards 0-3)</th>     
     </tr>
     <tr>
       <td>
         Waveform Length (us)<br/>
         <small>
-          Setting this affects <i>Custom Size</i>, <i>Almost Full</i> and <i>Buffer Organization</i>.<br/>
-          Choose the correct board type first.
+          Setting this affects <i>Custom Size</i>, <i>Almost Full</i> and <i>Buffer Organization</i>.
         </small><br/>
-        <select id="board_type" onchange="update_wf_lengths_readback();update_post_trigger_readback()">
-          <option value="0" selected>V1725, 640kS/chan memory</option>
-          <option value="1">V1725, 5.12MS/chan memory</option>
-          <option value="2">V1720, 1MS/chan memory</option>
-          <option value="3">V1720, 8MS/chan memory</option>
-          <option value="4">V1720, 1MS/chan memory, Pack2.5</option>
-          <option value="5">V1720, 8MS/chan memory, Pack2.5</option>
-        </select>
+        <div class="board_type_help">
+	        <small>
+	          Choose the correct board type first.
+	        </small><br/>
+	        <select id="board_type" onchange="update_wf_lengths_readback();update_post_trigger_readback()">
+	          <option value="0" selected>V1725, 640kS/chan memory</option>
+	          <option value="1">V1725, 5.12MS/chan memory</option>
+	          <option value="2">V1720, 1MS/chan memory</option>
+	          <option value="3">V1720, 8MS/chan memory</option>
+	          <option value="4">V1720, 1MS/chan memory, Pack2.5</option>
+	          <option value="5">V1720, 8MS/chan memory, Pack2.5</option>
+	        </select>
+        </div>
       </td>
       <td>
-        <input id="wf_length" onblur="set_wf_length()">
+        <input id="wf_length" class="blur_on_enter"onblur="set_wf_length()">
       </td>
       <td>
         <span id="wf_length_0"></span>us
@@ -390,7 +417,7 @@
         Custom Size
       </td>
       <td>       
-        <input id="Custom_size" onblur="set_parameter('Custom size')"></input>
+        <input id="Custom_size" class="blur_on_enter"onblur="set_parameter('Custom size')"></input>
       </td>
       <td >       
         <div class="modbvalue customsize" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Custom size" ></div> 
@@ -410,7 +437,7 @@
         Almost Full
       </td>
       <td>       
-        <input id="almost_full" onblur="set_parameter('almost_full')"></input>
+        <input id="almost_full" class="blur_on_enter" onblur="set_parameter('almost_full')"></input>
       </td>
       <td >       
         <div class="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/almost_full" ></div> 
@@ -430,7 +457,7 @@
         Buffer Organization
       </td>
       <td>       
-        <input id="Buffer_Organization" onblur="set_parameter('Buffer Organization')"></input>
+        <input id="Buffer_Organization" class="blur_on_enter"onblur="set_parameter('Buffer Organization')"></input>
       </td>
       <td >       
         <div class="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Buffer Organization" ></div> 
@@ -449,12 +476,12 @@
       <td>
         Post Trigger (us)<br/>
         <small>
-          Setting this affects <i>Post Trigger</i>.<br/>
-          Choose the correct board type first (above).
+          Setting this affects <i>Post Trigger</i>.<span class="board_type_help"><br/>
+          Choose the correct board type first (above).</span>
         </small><br/>
       </td>
       <td>
-        <input id="pt_length" onblur="set_pt_length()">
+        <input id="pt_length" class="blur_on_enter"onblur="set_pt_length()">
       </td>
       <td>
         <span id="pt_length_0"></span>us
@@ -474,7 +501,7 @@
         Post Trigger
       </td>
       <td>       
-          <input id="Post_Trigger" onblur="set_parameter('Post Trigger')"></input>
+          <input id="Post_Trigger" class="blur_on_enter"onblur="set_parameter('Post Trigger')"></input>
         </td>
         <td >       
           <div class="modbvalue posttrigger" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Post Trigger" ></div> 
@@ -494,7 +521,7 @@
         Channel Trigger Threshold (ADC value)
       </td>
       <td>       
-        <input id="SelfTrigger_Threshold" onblur="set_parameter('SelfTrigger_Threshold')"></input>
+        <input id="SelfTrigger_Threshold" class="blur_on_enter"onblur="set_parameter('SelfTrigger_Threshold')"></input>
       </td>
       <td >       
         <div class="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Threshold" ></div> 
