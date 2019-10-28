@@ -24,19 +24,20 @@ set(MIDASSYS $ENV{MIDASSYS})
 
 # Hardware setup
 # Number of optical links used per A3818
-set(NBLINKSPERA3818 1)
+set(NBLINKSPERA3818 4)
 
 # Number of optical links controlled by each frontend 
-set (NBLINKSPERFE 1) 
+set (NBLINKSPERFE 4) 
 
 # Number of daisy-chained v1725s per optical link
 set (NB1725PERLINK 1)
 
 # Number of v1725 boards in total 
-set (NBV1725TOTAL 1) 
+set (NBV1725TOTAL 4) 
 
 # Number of cores
 set (NBCORES 12)
+
 
 # Using the SYSTEM buffer
 set (USE_SYSTEM_BUFFER 1)
