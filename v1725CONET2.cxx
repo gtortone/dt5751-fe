@@ -22,6 +22,7 @@ This file contains the class implementation for the v1725 module driver.
 //! Configuration string for this board. (ODB: /Equipment/[eq_name]/Settings/[board_name]/)
 const char * v1725CONET2::config_str_board[] = {\
     "Acq mode = INT : 5",\
+	"Front panel TTL (y) or NIM (n) = BOOL : y",\
     "Board Configuration = DWORD : 16",\
     "Buffer organization = INT : 10",\
     "Custom size = INT : 40",\
@@ -1024,13 +1025,21 @@ int v1725CONET2::InitializeForAcq()
   sCAEN = WriteReg_(V1725_FP_IO_CONTROL, 0x00000000);
 	usleep(200000);
 
-  // V1725_FP_IO_CONTROL configuration
+	int size = sizeof(V1725_CONFIG_SETTINGS);
+	db_get_record(odb_handle_, settings_handle_, &config, &size, 0);
+
+	// V1725_FP_IO_CONTROL configuration
 	//                                                            0x1: TTL trigger levels 
 	//                                                            0x3c:LVDS I/O[15..0] output
 	//                                                            0x100:enable new config
   //                                                            0xD0000: Busy signal from motherboard outputted on TRG-OUT
   //                                                            0x400000: store extended timetag in bank. 
-	sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        0x4D013D);  // PAA - C:NIM, D:TTL
+	DWORD front_panel = 0x4D013C;   // PAA - C:NIM, D:TTL
+	if (config.front_panel_ttl) {
+		front_panel += 0x1;
+	}
+
+	sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        front_panel);
 	                                                 
   sCAEN = WriteReg_(V1725_FP_LVDS_IO_CRTL,      0x1100); // this configures the V1725 to output the trigger primitives from 
 
@@ -1108,8 +1117,6 @@ int v1725CONET2::InitializeForAcq()
   }
 
 	//PAA
-	int size = sizeof(V1725_CONFIG_SETTINGS);
-	db_get_record(odb_handle_, settings_handle_, &config, &size, 0);
 
 	//already reset/clear earlier this function, so skip here
 	AcqCtl_(config.acq_mode); 

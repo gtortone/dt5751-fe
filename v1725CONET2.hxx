@@ -74,6 +74,7 @@ public:
   };
   struct V1725_CONFIG_SETTINGS {
     INT       acq_mode;                //!< 0x8100@[ 1.. 0]
+    BOOL      front_panel_ttl;         //!< 0x811C@[0]
     DWORD     board_config;            //!< 0x8000@[19.. 0]
     INT       buffer_organization;     //!< 0x800C@[ 3.. 0]
     INT       custom_size;             //!< 0x8020@[31.. 0]
