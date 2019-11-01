@@ -78,13 +78,13 @@
        sampling_rate = 250e6;
        sram_samples_per_chan = 640e3;
        cs_factor = 10;
-       pt_factor = 2;
+       pt_factor = 4; // Should be 2 according to manual, but 4 seems correct in reality
      }
      if (board_type == 1) {
        sampling_rate = 250e6;
        sram_samples_per_chan = 5.12e6;
        cs_factor = 10;
-       pt_factor = 2;
+       pt_factor = 4; // Should be 2 according to manual, but 4 seems correct in reality
      }
      if (board_type == 2) {
        sampling_rate = 250e6;

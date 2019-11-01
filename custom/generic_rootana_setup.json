@@ -2,7 +2,7 @@
     "V1725 Waveforms" : { 
 	"MaxChannels" : 16,
 	"MaxModules" : 4,
-	"WebserverName" : "V1725"
+	"WebserverName" : "V1725_UW"
     },
     "Pulse Heights" : { 
 	"MaxChannels" : 16,
