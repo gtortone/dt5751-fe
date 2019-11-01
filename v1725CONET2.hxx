@@ -90,9 +90,10 @@ public:
     DWORD     selftrigger_threshold[16];//!< 0x1n80@[11.. 0]
     DWORD     selftrigger_logic[8];    //!< 0x1n84@[11.. 0]
     INT       zle_signed_threshold[16];//!< 0x1n24@[31.. 0]
-    INT       zle_bins_before[16];     //!< 0x1n28@[31.. 16]
-    INT       zle_bins_after[16];      //!< 0x1n28@[15.. 0]
+    INT       zle_bins_before[16];     //!< 0x1n54@[31.. 16]
+    INT       zle_bins_after[16];      //!< 0x1n58@[15.. 0]
     DWORD     dac[16];                 //!< 0x1n98@[15.. 0]
+    BOOL      dynamic_range_2v[16];    //!< 0x1n28@[0]
   } config; //!< instance of config structure
 
   /* Static */

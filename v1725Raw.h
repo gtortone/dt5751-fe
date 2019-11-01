@@ -62,8 +62,10 @@
 #define V1725_CONFIG_RELOAD                   0xEF34      /* write only; D32 */ 
 #define V1725_CONFIG_ROM                      0xF000      /* read  only; D32 */ 
 
-#define V1725_ZS_THRESHOLD                    0x1024      /* For channel 0 **** */
-#define V1725_ZS_NSAMP                        0x1028      /* For channel 0 **** */
+#define V1725_DYNAMIC_RANGE                   0x1028      /* For channel 0 **** */
+#define V1725_ZS_NSAMP_BEFORE                 0x1054      /* For channel 0 **** */
+#define V1725_ZS_NSAMP_AFTER                  0x1058      /* For channel 0 **** */
+#define V1725_ZLE_THRESHOLD                   0x105C      /* For channel 0 **** */
 #define V1725_INPUT_CONTROL                   0x1064      /* For channel 0  */
 #define V1725_PULSE_WIDTH                     0x1070      /* For channel 0 **** */
 #define V1725_CHANNEL_THRESHOLD               0x1080      /* For channel 0 */
@@ -72,7 +74,6 @@
 #define V1725_BUFFER_OCCUPANCY                0x1094      /* For channel 0 */
 #define V1725_CHANNEL_DAC                     0x1098      /* For channel 0 */
 #define V1725_CHANNEL_TEMPERATURE             0x10A8      /* For channel 0 */
-#define V1725_ZLE_THRESHOLD                   0x105C      /* For channel 0 **** */
 
 #define V1725_RUN_START                             0x0001
 #define V1725_RUN_STOP                              0x0002

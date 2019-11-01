@@ -126,6 +126,23 @@ const char * v1725CONET2::config_str_board[] = {\
     "[13] 10000",\
     "[14] 10000",\
     "[15] 10000",\
+	"Dynamic Range 2V (y) 0.5V (n) = BOOL[16] :",\
+	"[0] y",\
+	"[1] y",\
+	"[2] y",\
+	"[3] y",\
+	"[4] y",\
+	"[5] y",\
+	"[6] y",\
+	"[7] y",\
+	"[8] y",\
+	"[9] y",\
+	"[10] y",\
+	"[11] y",\
+	"[12] y",\
+	"[13] y",\
+	"[14] y",\
+	"[15] y",\
     NULL
 };
 
@@ -1167,7 +1184,9 @@ int v1725CONET2::InitializeForAcq()
 		} else {
 			WriteReg_(V1725_ZLE_THRESHOLD     + (iChan<<8), (0x80000000 | (-1*config.zle_signed_threshold[iChan])));
 		}
-		WriteReg_(V1725_ZS_NSAMP            + (iChan<<8), ((config.zle_bins_before[iChan]<<16) | config.zle_bins_after[iChan]));
+		WriteReg_(V1725_ZS_NSAMP_BEFORE       + (iChan<<8), config.zle_bins_before[iChan]);
+		WriteReg_(V1725_ZS_NSAMP_AFTER        + (iChan<<8), config.zle_bins_after[iChan]);
+		WriteReg_(V1725_DYNAMIC_RANGE         + (iChan<<8), config.dynamic_range_2v[iChan] ? 0 : 1);
 		DWORD temp;
 
 
