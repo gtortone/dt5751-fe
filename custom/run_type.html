@@ -75,6 +75,7 @@
      $(".instructions").hide();
      $("#instructions").hide();
 	   chrono_set_okay = {};
+	   v1725_set_okay = {};
    }
    
    function is_chrono_okay() {
@@ -143,7 +144,7 @@
    function notify_v1725_state() {
      wait_for_all_v1725_okay(5000).then(
         () => {
-        	if (v1725_set_okay.length == 0) {
+        	if (Object.keys(v1725_set_okay).length == 0) {
             $("#v1725_status").text("V1725s not touched");
         	} else if (is_v1725_okay()) {
             $("#v1725_status").text("V1725s set up correctly");
@@ -232,8 +233,6 @@
     	     mjsonrpc_error_alert(error);
     	   });
     	 }
-     } else {
-         $("#v1725_status").text("V1725s do not need to be touched");
      }
   
      notify_v1725_state();  
@@ -257,6 +256,13 @@
 
 <div id="mmain">
 
+  <p style="font-family:verdana,tahoma,sans-serif; padding-left:10px; padding-right:10px">
+	  This page will edit the chronobox (and sometimes the V1725) settings for different data types.
+	  For all types it sets up <code>ch_enable</code> and <code>ext_trig_ena</code> on the chronobox.
+	  For "normal" data it will also set up <code>ch_extend</code> and <code>top_min</code> on the chronobox,
+	  and <code>SelfTrigger_Threshold</code> on the V1725s.
+  </p>
+  
   <table class="mtable">
     <tr>
       <th colspan="2" class="mtableheader">Change run type</th>
@@ -279,7 +285,7 @@
         <table>
           <tr>
             <td>
-              <label for="trigger_extend">Coincidence window<br/><small>Number of 16ns bins</small></label>
+              <label for="trigger_extend">Chronobox coincidence window<br/><small>Number of 16ns bins</small></label>
             </td>
             <td>
               <input type="number" style="font-size:18px; width:70px" id="trigger_extend">
@@ -287,7 +293,7 @@
           </tr>
           <tr>
             <td>
-              <label for="trigger_majority">Trigger multiplicity<br/><small>Number of hits needed within window</small></label>
+              <label for="trigger_majority">Chronobox trigger multiplicity<br/><small>Number of hits needed within window</small></label>
             </td>
             <td>
               <input type="number" style="font-size:18px; width:70px" id="trigger_majority">
@@ -296,11 +302,12 @@
           <tr>
             <td>
               <label for="self_trigger">
-                Self trigger threshold<br/>
+                V1725 self-trigger threshold<br/>
                 <small>
-                  Number of ADC below baseline<br>
-                  Assumes all channels have a baseline of 15500<br>
-                  Leave blank to not touch the thresholds
+                  Number of ADC below baseline.<br>
+                  Assumes all channels have a baseline of 15500.<br>
+                  1mV is ~ 8ADC, so 200mV is ~ 1600ADC.<br>
+                  Leave blank to not touch the existing thresholds.
                 </small>
               </label>
             </td>
@@ -342,6 +349,7 @@
           <li>Turn on the laser</li>
           <li>Connect the "LASER" cable to CLKIN1 of the Chronobox</li>
           <li><a href="/?cmd=custom&page=V1725%20Setup">Set appropriate waveform length and post-trigger settings</a></li>
+          <li>Start the run</li>
         </ul>
       </td>
     </tr>
@@ -350,6 +358,7 @@
         <ul>
           <li>Connect the "CLOCK" cable to CLKIN1 of the Chronobox</li>
           <li><a href="/?cmd=custom&page=V1725%20Setup">Set appropriate waveform length and post-trigger settings</a></li>
+          <li>Start the run</li>
         </ul>
       </td>
     </tr>
@@ -357,6 +366,7 @@
       <td>
         <ul>
           <li><a href="/?cmd=custom&page=V1725%20Setup">Set appropriate waveform length and post-trigger settings</a></li>
+          <li>Start the run</li>
         </ul>
       </td>
     </tr>
