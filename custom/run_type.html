@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html class="mcss">
+<head>
+   <meta charset="UTF-8">
+   <link rel="stylesheet" href="midas.css">
+   <script src="controls.js"></script>
+   <script src="midas.js"></script>
+   <script src="mhttpd.js"></script>
+   <script src="jquery.min.js"></script>
+   <title>Run type</title>
+
+   <style>
+      .mtable td { padding: 10px; }
+   </style>
+
+   <script>
+   var chrono_url = "chronobox"
+
+	 function arrays_equal(a, b) {
+	   if (a === b) return true;
+	   if (a == null || b == null) return false;
+	   if (a.length != b.length) return false;
+
+	   for (var i = 0; i < a.length; i++) {
+	     if (a[i] !== b[i]) {
+	    	 return false;
+	     }
+	   }
+	   return true;
+	 }
+   
+   function chrono_error(jqXHR, textStatus, errorThrown) {
+     alert("Failed to communicate with the chronobox: " + textStatus + "; " + errorThrown);
+   }
+   
+   async function chrono_get(mid, vid, value) {
+     var url = chrono_url + "/read_var?mid=" + mid + "&vid=" + vid + "&includeData=y"; 
+     var settings = {"data": JSON.stringify(value),
+                     "dataType": "json"
+                    };
+     let result;
+
+     try {
+       result = await $.ajax(url, settings);
+       return result;
+     } catch (error) {
+       alert("Failed to get chrono");
+     }
+   }
+      
+   async function chrono_set(mid, vid, value) {
+     var url = chrono_url + "/write_var?mid=" + mid + "&vid=" + vid; 
+     var settings = {"data": JSON.stringify(value),
+                     "contentType": "application/json",
+                     "dataType": "json",
+                     "type": "POST"
+                    };
+     let result;
+
+     try {
+       result = await $.ajax(url, settings);
+       return result;
+     } catch (error) {
+       alert("Failed to set chrono");
+     }
+   }
+   
+   var chrono_set_okay = {};
+   var v1725_set_okay = {};
+   
+   function new_chrono_setup() {
+     $("#chrono_status").text("Starting chronobox setup");
+     $("#v1725_status").text("V1725s do not need to be touched");
+     $("#status").show();
+     $(".instructions").hide();
+     $("#instructions").hide();
+	   chrono_set_okay = {};
+   }
+   
+   function is_chrono_okay() {
+	   for (var k in chrono_set_okay) {
+		   if (!chrono_set_okay[k]) {
+			   return false;
+		   }
+	   }
+	   return true;
+   }
+   
+   async function wait_for_all_chrono_okay(timeout_ms) {
+	   var start_time = new Date().getTime()
+
+	   while (true) {
+	     if (is_chrono_okay()) {
+	       return true;
+	     }
+	     if (new Date() > start_time + timeout_ms) {
+	    	 return false;
+	     }
+	     await new Promise(resolve => setTimeout(resolve, 10));
+	   }
+	 }
+
+   function is_v1725_okay() {
+     for (var k in v1725_set_okay) {
+       if (!v1725_set_okay[k]) {
+         return false;
+       }
+     }
+     return true;
+   }
+   
+   async function wait_for_all_v1725_okay(timeout_ms) {
+     var start_time = new Date().getTime()
+
+     while (true) {
+       if (is_v1725_okay()) {
+         return true;
+       }
+       if (new Date() > start_time + timeout_ms) {
+         return false;
+       }
+       await new Promise(resolve => setTimeout(resolve, 10));
+     }
+   }
+   
+   function notify_chrono_state(instructions_div) {
+     wait_for_all_chrono_okay(5000).then(
+        () => {
+          if (is_chrono_okay()) {
+            $("#chrono_status").text("Chronobox set up correctly");
+            if (instructions_div !== null) {
+              $("#instructions").show();
+              $(instructions_div).show();
+            }
+          } else {
+            $("#chrono_status").text("Chronobox setup failed");
+            alert("Chronobox setup failed");
+          }
+        }
+     );
+   }
+   
+   function notify_v1725_state() {
+     wait_for_all_v1725_okay(5000).then(
+        () => {
+        	if (v1725_set_okay.length == 0) {
+            $("#v1725_status").text("V1725s not touched");
+        	} else if (is_v1725_okay()) {
+            $("#v1725_status").text("V1725s set up correctly");
+          } else {
+            $("#v1725_status").text("V1725 setup failed");
+            alert("V1725 setup failed");
+          }
+        }
+     );
+   }
+   
+   function chrono_set_and_validate(mid, vid, value) {
+	   chrono_set_okay[mid + "_" + vid] = false;
+	   
+     chrono_set(mid, vid, value).then( 
+		   (dummy) => chrono_get(mid, vid).then( 
+				 (data) => {
+					 if (!arrays_equal(data["d"], value)) {
+						 console.log("Failed to set chronobox " + mid + "/" + vid + " to " + value + ": " + data["d"]);
+					 } else {
+						 chrono_set_okay[mid + "_" + vid] = true;
+					 }
+				 } 
+			 )
+     );
+   }
+   
+   function chrono_test_get(mid, vid) {
+     chrono_get(mid, vid).then( (data) => {console.log(data["d"][0])} );
+   }
+
+   function set_laser() {
+	   new_chrono_setup();
+	   chrono_set_and_validate("mod_tdm", "ch_enable", [0]);
+	   chrono_set_and_validate("mod_tdm", "ext_trig_ena", [true]);
+	   notify_chrono_state("#laser_instructions");
+   }
+   
+   function set_clock() {
+     new_chrono_setup();
+     chrono_set_and_validate("mod_tdm", "ch_enable", [0]);
+     chrono_set_and_validate("mod_tdm", "ext_trig_ena", [true]);
+     notify_chrono_state("#clock_instructions");	   
+   }
+   
+   function set_normal() {
+     var ext = parseInt($("#trigger_extend").val());
+     var maj = parseInt($("#trigger_majority").val());
+     var sel = parseInt($("#self_trigger").val());
+     set_normal_with_params(ext, maj, sel);
+   }
+   
+   function set_normal_with_params(trigger_extend, trigger_majority, self_trigger) {
+	   // trigger_extend in 16ns bins
+     new_chrono_setup();
+     chrono_set_and_validate("mod_tdm", "ch_enable", [0x3F3F3F7F]);
+     chrono_set_and_validate("mod_tdm", "ext_trig_ena", [false]);
+     
+     if (trigger_majority !== undefined) {
+    	 chrono_set_and_validate("mod_tdm", "top_min", [trigger_majority]);
+     }
+     if (trigger_extend !== undefined) {
+       chrono_set_and_validate("mod_tdm", "ch_extend", [trigger_extend]);
+     }
+     if (self_trigger !== undefined && self_trigger == self_trigger && self_trigger != "") {
+    	 if (self_trigger < 0) {
+    		 self_trigger = self_trigger * -1;
+    	 }
+    	 
+       $("#v1725_status").text("Starting V1725 setup");
+    	 v1725_set_okay = {};
+    	 var baseline = 15500;
+    	 var t = baseline - self_trigger;
+    	 var t_array = [t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t];
+    	 var boards = ["Board0", "Board1", "Board2", "Board3"];
+    	 
+    	 for (var b in boards) {
+    		 let board = boards[b];
+    		 v1725_set_okay[board] = false;
+    		 var path = "/Equipment/V1725_Data00/Settings/" + board + "/SelfTrigger_Threshold";
+    		 mjsonrpc_db_set_value(path, t_array).then(function(rpc) {
+    			 if (rpc.result.status[0] == 1) {
+    				 v1725_set_okay[board] = true;
+    			 }
+    		 }).catch(function(error) {
+    	     mjsonrpc_error_alert(error);
+    	   });
+    	 }
+     } else {
+         $("#v1725_status").text("V1725s do not need to be touched");
+     }
+  
+     notify_v1725_state();  
+     notify_chrono_state("#normal_instructions");   
+   }
+   
+   function populate_trigger_settings() {
+     chrono_get("mod_tdm", "ch_extend").then((data) => {$("#trigger_extend").val(data["d"][0])});
+     chrono_get("mod_tdm", "top_min").then((data) => {$("#trigger_majority").val(data["d"][0])});
+   }
+   
+   </script>
+
+</head>
+
+<body class="mcss" onload="mhttpd_init('Run type');populate_trigger_settings()">
+
+<!-- header and side navigation will be filled in mhttpd_init -->
+<div id="mheader"></div>
+<div id="msidenav"></div>
+
+<div id="mmain">
+
+  <table class="mtable">
+    <tr>
+      <th colspan="2" class="mtableheader">Change run type</th>
+    </tr>
+    <tr>
+      <th>Laser</th>
+      <td>
+        <input type="button" class="mbutton" value="Set up laser run" onclick="set_laser(); event.preventDefault()">
+      </td>
+    </tr>
+    <tr>
+      <th>Noise</th>
+      <td>
+        <input type="button" class="mbutton" value="Set up noise run" onclick="set_clock(); event.preventDefault()">
+      </td>
+    </tr>
+    <tr>
+      <th>Normal</th>     
+      <td>
+        <table>
+          <tr>
+            <td>
+              <label for="trigger_extend">Coincidence window<br/><small>Number of 16ns bins</small></label>
+            </td>
+            <td>
+              <input type="number" style="font-size:18px; width:70px" id="trigger_extend">
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <label for="trigger_majority">Trigger multiplicity<br/><small>Number of hits needed within window</small></label>
+            </td>
+            <td>
+              <input type="number" style="font-size:18px; width:70px" id="trigger_majority">
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <label for="self_trigger">
+                Self trigger threshold<br/>
+                <small>
+                  Number of ADC below baseline<br>
+                  Assumes all channels have a baseline of 15500<br>
+                  Leave blank to not touch the thresholds
+                </small>
+              </label>
+            </td>
+            <td>
+              <input type="number" style="font-size:18px; width:70px" id="self_trigger">
+            </td>
+          </tr>
+	        <tr>
+	          <td colspan="2">
+              <input type="button" class="mbutton" value="Set up normal run" onclick="set_normal(); event.preventDefault()">
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <table class="mtable" style="display:none" id="status">
+    <tr>
+      <th class="mtableheader" colspan="2">Configuration status</th>
+    </tr>
+    <tr>
+      <th>Chronobox</th>
+      <td id="chrono_status"></td>
+    </tr>
+    <tr>
+      <th>V1725s</th>
+      <td id="v1725_status"></td>
+    </tr>
+  </table>
+
+  <table class="mtable" style="display:none" id="instructions">
+    <tr>
+      <th class="mtableheader">Further instructions</th>
+    </tr>
+    <tr id="laser_instructions" class="instructions" style="display:none">
+      <td>
+        <ul>
+          <li>Turn on the laser</li>
+          <li>Connect the "LASER" cable to CLKIN1 of the Chronobox</li>
+          <li><a href="/?cmd=custom&page=V1725%20Setup">Set appropriate waveform length and post-trigger settings</a></li>
+        </ul>
+      </td>
+    </tr>
+    <tr id="clock_instructions" class="instructions" style="display:none">
+      <td>
+        <ul>
+          <li>Connect the "CLOCK" cable to CLKIN1 of the Chronobox</li>
+          <li><a href="/?cmd=custom&page=V1725%20Setup">Set appropriate waveform length and post-trigger settings</a></li>
+        </ul>
+      </td>
+    </tr>
+    <tr id="normal_instructions" class="instructions" style="display:none">
+      <td>
+        <ul>
+          <li><a href="/?cmd=custom&page=V1725%20Setup">Set appropriate waveform length and post-trigger settings</a></li>
+        </ul>
+      </td>
+    </tr>
+  </table>
+
+</div>
+
+
+</body>
+</html>
+
