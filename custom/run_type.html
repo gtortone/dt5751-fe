@@ -256,7 +256,7 @@
 
 <div id="mmain">
 
-  <p style="font-family:verdana,tahoma,sans-serif; padding-left:10px; padding-right:10px">
+  <p class="mfont" style="padding-left:10px; padding-right:10px">
 	  This page will edit the chronobox (and sometimes the V1725) settings for different data types.
 	  For all types it sets up <code>ch_enable</code> and <code>ext_trig_ena</code> on the chronobox.
 	  For "normal" data it will also set up <code>ch_extend</code> and <code>top_min</code> on the chronobox,
@@ -270,18 +270,31 @@
     <tr>
       <th>Laser</th>
       <td>
+        <small>
+          In a laser run we use an external trigger, which is created at the same time as the laser fires.
+        </small>
+        <br>
         <input type="button" class="mbutton" value="Set up laser run" onclick="set_laser(); event.preventDefault()">
       </td>
     </tr>
     <tr>
       <th>Noise</th>
       <td>
+        <small>
+          In a noise run we use an external trigger generated periodically by a NIM module.
+        </small>
+        <br>
         <input type="button" class="mbutton" value="Set up noise run" onclick="set_clock(); event.preventDefault()">
       </td>
     </tr>
     <tr>
-      <th>Normal</th>     
+      <th>Physics</th>     
       <td>
+        <small>
+          In a physics run, the V1725s tell the chronobox when they see a hit, and
+          <br>the chronobox issues a trigger if there are N hits in a given time window.
+        </small>
+        <br>
         <table>
           <tr>
             <td>
@@ -317,7 +330,7 @@
           </tr>
 	        <tr>
 	          <td colspan="2">
-              <input type="button" class="mbutton" value="Set up normal run" onclick="set_normal(); event.preventDefault()">
+              <input type="button" class="mbutton" value="Set up physics run" onclick="set_normal(); event.preventDefault()">
             </td>
           </tr>
         </table>
