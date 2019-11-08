@@ -26,6 +26,15 @@ This file contains the class definition for the v1725 module driver.
 #include "midas.h"
 #include "msystem.h"
 
+// Max event size we support (in bytes).
+// Defined here as needed in v1725CONET2.cxx and feoV1725.cxx.
+// Size required in bytes = wf_len_us * num_boards * chans_per_board * us_to_bytes_factor + space for other info
+// E.g. for 1000us when reading 8 channels from 4 boards:
+//   1000 * 4 * 8 * 437.5 + 10000 = 14,010,000
+// If going very big, may also need to change /Experiment/MAX_EVENT_SIZE in ODB.
+// 45MB/event is enough for 3ms with 4 boards * 8 channels
+#define V1725_MAX_EVENT_SIZE 45000000
+
 typedef unsigned short UShort_t;    //Unsigned Short integer 2 bytes (unsigned short)
 typedef short          Short_t;     //Signed Short integer 2 bytes (unsigned short)
 typedef float          Float_t;     //Float 4 bytes (float)

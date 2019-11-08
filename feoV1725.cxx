@@ -143,12 +143,20 @@ char const *frontend_file_name = (char*)__FILE__;
 BOOL frontend_call_loop = FALSE;
 //! a frontend status page is displayed with this frequency in ms
 INT display_period = 000;
-//! maximum event size produced by this frontend
-INT max_event_size = 32 * 422800;
+//! maximum event size produced by this frontend (from #define in v1725CONET2.hxx)
+INT max_event_size = V1725_MAX_EVENT_SIZE;
 //! maximum event size for fragmented events (EQ_FRAGMENTED)
 INT max_event_size_frag = 5 * 1024 * 1024;
+
 //! buffer size to hold events
+//! Very large events - don't consume too much memory
+#if V1725_MAX_EVENT_SIZE > 30000000
+INT event_buffer_size = 10 * max_event_size + 10000;
+#elif V1725_MAX_EVENT_SIZE > 10000000
+INT event_buffer_size = 20 * max_event_size + 10000;
+#else
 INT event_buffer_size = 30 * max_event_size + 10000;
+#endif
 
 bool runInProgress = false; //!< run is in progress
 bool stopRunInProgress = false; //!<

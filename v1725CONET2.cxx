@@ -748,7 +748,7 @@ bool v1725CONET2::FillEventBank(char * pevent, uint32_t &timestamp)
   bk_create(pevent, bankName, TID_DWORD, (void **)&dest);
 
 
-  uint32_t limit_size = (32*422800-bk_size(pevent))/4; // what space is left in the event (in DWORDS)  
+  uint32_t limit_size = (V1725_MAX_EVENT_SIZE-bk_size(pevent))/4; // what space is left in the event (in DWORDS)
   if (size_words > limit_size) {
 //    printf("Event with size: %u (Module %02d) bigger than max %u, event truncated\n", size_words, this->GetModuleID(), limit_size);
     cm_msg(MERROR,"FillEventBank","Event with size: %u (Module %02d) bigger than max %u, event truncated", size_words, this->GetModuleID(), limit_size);
@@ -772,7 +772,7 @@ bool v1725CONET2::FillEventBank(char * pevent, uint32_t &timestamp)
 		}
 		else {
 			//      printf("Raw mode with long waveforms, exceeding the limit: event skipped\n");
-      cm_msg(MERROR,"FillEventBank","Raw mode with long waveforms, exceeding the limit: event skipped");
+      cm_msg(MERROR,"FillEventBank","Raw mode with long waveforms, exceeding the limit: event skipped. Size dwords %d from module %d. Free space left %d dwords of %d bytes.", size_words, this->GetModuleID(), limit_size, V1725_MAX_EVENT_SIZE);
       *(src + 0) = 0xA0000004; // Event Size set to 0 data (4 DWORDS for the the header ==> TO be checked !)
 			size_copied = 4;
 		}
