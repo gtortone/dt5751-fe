@@ -82,8 +82,8 @@ public:
     UnrecognizedDataFormat
   };
   struct V1725_CONFIG_SETTINGS {
+    BOOL      enable;
     INT       acq_mode;                //!< 0x8100@[ 1.. 0]
-    BOOL      front_panel_ttl;         //!< 0x811C@[0]
     DWORD     board_config;            //!< 0x8000@[19.. 0]
     INT       buffer_organization;     //!< 0x800C@[ 3.. 0]
     INT       custom_size;             //!< 0x8020@[31.. 0]
@@ -91,11 +91,10 @@ public:
     DWORD     trigger_source;          //!< 0x810C@[31.. 0]
     DWORD     trigger_output;          //!< 0x8110@[31.. 0]
     DWORD     post_trigger;            //!< 0x8114@[31.. 0]
-    // Hard code the two fp_* settings to alway on (Alex 21/2/13)
-    //    DWORD     fp_io_ctrl;        //!< 0x811C@[31.. 0]
-    DWORD     enable_zle;             //!< 0x816C@[31.. 0]
+    DWORD     fp_io_ctrl;              //!< 0x811C@[31.. 0]
+    DWORD     enable_zle;              //!< 0x816C@[31.. 0]
     DWORD     almost_full;             //!< 0x816C@[31.. 0]
-    //    DWORD     fp_lvds_io_ctrl;   //!< 0x81A0@[31.. 0]
+    DWORD     fp_lvds_io_ctrl;         //!< 0x81A0@[31.. 0]
     DWORD     selftrigger_threshold[16];//!< 0x1n80@[11.. 0]
     DWORD     selftrigger_logic[8];    //!< 0x1n84@[11.. 0]
     INT       zle_signed_threshold[16];//!< 0x1n24@[31.. 0]

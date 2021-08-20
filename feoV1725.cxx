@@ -163,6 +163,10 @@ bool stopRunInProgress = false; //!<
 bool eor_transition_called = false; // already called EOR
 uint32_t timestamp_offset[NBLINKSPERFE*NB1725PERLINK]; //!< trigger time stamp offsets
 
+BOOL enableChronobox = true;
+BOOL enableMerging = true;
+int unmergedModuleToRead = -1;
+
 // __________________________________________________________________
 /*-- MIDAS Function declarations -----------------------------------------*/
 INT frontend_init();
@@ -356,6 +360,15 @@ INT frontend_init(){
     db_set_value(hDB, 0, sEpath, &(equipment[1].info.event_id), sizeof(WORD), 1, TID_WORD);
   }
 
+  {
+    // Create flags for whether to enable Chronobox, and whether to merge data from all boards in same event.
+    char cb_path[255], merge_path[255];
+    sprintf(cb_path, "/Equipment/%s/Settings/Enable chronobox", equipment[0].name);
+    sprintf(merge_path, "/Equipment/%s/Settings/Merge data from boards", equipment[0].name);
+    db_get_value(hDB, 0, cb_path, &enableChronobox, &size, TID_BOOL, TRUE);
+    db_get_value(hDB, 0, cb_path, &enableMerging, &size, TID_BOOL, TRUE);
+  }
+
   // --- Suppress watchdog for PICe for now  ; what is this???
   cm_set_watchdog_params(FALSE, 0);
 
@@ -527,6 +540,21 @@ INT begin_of_run(INT run_number, char *error)
     db_set_value(hDB, 0, Path, &(dummy), sizeof(INT), 1, TID_INT);
   }
 
+  {
+    // Create flags for whether to enable Chronobox, and whether to merge data from all boards in same event.
+    char cb_path[255], merge_path[255];
+    sprintf(cb_path, "/Equipment/%s/Settings/Enable chronobox", equipment[0].name);
+    sprintf(merge_path, "/Equipment/%s/Settings/Merge data from boards", equipment[0].name);
+    INT size = sizeof(BOOL);
+    db_get_value(hDB, 0, cb_path, &enableChronobox, &size, TID_BOOL, TRUE);
+    db_get_value(hDB, 0, cb_path, &enableMerging, &size, TID_BOOL, TRUE);
+  }
+
+  if (enableChronobox && !enableMerging) {
+    cm_msg(MERROR, __FUNCTION__, "Invalid setup - you must merge data from all board if running with the chronobox.");
+    return FE_ERR_ODB;
+  }
+
   for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
     if (! itv1725->IsConnected()) continue;   // Skip unconnected board
     DWORD vmeAcq, vmeStat;
@@ -570,9 +598,11 @@ INT begin_of_run(INT run_number, char *error)
   // Need to discard the first ZMQ bank.
   is_first_event = true;
 
-  /// Sleep 1 second and start chronobox
-  sleep(1);
-  chronobox_start_stop(true);
+  if (enableChronobox) {
+    /// Sleep 1 second and start chronobox
+    sleep(1);
+    chronobox_start_stop(true);
+  }
 
 
   set_equipment_status(equipment[0].name, "Started run", "#00ff00");
@@ -689,11 +719,13 @@ BOOL wait_buffer_empty(int transition, BOOL first)
      printf("\nDeferred transition.  First call of wait_buffer_empty. Stopping run\n");
      // Some funny business here... need to pause the readout on the threads before
      // making the chronobox stop call... some sort of contention for the system resources.
-     stopRunInProgress = true;
-     usleep(500);
-     chronobox_start_stop(false);
-     stopRunInProgress = false;
-     sleep(1);
+     if (enableChronobox) {
+      stopRunInProgress = true;
+      usleep(500);
+      chronobox_start_stop(false);
+      stopRunInProgress = false;
+      sleep(1);
+    }
      wait_counter = 0;
      return FALSE;
    }
@@ -778,16 +810,18 @@ INT end_of_run(INT run_number, char *error)
 
   }
 
-  // Clear out all the events in the ZMQ buffer:
-  uint32_t rcvbuf [100];
-  int total_extra = 0;
-  int stat;
-  stat = zmq_recv (subscriber, rcvbuf, sizeof(rcvbuf), ZMQ_DONTWAIT);
-  while(stat > 0){
-    total_extra++;
+  if (enableChronobox) {
+    // Clear out all the events in the ZMQ buffer:
+    uint32_t rcvbuf [100];
+    int total_extra = 0;
+    int stat;
     stat = zmq_recv (subscriber, rcvbuf, sizeof(rcvbuf), ZMQ_DONTWAIT);
+    while(stat > 0){
+      total_extra++;
+      stat = zmq_recv (subscriber, rcvbuf, sizeof(rcvbuf), ZMQ_DONTWAIT);
+    }
+    if(total_extra >0) cm_msg(MINFO, "EOR", "Events left in the chronobox: %d",total_extra);
   }
-  if(total_extra >0) cm_msg(MINFO, "EOR", "Events left in the chronobox: %d",total_extra);
 
   printf(">>> End Of end_of_run\n\n");
   set_equipment_status(equipment[0].name, "Ended run", "#00ff00");
@@ -934,13 +968,40 @@ INT poll_event(INT source, INT count, BOOL test)
   register int i;
 
   for (i = 0; i < count; i++) {
-
-    //ready for readout only when data is present in all ring buffers
     bool evtReady = true;
-    for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-      if(itv1725->IsConnected() && (itv1725->GetNumEventsInRB() == 0)) {
-        evtReady = false;
+    unmergedModuleToRead = -1;
+
+    if (enableMerging) {
+      //ready for readout only when data is present in all ring buffers
+      for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
+        if(itv1725->IsConnected() && (itv1725->GetNumEventsInRB() == 0)) {
+          evtReady = false;
+        }
       }
+    } else {
+      //ready for readout when data is present on any ring buffer
+      evtReady = false;
+      int maxNumEvents = -1;
+
+      for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
+        if (!itv1725->IsConnected()) {
+          continue;
+        }
+
+        int numEvents = itv1725->GetNumEventsInRB();
+
+        if (numEvents > 0) {
+          evtReady = true;
+
+          if (numEvents > maxNumEvents) {
+            // Tell the readout routine to read data from the module with the
+            // most events in the buffer; this helps to more fairly read data
+            // from multiple boards when we're not merging the data.
+            unmergedModuleToRead = itv1725->GetModuleID();
+            maxNumEvents = numEvents;
+          }
+        }
+      }      
     }
 
     //If event not ready or we're in test phase, keep looping
@@ -1001,39 +1062,40 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
   // Keep track of timestamps
   std::vector<uint32_t> timestamps;
 
-  // Get the ChronoBox bank
-  // If this is the first event, then read ZMQ buffer an extra time; want to discard first event.
-  if(is_first_event){
-    uint32_t rcvbuf [100];
-    int stat0 = zmq_recv (subscriber, rcvbuf, sizeof(rcvbuf), ZMQ_DONTWAIT);
-    if(!stat0){
-      cm_msg(MERROR,"read_trigger_event", "ZMQ read error on first event. %i\n",stat0);
-    }
-    is_first_event = false;
-    printf("Flushed first event from chronobox\n");
-  }
-
-  int stat = -1;
-
-  bk_create(pevent, "ZMQ0", TID_DWORD, (void **)&pdata);
-
-  // Try to receive ZMQ data from chronobox.
-  // Use ZMQ_DONTWAIT to prevent blocking.
-  // But retry several times in case message is delayed.
-  float zmq_timeout_ms = 100;
-  float zmq_retry_wait_ms = 1;
-  float zmq_time = 0;
-
-  while (zmq_time < zmq_timeout_ms) {
-    stat = zmq_recv (subscriber, pdata, 1000, ZMQ_DONTWAIT);
-
-    if (stat > 0) {
-      break;
+  if (enableChronobox) {
+    // Get the ChronoBox bank
+    // If this is the first event, then read ZMQ buffer an extra time; want to discard first event.
+    if(is_first_event){
+      uint32_t rcvbuf [100];
+      int stat0 = zmq_recv (subscriber, rcvbuf, sizeof(rcvbuf), ZMQ_DONTWAIT);
+      if(!stat0){
+        cm_msg(MERROR,"read_trigger_event", "ZMQ read error on first event. %i\n",stat0);
+      }
+      is_first_event = false;
+      printf("Flushed first event from chronobox\n");
     }
 
-    zmq_time += zmq_retry_wait_ms;
-    usleep(1000 * zmq_retry_wait_ms);
-  }
+    int stat = -1;
+
+    bk_create(pevent, "ZMQ0", TID_DWORD, (void **)&pdata);
+
+    // Try to receive ZMQ data from chronobox.
+    // Use ZMQ_DONTWAIT to prevent blocking.
+    // But retry several times in case message is delayed.
+    float zmq_timeout_ms = 100;
+    float zmq_retry_wait_ms = 1;
+    float zmq_time = 0;
+
+    while (zmq_time < zmq_timeout_ms) {
+      stat = zmq_recv (subscriber, pdata, 1000, ZMQ_DONTWAIT);
+
+      if (stat > 0) {
+        break;
+      }
+
+      zmq_time += zmq_retry_wait_ms;
+      usleep(1000 * zmq_retry_wait_ms);
+    }
 
     if (stat > 0) {
 
@@ -1045,21 +1107,45 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
     }else{
       // There should be ZMQ data for each bank.  If not, stop the run.
       if(!eor_transition_called){
-	cm_msg(MERROR,"read_trigger_event", "Error: did not receive a ZMQ bank after %f ms.  Stopping run.", zmq_timeout_ms);
-	cm_transition(TR_STOP, 0, NULL, 0, TR_DETACH, 0);
-	eor_transition_called = true;
+        cm_msg(MERROR,"read_trigger_event", "Error: did not receive a ZMQ bank after %f ms.  Stopping run.", zmq_timeout_ms);
+        cm_transition(TR_STOP, 0, NULL, 0, TR_DETACH, 0);
+        eor_transition_called = true;
+        return 0;
       }
     }
-    //  }
+  } // End of chronobox
 
   // Get the V1725
+  if (!enableMerging && unmergedModuleToRead < 0) {
+    cm_msg(MERROR,"read_trigger_event", "Error: module to read is set to invalid value %d! Stopping run.", unmergedModuleToRead);
+    cm_transition(TR_STOP, 0, NULL, 0, TR_DETACH, 0);
+    eor_transition_called = true;
+    return 0;
+  }
 
   for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
     if (! itv1725->IsConnected()) continue;   // Skip unconnected board
 
+    if (enableMerging && itv1725->GetNumEventsInRB() == 0) {
+        cm_msg(MERROR,"read_trigger_event", "Error: no events in RB for module %d.  Stopping run.", itv1725->GetModuleID());
+        cm_transition(TR_STOP, 0, NULL, 0, TR_DETACH, 0);
+        eor_transition_called = true;
+        return 0;
+    }
+
+    if (!enableMerging && itv1725->GetModuleID() != unmergedModuleToRead) {
+      continue;
+    }
+
     // >>> Fill Event bank
     uint32_t timestamp;
     itv1725->FillEventBank(pevent,timestamp);
+
+    if (!enableMerging) {
+      // Only saving data from 1 board.
+      break;
+    }
+
     // Save timestamp for ZLE bank.
     timestamps.push_back((timestamp & 0x7fffffff));
   }
@@ -1109,6 +1195,9 @@ INT read_buffer_level(char *pevent, INT off) {
   bk_init32(pevent);
   int PLLLockLossID = -1;
   for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
+    if (!itv1725->IsConnected()) {
+      continue;
+    }
     itv1725->FillBufferLevelBank(pevent);
 
     // Check the PLL lock
@@ -1144,6 +1233,9 @@ INT read_temperature(char *pevent, INT off) {
   // Read the temperature for each ADC...
   DWORD temp;
   for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725){
+    if (!itv1725->IsConnected()) {
+      continue;
+    }
 
     int addr;
     char bankName[5];

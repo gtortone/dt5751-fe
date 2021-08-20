@@ -21,8 +21,8 @@ This file contains the class implementation for the v1725 module driver.
 
 //! Configuration string for this board. (ODB: /Equipment/[eq_name]/Settings/[board_name]/)
 const char * v1725CONET2::config_str_board[] = {\
+    "Enable = BOOL : y",\
     "Acq mode = INT : 5",\
-	"Front panel TTL (y) or NIM (n) = BOOL : y",\
     "Board Configuration = DWORD : 16",\
     "Buffer organization = INT : 10",\
     "Custom size = INT : 40",\
@@ -30,8 +30,10 @@ const char * v1725CONET2::config_str_board[] = {\
     "Trigger Source = DWORD : 1073741824",\
     "Trigger Output = DWORD : 1073741824",\
     "Post Trigger = DWORD : 100",\
+    "Front panel IO = DWORD : 0x4D013C",\
     "Enable ZLE = DWORD : 0",\
     "almost_full = DWORD : 512",\
+    "Front panel LVDS IO = DWORD : 0x1100",\
     "SelfTrigger_Threshold = DWORD[16] :",\
     "[0] 3870",\
     "[1] 3870",\
@@ -170,6 +172,9 @@ v1725CONET2::v1725CONET2(int feindex, int link, int board, int moduleID, HNDLE h
   rb_handle_ = -1;
   verbosity_ = 0;
 
+  // Start by assuming the board is enabled; will be overriden by ODB later.
+  config.enable = true;
+
 }
 /**
  * Move constructor needed because we're putting v1725CONET2 objects in a vector which requires
@@ -256,7 +261,7 @@ std::string v1725CONET2::GetName()
  */
 bool v1725CONET2::IsConnected()
 {
-  return (device_handle_ >= 0);
+  return (device_handle_ >= 0) && config.enable;
 }
 
 //
@@ -407,6 +412,9 @@ bool v1725CONET2::Disconnect()
 {
   if (verbosity_) std::cout << GetName() << "::Disconnect()\n";
 
+  if (device_handle_ < 0) {
+    return true;
+  }
   if (!IsConnected()) {
     cm_msg(MERROR,"Disconnect","Board %d already disconnected", this->GetModuleID());
     return false;
@@ -650,6 +658,10 @@ bool v1725CONET2::WriteReg(DWORD address, DWORD val)
  */
 bool v1725CONET2::Poll(DWORD *val)
 {
+  if (!IsConnected()) {
+    return false;
+  }
+
   CAENComm_ErrorCode sCAEN = CAENComm_Read32(device_handle_, V1725_EVENT_STORED, val);
   return (sCAEN == CAENComm_Success);
 }
@@ -1045,23 +1057,8 @@ int v1725CONET2::InitializeForAcq()
 	int size = sizeof(V1725_CONFIG_SETTINGS);
 	db_get_record(odb_handle_, settings_handle_, &config, &size, 0);
 
-	// V1725_FP_IO_CONTROL configuration
-	//                                                            0x1: TTL trigger levels 
-	//                                                            0x3c:LVDS I/O[15..0] output
-	//                                                            0x100:enable new config
-  //                                                            0xD0000: Busy signal from motherboard outputted on TRG-OUT
-  //                                                            0x400000: store extended timetag in bank. 
-	DWORD front_panel = 0x4D013C;   // PAA - C:NIM, D:TTL
-	if (config.front_panel_ttl) {
-		front_panel += 0x1;
-	}
-
-	sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        front_panel);
-	                                                 
-  sCAEN = WriteReg_(V1725_FP_LVDS_IO_CRTL,      0x1100); // this configures the V1725 to output the trigger primitives from 
-
-	// the 8 trigger pairs to the upper 8 LVDS outputs.
-	// The configuration 0x0011 should work to send the same signals to the lower 8 LVDS outputs, but this doesn't work.
+	sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        config.fp_io_ctrl);	                                                 
+  sCAEN = WriteReg_(V1725_FP_LVDS_IO_CRTL,      config.fp_lvds_io_ctrl);
 
   std::stringstream ss_fw_datatype;
   ss_fw_datatype << "Module " << moduleID_ << ", ";
@@ -1116,6 +1113,15 @@ int v1725CONET2::InitializeForAcq()
     cm_msg(MINFO,"InitializeForAcq","*** WARNING *** Trying to use a v1725 frontend with another"
 		" type of board (0x%x).   Results will be unexpected! ",version);
 
+  // Record board type in the ODB.
+  char rdb_str[200];
+
+  if(feIndex_ == -1)
+    snprintf(rdb_str, sizeof(rdb_str), "/Equipment/V1725_Data/Readback/Board%d/Board type", moduleID_ % 8);
+  else
+    snprintf(rdb_str, sizeof(rdb_str), "/Equipment/V1725_Data%02d/Readback/Board%d/Board type", feIndex_, moduleID_ % 8);
+
+  db_set_value(hDB, 0, rdb_str, &version, sizeof(version), 1, TID_DWORD);
 
 //  ss_fw_datatype << this->GetChannelConfig();
   switch(this->GetDataType()){
@@ -1135,8 +1141,7 @@ int v1725CONET2::InitializeForAcq()
 
 	//PAA
 
-	//already reset/clear earlier this function, so skip here
-	AcqCtl_(config.acq_mode); 
+  WriteReg_(V1725_ACQUISITION_CONTROL,     config.acq_mode);
 	WriteReg_(V1725_BOARD_CONFIG,            config.board_config);
 	WriteReg_(V1725_BUFFER_ORGANIZATION,     config.buffer_organization);
 	WriteReg_(V1725_CUSTOM_SIZE,             config.custom_size);
@@ -1150,7 +1155,6 @@ int v1725CONET2::InitializeForAcq()
 	}
 	
 	WriteReg_(V1725_CHANNEL_EN_MASK,         config.channel_mask);
-	AcqCtl_(V1725_COUNT_ACCEPTED_TRIGGER);
 	WriteReg_(V1725_TRIG_SRCE_EN_MASK,       config.trigger_source);
 	WriteReg_(V1725_FP_TRIGGER_OUT_EN_MASK,  config.trigger_output);
 	WriteReg_(V1725_POST_TRIGGER_SETTING,    config.post_trigger);
