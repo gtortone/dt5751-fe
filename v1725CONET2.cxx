@@ -1121,7 +1121,7 @@ int v1725CONET2::InitializeForAcq()
   else
     snprintf(rdb_str, sizeof(rdb_str), "/Equipment/V1725_Data%02d/Readback/Board%d/Board type", feIndex_, moduleID_ % 8);
 
-  db_set_value(hDB, 0, rdb_str, &version, sizeof(version), 1, TID_DWORD);
+  db_set_value(odb_handle_, 0, rdb_str, &version, sizeof(version), 1, TID_DWORD);
 
 //  ss_fw_datatype << this->GetChannelConfig();
   switch(this->GetDataType()){

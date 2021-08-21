@@ -359,7 +359,7 @@
     }
 
    function board_type_rdb_changed(board_id) {
-     let val = parseInt(document.getElementById("board_type_" + board_id).innerText);
+     let val = parseInt(document.getElementById("board_type_rdb_" + board_id).innerText);
      let handled = false;
      let family = (val & 0xFF);
      let memory = ((val >> 8) & 0xFF);
@@ -391,7 +391,7 @@
        }
      } 
 
-     document.getElementById("board_type_" + board_id).disabled = !handled;
+     document.getElementById("board_type_" + board_id).disabled = handled;
    }
    
    function register_listeners() {
@@ -571,7 +571,7 @@
     </tr>
     <tr>
       <td>Merge data from multiple boards into a single event</td>
-      <td><input type="checkbox" class="modbcheckbox" data-odb-path="/Equipment/V1725_Data00/Settings/Enable merging" data-odb-editable="1"></td>
+      <td><input type="checkbox" class="modbcheckbox" data-odb-path="/Equipment/V1725_Data00/Settings/Merge data from boards" data-odb-editable="1"></td>
     </tr>
   </table>
 

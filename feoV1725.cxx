@@ -363,10 +363,11 @@ INT frontend_init(){
   {
     // Create flags for whether to enable Chronobox, and whether to merge data from all boards in same event.
     char cb_path[255], merge_path[255];
+    int size_bool = sizeof(BOOL);
     sprintf(cb_path, "/Equipment/%s/Settings/Enable chronobox", equipment[0].name);
     sprintf(merge_path, "/Equipment/%s/Settings/Merge data from boards", equipment[0].name);
-    db_get_value(hDB, 0, cb_path, &enableChronobox, &size, TID_BOOL, TRUE);
-    db_get_value(hDB, 0, cb_path, &enableMerging, &size, TID_BOOL, TRUE);
+    db_get_value(hDB, 0, cb_path, &enableChronobox, &size_bool, TID_BOOL, TRUE);
+    db_get_value(hDB, 0, merge_path, &enableMerging, &size_bool, TID_BOOL, TRUE);
   }
 
   // --- Suppress watchdog for PICe for now  ; what is this???
@@ -447,12 +448,11 @@ INT frontend_init(){
 
   printf(">>> End of Init. %d active v1725. Expected %d\n\n", nActive, nExpected);
 
-  if(nActive == nExpected){
-    set_equipment_status(equipment[0].name, "Initialized", "#00ff00");
-  }
-  else{
-    return FE_ERR_HW;
-  }
+  if (nActive == nExpected){
+    cm_msg(MERROR, __FUNCTION__, "Unexpected number of active boards (%d vs %d)", nActive, nExpected);
+  } 
+  
+  set_equipment_status(equipment[0].name, "Initialized", "#00ff00");
 
   cpu_set_t mask;
   CPU_ZERO(&mask);
@@ -525,9 +525,6 @@ INT begin_of_run(INT run_number, char *error)
   int rb_handle;
   int status;
 
-  /// Make sure the chronobox is stopped
-  chronobox_start_stop(false);
-
   stopRunInProgress = false;
   eor_transition_called = false;
 
@@ -541,18 +538,23 @@ INT begin_of_run(INT run_number, char *error)
   }
 
   {
-    // Create flags for whether to enable Chronobox, and whether to merge data from all boards in same event.
+    // Create/read flags for whether to enable Chronobox, and whether to merge data from all boards in same event.
     char cb_path[255], merge_path[255];
     sprintf(cb_path, "/Equipment/%s/Settings/Enable chronobox", equipment[0].name);
     sprintf(merge_path, "/Equipment/%s/Settings/Merge data from boards", equipment[0].name);
     INT size = sizeof(BOOL);
     db_get_value(hDB, 0, cb_path, &enableChronobox, &size, TID_BOOL, TRUE);
-    db_get_value(hDB, 0, cb_path, &enableMerging, &size, TID_BOOL, TRUE);
+    db_get_value(hDB, 0, merge_path, &enableMerging, &size, TID_BOOL, TRUE);
   }
 
   if (enableChronobox && !enableMerging) {
     cm_msg(MERROR, __FUNCTION__, "Invalid setup - you must merge data from all board if running with the chronobox.");
     return FE_ERR_ODB;
+  }
+
+  if (enableChronobox) {
+    /// Make sure the chronobox is stopped
+    chronobox_start_stop(false);
   }
 
   for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
