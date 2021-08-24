@@ -185,6 +185,7 @@ INT read_temperature(char *pevent, INT off);
 void * link_thread(void *);
 void *subscriber;
 
+BOOL equipment_common_overwrite = false;
 
 // __________________________________________________________________
 /*-- Equipment list ------------------------------------------------*/
@@ -548,7 +549,8 @@ INT begin_of_run(INT run_number, char *error)
   }
 
   if (enableChronobox && !enableMerging) {
-    cm_msg(MERROR, __FUNCTION__, "Invalid setup - you must merge data from all board if running with the chronobox.");
+    cm_msg(MERROR, __FUNCTION__, "Invalid setup - you must merge data from all boards if running with the chronobox.");
+    sprintf(error, "Invalid setup - you must merge data from all boards if running with the chronobox.");
     return FE_ERR_ODB;
   }
 
