@@ -2,7 +2,11 @@
 /*                                                                         */
 /*  Filename: V1725.h                                                      */
 /*                                                                         */
-/*  Function: headerfile for V1725 (standard RAW firmware)                  */
+/*  Function: headerfile for V1725 (RAW or DPP-ZLE firmware).              */
+/*                                                                         */
+/*  Names starting with: V1725RAW_ are only valid for Raw firmware         */
+/*                       V1725ZLE_ are only valid for DPP-ZLE firmware     */
+/*                       V1725_    are valid for both Raw and DPP-ZLE      */
 /*                                                                         */
 /* ----------------------------------------------------------------------- */
 /* $Id$                                                                    */
@@ -17,16 +21,17 @@
 #define V1725_BOARD_CFG_BIT_SET             0x8004      /* write only  D32 */ 
 #define V1725_BOARD_CFG_BIT_CLR             0x8008      /* write only; D32 */
  
-#define V1725_BUFFER_ORGANIZATION             0x800C      /* R/W       ; D32 */ 
+#define V1725RAW_BUFFER_ORGANIZATION          0x800C      /* R/W       ; D32 */ 
 #define V1725_CUSTOM_SIZE                     0x8020      /* R/W       ; D32 */
-#define V1725_SELFTRIGGER_LOGIC               0x8084      /* R/W       ; D32 */ 
+#define V1725ZLE_PRE_TRIGGER_SETTING          0x8038      /* R/W       ; D32 */ 
+#define V1725RAW_SELFTRIGGER_LOGIC            0x8084      /* R/W       ; D32 */ 
 #define V1725_ADC_CALIBRATION                 0x809C      /* R/W       ; D32 */ 
 #define V1725_ACQUISITION_CONTROL             0x8100      /* R/W       ; D32 */ 
 #define V1725_ACQUISITION_STATUS              0x8104      /* read  only; D32 */ 
 #define V1725_SW_TRIGGER                      0x8108      /* write only; D32 */ 
 #define V1725_TRIG_SRCE_EN_MASK               0x810C      /* R/W       ; D32 */ 
 #define V1725_FP_TRIGGER_OUT_EN_MASK          0x8110      /* R/W       ; D32 */ 
-#define V1725_POST_TRIGGER_SETTING            0x8114      /* R/W       ; D32 */ 
+#define V1725RAW_POST_TRIGGER_SETTING         0x8114      /* R/W       ; D32 */ 
 #define V1725_FP_IO_DATA                      0x8118      /* R/W       ; D32 */ 
 #define V1725_FP_IO_CONTROL                   0x811C      /* R/W       ; D32 */  
 #define V1725_CHANNEL_EN_MASK                 0x8120      /* R/W       ; D32 */ 
@@ -38,7 +43,7 @@
 #define V1725_MONITOR_MODE                    0x8144      /* R/W       ; D32 */ 
 #define V1725_EVENT_SIZE                      0x814C	  /* read  only; D32 */
 #define V1725_FAN_SPEED_CONTROL               0x8168	  /* R/W       ; D32 */
-#define V1725_ALMOST_FULL_LEVEL               0x816C      /* R/W       ; D32 */
+#define V1725RAW_ALMOST_FULL_LEVEL            0x816C      /* R/W       ; D32 */
 #define V1725_RUN_START_STOP_DELAY            0x8170      /* R/W       ; D32 */
 #define V1725_BOARD_FAILURE_STATUS            0x8178      /* R/W       ; D32 */
 #define V1725_FP_LVDS_IO_CRTL                 0x81A0      /* R/W       ; D32 */
@@ -63,12 +68,16 @@
 #define V1725_CONFIG_ROM                      0xF000      /* read  only; D32 */ 
 
 #define V1725_DYNAMIC_RANGE                   0x1028      /* For channel 0 **** */
-#define V1725_ZS_NSAMP_BEFORE                 0x1054      /* For channel 0 **** */
-#define V1725_ZS_NSAMP_AFTER                  0x1058      /* For channel 0 **** */
-#define V1725_ZLE_THRESHOLD                   0x105C      /* For channel 0 **** */
-#define V1725_INPUT_CONTROL                   0x1064      /* For channel 0  */
+#define V1725ZLE_ZS_BASELINE                  0x1034      /* For channel 0 **** */
+#define V1725ZLE_ZS_NSAMP_BEFORE              0x1054      /* For channel 0 **** */
+#define V1725ZLE_ZS_NSAMP_AFTER               0x1058      /* For channel 0 **** */
+#define V1725ZLE_ZS_THRESHOLD                 0x105C      /* For channel 0 **** */
+#define V1725ZLE_CHANNEL_THRESHOLD            0x1060      /* For channel 0 */
+#define V1725ZLE_INPUT_CONTROL                0x1064      /* For channel 0 */
+#define V1725ZLE_CHANNEL_LOGIC                0x1068      /* For channel 0 */
 #define V1725_PULSE_WIDTH                     0x1070      /* For channel 0 **** */
-#define V1725_CHANNEL_THRESHOLD               0x1080      /* For channel 0 */
+#define V1725RAW_CHANNEL_THRESHOLD            0x1080      /* For channel 0 */
+#define V1725RAW_CHANNEL_LOGIC                0x1084      /* For channel 0 */
 #define V1725_CHANNEL_STATUS                  0x1088      /* For channel 0 */
 #define V1725_FPGA_FWREV                      0x108C      /* For channel 0 */
 #define V1725_BUFFER_OCCUPANCY                0x1094      /* For channel 0 */

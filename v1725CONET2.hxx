@@ -83,25 +83,28 @@ public:
   };
   struct V1725_CONFIG_SETTINGS {
     BOOL      enable;
-    INT       acq_mode;                //!< 0x8100@[ 1.. 0]
-    DWORD     board_config;            //!< 0x8000@[19.. 0]
-    INT       buffer_organization;     //!< 0x800C@[ 3.. 0]
-    INT       custom_size;             //!< 0x8020@[31.. 0]
-    DWORD     channel_mask;            //!< 0x8120@[ 7.. 0]
-    DWORD     trigger_source;          //!< 0x810C@[31.. 0]
-    DWORD     trigger_output;          //!< 0x8110@[31.. 0]
-    DWORD     post_trigger;            //!< 0x8114@[31.. 0]
-    DWORD     fp_io_ctrl;              //!< 0x811C@[31.. 0]
-    DWORD     enable_zle;              //!< 0x816C@[31.. 0]
-    DWORD     almost_full;             //!< 0x816C@[31.. 0]
-    DWORD     fp_lvds_io_ctrl;         //!< 0x81A0@[31.. 0]
-    DWORD     selftrigger_threshold[16];//!< 0x1n80@[11.. 0]
-    DWORD     selftrigger_logic[8];    //!< 0x1n84@[11.. 0]
-    INT       zle_signed_threshold[16];//!< 0x1n24@[31.. 0]
-    INT       zle_bins_before[16];     //!< 0x1n54@[31.. 16]
-    INT       zle_bins_after[16];      //!< 0x1n58@[15.. 0]
-    DWORD     dac[16];                 //!< 0x1n98@[15.. 0]
-    BOOL      dynamic_range_2v[16];    //!< 0x1n28@[0]
+    BOOL      has_zle_firmware;         //!< Some registers only valid for ZLE or non-ZLE FW
+    INT       acq_mode;                 //!< 0x8100@[ 1.. 0]
+    DWORD     board_config;             //!< 0x8000@[19.. 0]
+    INT       buffer_organization;      //!< 0x800C@[ 3.. 0] - NON-ZLE only
+    INT       custom_size;              //!< 0x8020@[31.. 0] (known as record length for ZLE)
+    DWORD     channel_mask;             //!< 0x8120@[ 7.. 0]
+    DWORD     trigger_source;           //!< 0x810C@[31.. 0]
+    DWORD     trigger_output;           //!< 0x8110@[31.. 0]
+    DWORD     post_trigger;             //!< 0x8114@[31.. 0] - NON-ZLE only
+    DWORD     pre_trigger;              //!< 0x8038@[31.. 0] - ZLE only
+    DWORD     fp_io_ctrl;               //!< 0x811C@[31.. 0]
+    DWORD     enable_zle;               //!< 0x8064@[31.. 0] - ZLE only
+    DWORD     almost_full;              //!< 0x816C@[31.. 0] - NON-ZLE only
+    DWORD     fp_lvds_io_ctrl;          //!< 0x81A0@[31.. 0]
+    DWORD     selftrigger_threshold[16];//!< 0x1n80@[11.. 0] for NON-ZLE / 0x1n60@[11.. 0] for ZLE
+    DWORD     selftrigger_logic[8];     //!< 0x1n84@[11.. 0] for NON-ZLE / 0x1n68@[11.. 0] for ZLE
+    INT       zle_signed_threshold[16]; //!< 0x1n5C@[31.. 0] - ZLE only
+    DWORD     zle_bins_before[16];      //!< 0x1n54@[31.. 16]- ZLE only
+    DWORD     zle_bins_after[16];       //!< 0x1n58@[15.. 0] - ZLE only
+    DWORD     zle_baseline[16];         //!< 0x1n34@[31.. 0] - ZLE only
+    DWORD     dac[16];                  //!< 0x1n98@[15.. 0]
+    BOOL      dynamic_range_2v[16];     //!< 0x1n28@[0]
   } config; //!< instance of config structure
 
   /* Static */

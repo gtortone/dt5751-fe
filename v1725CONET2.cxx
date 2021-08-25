@@ -22,6 +22,7 @@ This file contains the class implementation for the v1725 module driver.
 //! Configuration string for this board. (ODB: /Equipment/[eq_name]/Settings/[board_name]/)
 const char * v1725CONET2::config_str_board[] = {\
     "Enable = BOOL : y",\
+    "Has ZLE firmware = BOOL : n",\
     "Acq mode = INT : 5",\
     "Board Configuration = DWORD : 16",\
     "Buffer organization = INT : 10",\
@@ -30,6 +31,7 @@ const char * v1725CONET2::config_str_board[] = {\
     "Trigger Source = DWORD : 1073741824",\
     "Trigger Output = DWORD : 1073741824",\
     "Post Trigger = DWORD : 100",\
+    "Pre Trigger = DWORD : 100",\
     "Front panel IO = DWORD : 0x4D013C",\
     "Enable ZLE = DWORD : 0",\
     "almost_full = DWORD : 512",\
@@ -111,6 +113,23 @@ const char * v1725CONET2::config_str_board[] = {\
     "[13] 0x5",\
     "[14] 0x5",\
     "[15] 0x5",\
+    "ZLEBaseline = DWORD[16] :",\
+    "[0] 0x30000",\
+    "[1] 0x30000",\
+    "[2] 0x30000",\
+    "[3] 0x30000",\
+    "[4] 0x30000",\
+    "[5] 0x30000",\
+    "[6] 0x30000",\
+    "[7] 0x30000",\
+    "[8] 0x30000",\
+    "[9] 0x30000",\
+    "[10] 0x30000",\
+    "[11] 0x30000",\
+    "[12] 0x30000",\
+    "[13] 0x30000",\
+    "[14] 0x30000",\
+    "[15] 0x30000",\
     "DAC = DWORD[16] :",\
     "[0] 10000",\
     "[1] 10000",\
@@ -831,7 +850,13 @@ bool v1725CONET2::FillBufferLevelBank(char * pevent)
 
   //Get v1725 buffer level
   sCAEN = ReadReg_(V1725_EVENT_STORED, &eStored);
-  sCAEN = ReadReg_(V1725_ALMOST_FULL_LEVEL, &almostFull);
+
+  if (config.has_zle_firmware) {
+    almostFull = 0;
+  } else {
+    sCAEN = ReadReg_(V1725RAW_ALMOST_FULL_LEVEL, &almostFull);
+  }
+  
   //Get ring buffer level
   rb_get_buffer_level(this->GetRingBufferHandle(), &rb_level);
 
@@ -1142,9 +1167,18 @@ int v1725CONET2::InitializeForAcq()
 	//PAA
 
   WriteReg_(V1725_ACQUISITION_CONTROL,     config.acq_mode);
-	WriteReg_(V1725_BOARD_CONFIG,            config.board_config);
-	WriteReg_(V1725_BUFFER_ORGANIZATION,     config.buffer_organization);
-	WriteReg_(V1725_CUSTOM_SIZE,             config.custom_size);
+
+  if (config.has_zle_firmware) {
+	  WriteReg_(V1725_BOARD_CONFIG,               0); // Many fewer options.
+    WriteReg_(V1725ZLE_RECORD_LENGTH,           config.custom_size);
+    WriteReg_(V1725ZLE_PRE_TRIGGER_SETTING,     config.pre_trigger);
+  } else {
+	  WriteReg_(V1725_BOARD_CONFIG,               config.board_config);
+    WriteReg_(V1725RAW_BUFFER_ORGANIZATION,     config.buffer_organization);
+    WriteReg_(V1725RAW_CUSTOM_SIZE,             config.custom_size);
+    WriteReg_(V1725RAW_POST_TRIGGER_SETTING,    config.post_trigger);
+    WriteReg_(V1725RAW_ALMOST_FULL_LEVEL,       config.almost_full);
+  }
 	
 	/* A bug exists in the firmware where if the channel mask is 0 (all channels
 	 * disabled), the board misbehaves (reports bogus number of events in output
@@ -1157,8 +1191,6 @@ int v1725CONET2::InitializeForAcq()
 	WriteReg_(V1725_CHANNEL_EN_MASK,         config.channel_mask);
 	WriteReg_(V1725_TRIG_SRCE_EN_MASK,       config.trigger_source);
 	WriteReg_(V1725_FP_TRIGGER_OUT_EN_MASK,  config.trigger_output);
-	WriteReg_(V1725_POST_TRIGGER_SETTING,    config.post_trigger);
-	WriteReg_(V1725_ALMOST_FULL_LEVEL,       config.almost_full);
 	WriteReg_(V1725_MONITOR_MODE,            0x3); // Buffer Occupancy mode;
 	WriteReg_(V1725_BLT_EVENT_NB,            0x1); // TL? max number of events per BLT is 1?
 	WriteReg_(V1725_VME_CONTROL,             V1725_ALIGN64);
@@ -1166,8 +1198,7 @@ int v1725CONET2::InitializeForAcq()
 
 	printf("..............................Now other settings...\n");
 	//set specfic channel values
-	// TODO: add right registers for V1725 ZLE
-	// FIXME HERE!
+
 	usleep(200000);
 #ifdef NO_V1725
 	for (int iChan=0; iChan<8; iChan++) {
@@ -1175,37 +1206,40 @@ int v1725CONET2::InitializeForAcq()
 	for (int iChan=0; iChan<16; iChan++) {
 #endif
 
-		WriteReg_(V1725_CHANNEL_THRESHOLD   + (iChan<<8), config.selftrigger_threshold     [iChan]);
+    if (config.has_zle_firmware) {
+  		WriteReg_(V1725ZLE_CHANNEL_THRESHOLD + (iChan<<8), config.selftrigger_threshold[iChan]);
+      WriteReg_(V1725ZLE_CHANNEL_LOGIC     + (iChan<<8), config.selftrigger_logic[i]);
+      WriteReg_(V1725ZLE_ZS_NSAMP_BEFORE   + (iChan<<8), config.zle_bins_before[iChan]);
+      WriteReg_(V1725ZLE_ZS_NSAMP_AFTER    + (iChan<<8), config.zle_bins_after[iChan]);
+      WriteReg_(V1725ZLE_ZS_BASELINE       + (iChan<<8), config.zle_baseline[iChan]);
 
-#ifdef NO_V1725  // registers are different for V1720
-		WriteReg_(0x1080 + (iChan<<8), config.selftrigger_threshold     [iChan]);  // threshold
-		WriteReg_(0x1084 + (iChan<<8), 1);  // number of samples over threshold = 4
-#endif
-	
+      DWORD thresh_comp = config.zle_signed_threshold[iChan] > 0 ? config.zle_signed_threshold[iChan] : (0x80000000 | (-1*config.zle_signed_threshold[iChan]));
+      WriteReg_(V1725ZLE_ZS_THRESHOLD      + (iChan<<8), thresh_comp);
+
+      // V1725ZLE_INPUT_CONTROL controls whether ZLE is enabled AND whether to trigger when
+      // under thresh or over thresh. For RAW firmware, the polarity is defined in the
+      // BOARD_CONFIG register, but that bit doesn't apply here. Instead we read the board
+      // config parameter and apply the setting to INPUT_CONTROL.
+      // Note that: raw; BOARD_CONFIG  bit 6; 0 => positive pulses
+      //            zle; INPUT_CONTROL bit 7; 1 => positive pulses
+      bool neg_pulses = ((config.board_config >> 6) & 0x1) == 1);
+      DWORD input_control = 0;
+
+      if (!neg_pulses) { 
+        input_control |= (0x1 << 8);
+      }
+      if (!config.enable_zle) { 
+        input_control |= (0x1 << 7);
+      }
+
+      WriteReg_(V1725ZLE_INPUT_CONTROL + (iChan<<8), input_control);
+    } else {
+  		WriteReg_(V1725RAW_CHANNEL_THRESHOLD + (iChan<<8), config.selftrigger_threshold[iChan]);
+      WriteReg_(V1725RAW_CHANNEL_LOGIC     + (iChan<<8), config.selftrigger_logic[i]);
+    }
 		
-		if( config.zle_signed_threshold[iChan]>0) {
-			WriteReg_(V1725_ZLE_THRESHOLD     + (iChan<<8), config.zle_signed_threshold  [iChan]);
-		} else {
-			WriteReg_(V1725_ZLE_THRESHOLD     + (iChan<<8), (0x80000000 | (-1*config.zle_signed_threshold[iChan])));
-		}
-		WriteReg_(V1725_ZS_NSAMP_BEFORE       + (iChan<<8), config.zle_bins_before[iChan]);
-		WriteReg_(V1725_ZS_NSAMP_AFTER        + (iChan<<8), config.zle_bins_after[iChan]);
-		WriteReg_(V1725_DYNAMIC_RANGE         + (iChan<<8), config.dynamic_range_2v[iChan] ? 0 : 1);
-		DWORD temp;
-
-
-		WriteReg_(V1725_CHANNEL_DAC         + (iChan<<8), config.dac[iChan]);			
-		//ReadReg_(V1725_CHANNEL_STATUS | (iChan << 8),&temp);
-		//printf("DAC (0x%x)after %x ,,, config %x %x \n",V1725_CHANNEL_DAC         + (iChan<<8),temp,config.dac[iChan],iChan);
-		
-		// Disable ZLE if requested
-		if(!config.enable_zle){
-			// Disable ZLE threshold
-			//printf("Disabling ZLE algorithm\n");
-			// This register also defines the polarity of the trigger;
-			// Currently bit 6 = 0, so we are negative pulse for triggering.
-			WriteReg_(V1725_INPUT_CONTROL + (iChan<<8),0x80);
-		}
+		WriteReg_(V1725_DYNAMIC_RANGE       + (iChan<<8), config.dynamic_range_2v[iChan] ? 0 : 1);
+		WriteReg_(V1725_CHANNEL_DAC         + (iChan<<8), config.dac[iChan]);	
 	}		
 
 	// Wait for 200ms after channing DAC offsets, before starting calibration. 
@@ -1245,9 +1279,7 @@ int v1725CONET2::InitializeForAcq()
 	}
 
 	printf("Module[...] : ADC calibration finished already\n");
-	// Set the trigger logic for each group of two channels; 
-	// 3 meansa trigger on either channel will trigger the group
-	WriteReg_(V1725_SELFTRIGGER_LOGIC, 3);
+
 #endif	
 	
 	// Check finally for Acquisition status
