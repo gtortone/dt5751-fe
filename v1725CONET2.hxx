@@ -133,6 +133,7 @@ public:
   bool StartRun();
   bool StopRun();
   bool IsConnected();
+  bool IsEnabled() { return config.enable; }
   bool IsRunning();
   bool ReadReg(DWORD, DWORD*);
   bool WriteReg(DWORD, DWORD);

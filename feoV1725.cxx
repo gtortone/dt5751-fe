@@ -378,8 +378,6 @@ INT frontend_init(){
   int nActive = 0;   //Number of v1725 boards activated at the end of frontend_init
   std::vector<std::pair<int,int> > errBoards;  //v1725 boards which we couldn't connect to
 
-  nExpected = NB1725PERLINK*NBLINKSPERFE;
-
   if((NBV1725TOTAL % (NB1725PERLINK*NBLINKSPERFE)) != 0){
     printf("Incorrect setup: the number of boards controlled by each frontend"
            " is not a fraction of the total number of boards. %i %i %i\n",NBV1725TOTAL,NB1725PERLINK,NBLINKSPERFE);
@@ -438,6 +436,10 @@ INT frontend_init(){
     // Set history ODB record (create if necessary)
     itv1725->SetHistoryRecord(hDB,seq_callback);
 
+    if (itv1725->IsEnabled()) {
+      nExpected++;
+    }
+
     if (! itv1725->IsConnected()) continue;   // Skip unconnected board
 
     int status = itv1725->InitializeForAcq();
@@ -449,8 +451,9 @@ INT frontend_init(){
 
   printf(">>> End of Init. %d active v1725. Expected %d\n\n", nActive, nExpected);
 
-  if (nActive == nExpected){
+  if (nActive < nExpected){
     cm_msg(MERROR, __FUNCTION__, "Unexpected number of active boards (%d vs %d)", nActive, nExpected);
+    return FE_ERR_HW;
   } 
   
   set_equipment_status(equipment[0].name, "Initialized", "#00ff00");
