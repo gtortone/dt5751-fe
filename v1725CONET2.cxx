@@ -950,7 +950,7 @@ int v1725CONET2::SetBoardRecord(HNDLE h, void(*cb_func)(INT,INT,void*))
   if (verbosity_) std::cout << GetName() << "::SetBoardRecord(" << h << "," << set_str << ",...)" << std::endl;
   int status,size;
   //create record if doesn't exist and find key
-  status = db_create_record(h, 0, set_str, strcomb(config_str_board));
+  status = db_check_record(h, 0, set_str, strcomb(config_str_board), TRUE);
   status = db_find_key(h, 0, set_str, &settings_handle_);
   if (status != DB_SUCCESS) {
     cm_msg(MINFO,"SetBoardRecord","Key %s not found. Return code: %d", set_str, status);

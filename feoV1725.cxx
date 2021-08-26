@@ -433,12 +433,12 @@ INT frontend_init(){
    * doing that. */
   int nInitOk = 0;
   for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-    if (! itv1725->IsConnected()) continue;   // Skip unconnected board
-
     // Setup ODB record (create if necessary)
     itv1725->SetBoardRecord(hDB,seq_callback);
     // Set history ODB record (create if necessary)
     itv1725->SetHistoryRecord(hDB,seq_callback);
+
+    if (! itv1725->IsConnected()) continue;   // Skip unconnected board
 
     int status = itv1725->InitializeForAcq();
     nInitOk += status;
