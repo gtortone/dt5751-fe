@@ -33,7 +33,7 @@ const char * v1725CONET2::config_str_board[] = {\
     "Post Trigger = DWORD : 100",\
     "Pre Trigger = DWORD : 100",\
     "Front panel IO = DWORD : 0x4D013C",\
-    "Enable ZLE = DWORD : 0",\
+    "Enable ZLE = BOOL : n",\
     "almost_full = DWORD : 512",\
     "Front panel LVDS IO = DWORD : 0x1100",\
     "SelfTrigger_Threshold = DWORD[16] :",\
@@ -1208,7 +1208,7 @@ int v1725CONET2::InitializeForAcq()
 
     if (config.has_zle_firmware) {
   		WriteReg_(V1725ZLE_CHANNEL_THRESHOLD + (iChan<<8), config.selftrigger_threshold[iChan]);
-      WriteReg_(V1725ZLE_CHANNEL_LOGIC     + (iChan<<8), config.selftrigger_logic[i]);
+      WriteReg_(V1725ZLE_CHANNEL_LOGIC     + (iChan<<8), config.selftrigger_logic[iChan]);
       WriteReg_(V1725ZLE_ZS_NSAMP_BEFORE   + (iChan<<8), config.zle_bins_before[iChan]);
       WriteReg_(V1725ZLE_ZS_NSAMP_AFTER    + (iChan<<8), config.zle_bins_after[iChan]);
       WriteReg_(V1725ZLE_ZS_BASELINE       + (iChan<<8), config.zle_baseline[iChan]);
@@ -1222,7 +1222,7 @@ int v1725CONET2::InitializeForAcq()
       // config parameter and apply the setting to INPUT_CONTROL.
       // Note that: raw; BOARD_CONFIG  bit 6; 0 => positive pulses
       //            zle; INPUT_CONTROL bit 7; 1 => positive pulses
-      bool neg_pulses = ((config.board_config >> 6) & 0x1) == 1);
+      bool neg_pulses = (((config.board_config >> 6) & 0x1) == 1);
       DWORD input_control = 0;
 
       if (!neg_pulses) { 
@@ -1235,7 +1235,7 @@ int v1725CONET2::InitializeForAcq()
       WriteReg_(V1725ZLE_INPUT_CONTROL + (iChan<<8), input_control);
     } else {
   		WriteReg_(V1725RAW_CHANNEL_THRESHOLD + (iChan<<8), config.selftrigger_threshold[iChan]);
-      WriteReg_(V1725RAW_CHANNEL_LOGIC     + (iChan<<8), config.selftrigger_logic[i]);
+      WriteReg_(V1725RAW_CHANNEL_LOGIC     + (iChan<<8), config.selftrigger_logic[iChan]);
     }
 		
 		WriteReg_(V1725_DYNAMIC_RANGE       + (iChan<<8), config.dynamic_range_2v[iChan] ? 0 : 1);

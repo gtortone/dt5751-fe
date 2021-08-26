@@ -28,7 +28,7 @@ CAENComm_ErrorCode ov1725_ChannelSet(int handle, uint32_t channel, uint32_t what
 {
   uint32_t reg, mask;
 
-  if (what == V1725_CHANNEL_THRESHOLD)   mask = 0x0FFF;
+  if (what == V1725RAW_CHANNEL_THRESHOLD)   mask = 0x0FFF;
   if (what == V1725_CHANNEL_DAC)         mask = 0xFFFF;
   reg = what | (channel << 8);
   return CAENComm_Write32(handle, reg, (that & 0xFFF));
@@ -39,7 +39,7 @@ CAENComm_ErrorCode ov1725_ChannelGet(int handle, uint32_t channel, uint32_t what
 {
   uint32_t reg, mask;
 
-  if (what == V1725_CHANNEL_THRESHOLD)   mask = 0x0FFF;
+  if (what == V1725RAW_CHANNEL_THRESHOLD)   mask = 0x0FFF;
   if (what == V1725_CHANNEL_DAC)         mask = 0xFFFF;
   reg = what | (channel << 8);
   return CAENComm_Read32(handle, reg, data);
@@ -49,7 +49,7 @@ CAENComm_ErrorCode ov1725_ChannelGet(int handle, uint32_t channel, uint32_t what
 CAENComm_ErrorCode ov1725_ChannelThresholdSet(int handle, uint32_t channel, uint32_t threshold)
 {
   uint32_t reg;
-  reg = V1725_CHANNEL_THRESHOLD | (channel << 8);
+  reg = V1725RAW_CHANNEL_THRESHOLD | (channel << 8);
   printf("reg:0x%x, threshold:%x\n", reg, threshold);
   return CAENComm_Write32(handle, reg,(threshold & 0xFFF));
 }
@@ -179,7 +179,7 @@ CAENComm_ErrorCode ov1725_info(int handle, int *nchannels, uint32_t *data)
 
   // Evaluate the event size
   // Number of samples per channels
-  sCAEN = CAENComm_Read32(handle, V1725_BUFFER_ORGANIZATION, &reg);  
+  sCAEN = CAENComm_Read32(handle, V1725RAW_BUFFER_ORGANIZATION, &reg);  
   *data = V1725_NSAMPLES_MODE[reg];
 
   // times the number of active channels
@@ -259,10 +259,10 @@ CAENComm_ErrorCode  ov1725_Setup(int handle, int mode)
     printf("--------------------------------------------\n");
     printf("Trigger from FP, 8ch, 1Ks, postTrigger 800\n");
     printf("--------------------------------------------\n");
-    sCAEN = CAENComm_Write32(handle, V1725_BUFFER_ORGANIZATION,   0x0A);    // 1K buffer
+    sCAEN = CAENComm_Write32(handle, V1725RAW_BUFFER_ORGANIZATION,   0x0A);    // 1K buffer
     sCAEN = CAENComm_Write32(handle, V1725_TRIG_SRCE_EN_MASK,     0x4000);  // External Trigger
     sCAEN = CAENComm_Write32(handle, V1725_CHANNEL_EN_MASK,       0xFF);    // 8ch enable
-    sCAEN = CAENComm_Write32(handle, V1725_POST_TRIGGER_SETTING,  800);     // PreTrigger (1K-800)
+    sCAEN = CAENComm_Write32(handle, V1725RAW_POST_TRIGGER_SETTING,  800);     // PreTrigger (1K-800)
     sCAEN = CAENComm_Write32(handle, V1725_ACQUISITION_CONTROL,   0x00);    // Reset Acq Control
     printf("\n");
     break;
@@ -270,7 +270,7 @@ CAENComm_ErrorCode  ov1725_Setup(int handle, int mode)
     printf("--------------------------------------------\n");
     printf("Trigger from LEMO\n");
     printf("--------------------------------------------\n");
-    sCAEN = CAENComm_Write32(handle, V1725_BUFFER_ORGANIZATION, 1);
+    sCAEN = CAENComm_Write32(handle, V1725RAW_BUFFER_ORGANIZATION, 1);
     printf("\n");
     break;
   default:

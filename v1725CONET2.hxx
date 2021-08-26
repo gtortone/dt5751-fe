@@ -94,7 +94,7 @@ public:
     DWORD     post_trigger;             //!< 0x8114@[31.. 0] - NON-ZLE only
     DWORD     pre_trigger;              //!< 0x8038@[31.. 0] - ZLE only
     DWORD     fp_io_ctrl;               //!< 0x811C@[31.. 0]
-    DWORD     enable_zle;               //!< 0x8064@[31.. 0] - ZLE only
+    BOOL      enable_zle;               //!< 0x8064@[31.. 0] - ZLE only
     DWORD     almost_full;              //!< 0x816C@[31.. 0] - NON-ZLE only
     DWORD     fp_lvds_io_ctrl;          //!< 0x81A0@[31.. 0]
     DWORD     selftrigger_threshold[16];//!< 0x1n80@[11.. 0] for NON-ZLE / 0x1n60@[11.. 0] for ZLE

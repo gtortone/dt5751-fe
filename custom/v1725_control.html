@@ -89,7 +89,7 @@
      return get_board_params(board_id)[3];
    }
 
-   function get_board_pret_trigger_factor(board_id) {
+   function get_board_pre_trigger_factor(board_id) {
      return get_board_params(board_id)[4];
    }
 
@@ -390,9 +390,13 @@
 
     function zle_baseline_updated(board_id) {
       let val = parseInt(document.getElementById("zle_bl_" + board_id).innerText);
-      document.getElementById("zle_bl_" + board_id + "_mode").checked = (((val >> 24) & 0x1) == 1);
+      let zle_fixed_bl = (((val >> 24) & 0x1) == 1);
+      document.getElementById("zle_bl_" + board_id + "_mode").checked = zle_fixed_bl;
       document.getElementById("zle_bl_" + board_id + "_val").value = ((val >> 0) & 0x3FFF);
       document.getElementById("zle_bl_" + board_id + "_rms").value = ((val >> 16) & 0xFF);
+
+      document.getElementById("zle_bl_" + board_id + "_val").style.display = zle_fixed_bl ? "" : "none";
+      document.getElementById("zle_bl_" + board_id + "_rms").style.display = zle_fixed_bl ? "none" : "";
     }
 
     function update_zle_baseline(board_id) {
@@ -543,7 +547,7 @@
      }
    }
    
-   function update_pret_trigger_readback(board_id) {
+   function update_pre_trigger_readback(board_id) {
      var boxes = document.getElementsByClassName("pretrigger");
 
      for (var i = 0; i < boxes.length; i++) {
@@ -617,6 +621,7 @@
      let enabled = document.getElementById("enable_" + board_id).checked;
      let elems = document.querySelectorAll("[data-board='" + board_id + "']");
      let board_is_zle = is_zle(board_id);
+     let zle_compression = document.getElementById("enable_zle_" + board_id).checked;
      
      for (var i = 0; i < elems.length; i++) {
        let show = enabled;
@@ -625,6 +630,9 @@
          show = false;
        }
        if (show && elems[i].dataset.raw == "1" && board_is_zle) {
+         show = false;
+       }
+       if (show && elems[i].dataset.zlecomp == "1" && !zle_compression) {
          show = false;
        }
 
@@ -812,10 +820,10 @@
         Post Trigger (us)<br/>
         <small>Setting this affects <i>Post Trigger</i>.<br>Only for RAW firmware</small>
       </td>
-      <td><div data-board="0"><input id="pt_length_0" data-raw="1" style="width:100px" class="blur_on_enter" onblur="set_pt_length(0)">us</div></td>
-      <td><div data-board="1"><input id="pt_length_1" data-raw="1" style="width:100px" class="blur_on_enter" onblur="set_pt_length(1)">us</div></td>
-      <td><div data-board="2"><input id="pt_length_2" data-raw="1" style="width:100px" class="blur_on_enter" onblur="set_pt_length(2)">us</div></td>
-      <td><div data-board="3"><input id="pt_length_3" data-raw="1" style="width:100px" class="blur_on_enter" onblur="set_pt_length(3)">us</div></td>
+      <td><div data-board="0" data-raw="1"><input id="pt_length_0" style="width:100px" class="blur_on_enter" onblur="set_pt_length(0)">us</div></td>
+      <td><div data-board="1" data-raw="1"><input id="pt_length_1" style="width:100px" class="blur_on_enter" onblur="set_pt_length(1)">us</div></td>
+      <td><div data-board="2" data-raw="1"><input id="pt_length_2" style="width:100px" class="blur_on_enter" onblur="set_pt_length(2)">us</div></td>
+      <td><div data-board="3" data-raw="1"><input id="pt_length_3" style="width:100px" class="blur_on_enter" onblur="set_pt_length(3)">us</div></td>
     </tr>
     <tr>
       <td>Post Trigger<br><small>Only for RAW firmware</small></td>
@@ -843,39 +851,60 @@
     </tr>
     <tr>
       <td>Enable ZLE compression<br><small>Only for ZLE firmware</small></td>
-      <td><input type="checkbox" class="modbcheckbox" data-zle="1" id="enable_zle_0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Enable ZLE" onchange="enable_changed(0)" onload="onchange()"></td>
-      <td><input type="checkbox" class="modbcheckbox" data-zle="1" id="enable_zle_1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Enable ZLE" onchange="enable_changed(1)" onload="onchange()"></td>
-      <td><input type="checkbox" class="modbcheckbox" data-zle="1" id="enable_zle_2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Enable ZLE" onchange="enable_changed(2)" onload="onchange()"></td>
-      <td><input type="checkbox" class="modbcheckbox" data-zle="1" id="enable_zle_3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Enable ZLE" onchange="enable_changed(3)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" data-board="0" data-zle="1" id="enable_zle_0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Enable ZLE" onchange="enable_changed(0)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" data-board="1" data-zle="1" id="enable_zle_1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Enable ZLE" onchange="enable_changed(1)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" data-board="2" data-zle="1" id="enable_zle_2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Enable ZLE" onchange="enable_changed(2)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" data-board="3" data-zle="1" id="enable_zle_3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Enable ZLE" onchange="enable_changed(3)" onload="onchange()"></td>
     </tr>
     <tr>
       <td>ZLE threshold (ADC from baseline, signed)<br><small>Only for ZLE firmware</small></td>
-      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/ZLESignedThresh"></div></td>
-      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/ZLESignedThresh"></div></td>
-      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/ZLESignedThresh"></div></td>
-      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/ZLESignedThresh"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/ZLESignedThresh"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/ZLESignedThresh"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/ZLESignedThresh"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/ZLESignedThresh"></div></td>
     </tr>
     <tr>
       <td>ZLE pre-window (N*2 samples are recorded!)<br><small>Only for ZLE firmware</small></td>
-      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/ZLENBinsBefore"></div></td>
-      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/ZLENBinsBefore"></div></td>
-      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/ZLENBinsBefore"></div></td>
-      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/ZLENBinsBefore"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/ZLENBinsBefore"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/ZLENBinsBefore"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/ZLENBinsBefore"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/ZLENBinsBefore"></div></td>
     </tr>
     <tr>
       <td>ZLE post-window (N*2 samples are recorded!)<br><small>Only for ZLE firmware</small></td>
-      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/ZLENBinsAfter"></div></td>
-      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/ZLENBinsAfter"></div></td>
-      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/ZLENBinsAfter"></div></td>
-      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/ZLENBinsAfter"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/ZLENBinsAfter"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/ZLENBinsAfter"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/ZLENBinsAfter"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/ZLENBinsAfter"></div></td>
     </tr>
     <tr>
       <td>ZLE baseline settings<br><small>Only for ZLE firmware</small></td>
       <td>
-        <div data-board="0" data-zle="1">
-        <label for="zle_bl_0_mode"><input type="checkbox" id="zle_bl_0_fixed" onchange="update_zle_baseline(0)">Use fixed baseline</label><br>
+        <div data-board="0" data-zle="1" data-zlecomp="1">
+        <label for="zle_bl_0_mode"><input type="checkbox" id="zle_bl_0_mode" onchange="update_zle_baseline(0)">Use fixed baseline</label><br>
         <input data-board="0" id="zle_bl_0_val" style="width:40px" onchange="update_zle_baseline(0)">Fixed baseline (ADC)<br>
         <input data-board="0" id="zle_bl_0_rms" style="width:40px" onchange="update_zle_baseline(0)">Baseline noise (ADC)
+        </div>
+      </td>
+      <td>
+        <div data-board="1" data-zle="1" data-zlecomp="1">
+        <label for="zle_bl_1_mode"><input type="checkbox" id="zle_bl_1_mode" onchange="update_zle_baseline(1)">Use fixed baseline</label><br>
+        <input data-board="1" id="zle_bl_1_val" style="width:40px" onchange="update_zle_baseline(1)">Fixed baseline (ADC)<br>
+        <input data-board="1" id="zle_bl_1_rms" style="width:40px" onchange="update_zle_baseline(1)">Baseline noise (ADC)
+        </div>
+      </td>
+      <td>
+        <div data-board="2" data-zle="1" data-zlecomp="1">
+        <label for="zle_bl_2_mode"><input type="checkbox" id="zle_bl_2_mode" onchange="update_zle_baseline(2)">Use fixed baseline</label><br>
+        <input data-board="2" id="zle_bl_2_val" style="width:40px" onchange="update_zle_baseline(2)">Fixed baseline (ADC)<br>
+        <input data-board="2" id="zle_bl_2_rms" style="width:40px" onchange="update_zle_baseline(2)">Baseline noise (ADC)
+        </div>
+      </td>
+      <td>
+        <div data-board="3" data-zle="1" data-zlecomp="1">
+        <label for="zle_bl_3_mode"><input type="checkbox" id="zle_bl_3_mode" onchange="update_zle_baseline(3)">Use fixed baseline</label><br>
+        <input data-board="3" id="zle_bl_3_val" style="width:40px" onchange="update_zle_baseline(3)">Fixed baseline (ADC)<br>
+        <input data-board="3" id="zle_bl_3_rms" style="width:40px" onchange="update_zle_baseline(3)">Baseline noise (ADC)
         </div>
       </td>
     </tr>
@@ -1571,10 +1600,10 @@
     </tr>
     <tr>
       <td>ZLE baseline<br><small>Computed from ZLE baseline settings<br>Only for ZLE firmware</small></td>
-      <td><span class="modbvalue" id="zle_bl_0" data-board="0" data-format="x" onchange="zle_baseline_updated(0)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/ZLEBaseline"></span></td>
-      <td><span class="modbvalue" id="zle_bl_1" data-board="1" data-format="x" onchange="zle_baseline_updated(1)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/ZLEBaseline"></span></td>
-      <td><span class="modbvalue" id="zle_bl_2" data-board="2" data-format="x" onchange="zle_baseline_updated(2)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/ZLEBaseline"></span></td>
-      <td><span class="modbvalue" id="zle_bl_3" data-board="3" data-format="x" onchange="zle_baseline_updated(3)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/ZLEBaseline"></span></td>
+      <td><span class="modbvalue" id="zle_bl_0" data-board="0" data-zle="1" data-format="x" onchange="zle_baseline_updated(0)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/ZLEBaseline"></span></td>
+      <td><span class="modbvalue" id="zle_bl_1" data-board="1" data-zle="1" data-format="x" onchange="zle_baseline_updated(1)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/ZLEBaseline"></span></td>
+      <td><span class="modbvalue" id="zle_bl_2" data-board="2" data-zle="1" data-format="x" onchange="zle_baseline_updated(2)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/ZLEBaseline"></span></td>
+      <td><span class="modbvalue" id="zle_bl_3" data-board="3" data-zle="1" data-format="x" onchange="zle_baseline_updated(3)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/ZLEBaseline"></span></td>
     </tr>
 
   </table>
