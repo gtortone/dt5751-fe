@@ -413,7 +413,7 @@ void * v1725CONET2::connectThread(void * arg){
       << t_args->v1725->link_ << ","
       << t_args->v1725->board_ << ")" << std::endl;
 
-  *(t_args->errcode) = CAENComm_OpenDevice(CAENComm_PCIE_OpticalLink, t_args->v1725->link_, t_args->v1725->board_,
+  *(t_args->errcode) = CAENComm_OpenDevice(CAENComm_OpticalLink, t_args->v1725->link_, t_args->v1725->board_,
       0, &(t_args->v1725->device_handle_));
   pthread_cond_signal(t_args->cv);
 
