@@ -395,8 +395,8 @@
       document.getElementById("zle_bl_" + board_id + "_val").value = ((val >> 0) & 0x3FFF);
       document.getElementById("zle_bl_" + board_id + "_rms").value = ((val >> 16) & 0xFF);
 
-      document.getElementById("zle_bl_" + board_id + "_val").style.display = zle_fixed_bl ? "" : "none";
-      document.getElementById("zle_bl_" + board_id + "_rms").style.display = zle_fixed_bl ? "none" : "";
+      document.getElementById("zle_bl_" + board_id + "_val_div").style.display = zle_fixed_bl ? "" : "none";
+      document.getElementById("zle_bl_" + board_id + "_rms_div").style.display = zle_fixed_bl ? "none" : "";
     }
 
     function update_zle_baseline(board_id) {
@@ -756,11 +756,39 @@
 
 
     <tr>
-      <td>Start mode<br><small>0=Software<br>1=S-IN<br>2=First trigger<br>3=LVDS</small></td>
-      <td><label data-board="0" for="acq_0_start"> <input style="max-width:40px" id="acq_0_start" onchange="update_acq(0)"></label></td>
-      <td><label data-board="1" for="acq_1_start"> <input style="max-width:40px" id="acq_1_start" onchange="update_acq(1)"></label></td>
-      <td><label data-board="2" for="acq_2_start"> <input style="max-width:40px" id="acq_2_start" onchange="update_acq(2)"></label></td>
-      <td><label data-board="3" for="acq_3_start"> <input style="max-width:40px" id="acq_3_start" onchange="update_acq(3)"></label></td>
+      <td>Start acquisition signal</td>
+      <td>
+        <select data-board="0" id="acq_0_start" onchange="update_acq(0)">
+          <option value="0">Software</option>
+          <option value="1">S-IN</option>
+          <option value="2">First trigger</option>
+          <option value="3">LVDS</option>
+        </select>
+      </td>
+      <td>
+        <select data-board="1" id="acq_1_start" onchange="update_acq(1)">
+          <option value="0">Software</option>
+          <option value="1">S-IN</option>
+          <option value="2">First trigger</option>
+          <option value="3">LVDS</option>
+        </select>
+      </td>
+      <td>
+        <select data-board="2" id="acq_2_start" onchange="update_acq(2)">
+          <option value="0">Software</option>
+          <option value="1">S-IN</option>
+          <option value="2">First trigger</option>
+          <option value="3">LVDS</option>
+        </select>
+      </td>
+      <td>
+        <select data-board="3" id="acq_3_start" onchange="update_acq(3)">
+          <option value="0">Software</option>
+          <option value="1">S-IN</option>
+          <option value="2">First trigger</option>
+          <option value="3">LVDS</option>
+        </select>
+      </td>
     </tr>
     <tr>
       <td>Count all triggers<br><small>Unchecked = count only accepted triggers</small></td>
@@ -881,30 +909,30 @@
       <td>ZLE baseline settings<br><small>Only for ZLE firmware</small></td>
       <td>
         <div data-board="0" data-zle="1" data-zlecomp="1">
-        <label for="zle_bl_0_mode"><input type="checkbox" id="zle_bl_0_mode" onchange="update_zle_baseline(0)">Use fixed baseline</label><br>
-        <input data-board="0" id="zle_bl_0_val" style="width:40px" onchange="update_zle_baseline(0)">Fixed baseline (ADC)<br>
-        <input data-board="0" id="zle_bl_0_rms" style="width:40px" onchange="update_zle_baseline(0)">Baseline noise (ADC)
+        <label for="zle_bl_0_mode"><input type="checkbox" id="zle_bl_0_mode" onchange="update_zle_baseline(0)">Use fixed baseline</label>
+        <div id="zle_bl_0_val_div"><input id="zle_bl_0_val" style="width:40px" onchange="update_zle_baseline(0)">Fixed baseline (ADC)</div>
+        <div id="zle_bl_0_rms_div"><input id="zle_bl_0_rms" style="width:40px" onchange="update_zle_baseline(0)">Baseline noise (ADC)</div>
         </div>
       </td>
       <td>
         <div data-board="1" data-zle="1" data-zlecomp="1">
-        <label for="zle_bl_1_mode"><input type="checkbox" id="zle_bl_1_mode" onchange="update_zle_baseline(1)">Use fixed baseline</label><br>
-        <input data-board="1" id="zle_bl_1_val" style="width:40px" onchange="update_zle_baseline(1)">Fixed baseline (ADC)<br>
-        <input data-board="1" id="zle_bl_1_rms" style="width:40px" onchange="update_zle_baseline(1)">Baseline noise (ADC)
+        <label for="zle_bl_1_mode"><input type="checkbox" id="zle_bl_1_mode" onchange="update_zle_baseline(1)">Use fixed baseline</label>
+        <div id="zle_bl_1_val_div"><input id="zle_bl_1_val" style="width:40px" onchange="update_zle_baseline(1)">Fixed baseline (ADC)</div>
+        <div id="zle_bl_1_rms_div"><input id="zle_bl_1_rms" style="width:40px" onchange="update_zle_baseline(1)">Baseline noise (ADC)</div>
         </div>
       </td>
       <td>
         <div data-board="2" data-zle="1" data-zlecomp="1">
-        <label for="zle_bl_2_mode"><input type="checkbox" id="zle_bl_2_mode" onchange="update_zle_baseline(2)">Use fixed baseline</label><br>
-        <input data-board="2" id="zle_bl_2_val" style="width:40px" onchange="update_zle_baseline(2)">Fixed baseline (ADC)<br>
-        <input data-board="2" id="zle_bl_2_rms" style="width:40px" onchange="update_zle_baseline(2)">Baseline noise (ADC)
+        <label for="zle_bl_2_mode"><input type="checkbox" id="zle_bl_2_mode" onchange="update_zle_baseline(2)">Use fixed baseline</label>
+        <div id="zle_bl_2_val_div"><input id="zle_bl_2_val" style="width:40px" onchange="update_zle_baseline(2)">Fixed baseline (ADC)</div>
+        <div id="zle_bl_2_rms_div"><input id="zle_bl_2_rms" style="width:40px" onchange="update_zle_baseline(2)">Baseline noise (ADC)</div>
         </div>
       </td>
       <td>
         <div data-board="3" data-zle="1" data-zlecomp="1">
-        <label for="zle_bl_3_mode"><input type="checkbox" id="zle_bl_3_mode" onchange="update_zle_baseline(3)">Use fixed baseline</label><br>
-        <input data-board="3" id="zle_bl_3_val" style="width:40px" onchange="update_zle_baseline(3)">Fixed baseline (ADC)<br>
-        <input data-board="3" id="zle_bl_3_rms" style="width:40px" onchange="update_zle_baseline(3)">Baseline noise (ADC)
+        <label for="zle_bl_3_mode"><input type="checkbox" id="zle_bl_3_mode" onchange="update_zle_baseline(3)">Use fixed baseline</label>
+        <div id="zle_bl_3_val_div"><input id="zle_bl_3_val" style="width:40px" onchange="update_zle_baseline(3)">Fixed baseline (ADC)</div>
+        <div id="zle_bl_3_rms_div"><input id="zle_bl_3_rms" style="width:40px" onchange="update_zle_baseline(3)">Baseline noise (ADC)</div>
         </div>
       </td>
     </tr>
@@ -1164,21 +1192,11 @@
       </td>
     </tr>
     <tr>
-      <td>
-        Self-trigger when <i>under</i> threshold
-      </td>
-      <td>
-        <input type="checkbox" data-board="0" id="board_config_0_polarity" onchange="update_board_config(0)">
-      </td>
-      <td>
-        <input type="checkbox" data-board="1" id="board_config_1_polarity" onchange="update_board_config(1)">
-      </td>
-      <td>
-        <input type="checkbox" data-board="2" id="board_config_2_polarity" onchange="update_board_config(2)">
-      </td>
-      <td>
-        <input type="checkbox" data-board="3" id="board_config_3_polarity" onchange="update_board_config(3)">
-      </td>
+      <td>Self-trigger when <i>under</i> threshold</td>
+      <td><input type="checkbox" data-board="0" id="board_config_0_polarity" onchange="update_board_config(0)"></td>
+      <td><input type="checkbox" data-board="1" id="board_config_1_polarity" onchange="update_board_config(1)"></td>
+      <td><input type="checkbox" data-board="2" id="board_config_2_polarity" onchange="update_board_config(2)"></td>
+      <td><input type="checkbox" data-board="3" id="board_config_3_polarity" onchange="update_board_config(3)"></td>
     </tr>    
     <tr>
       <td>Self-trigger coincidence window<br><small>Units of 16ns cycles. Max 15 (240ns).</small></td>
@@ -1239,11 +1257,39 @@
       </td>
     </tr>
     <tr>
-      <td>TRG-OUT virtual probe source<br><small>0=RUN<br>1=CLKOUT<br>2=CLKPhase<br>3=BUSY</small></td>
-      <td><input style="max-width:40px" data-board="0" id="io_0_probe" onchange="update_io(0)"></td>
-      <td><input style="max-width:40px" data-board="1" id="io_1_probe" onchange="update_io(1)"></td>
-      <td><input style="max-width:40px" data-board="2" id="io_2_probe" onchange="update_io(2)"></td>
-      <td><input style="max-width:40px" data-board="3" id="io_3_probe" onchange="update_io(3)"></td>
+      <td>TRG-OUT virtual probe source</td>
+      <td>
+        <select data-board="0" id="io_0_probe" onchange="update_io(0)">
+          <option value="0">RUN</option>
+          <option value="1">CLK OUT</option>
+          <option value="2">CLK Phase</option>
+          <option value="3">BUSY</option>
+        </select>
+      </td>
+      <td>
+        <select data-board="1" id="io_1_probe" onchange="update_io(2)">
+          <option value="0">RUN</option>
+          <option value="1">CLK OUT</option>
+          <option value="2">CLK Phase</option>
+          <option value="3">BUSY</option>
+        </select>
+      </td>
+      <td>
+        <select data-board="2" id="io_2_probe" onchange="update_io(2)">
+          <option value="0">RUN</option>
+          <option value="1">CLK OUT</option>
+          <option value="2">CLK Phase</option>
+          <option value="3">BUSY</option>
+        </select>
+      </td>
+      <td>
+        <select data-board="3" id="io_3_probe" onchange="update_io(3)">
+          <option value="0">RUN</option>
+          <option value="1">CLK OUT</option>
+          <option value="2">CLK Phase</option>
+          <option value="3">BUSY</option>
+        </select>
+      </td>
     </tr>
     <tr>
       <td>
@@ -1253,8 +1299,14 @@
         <div data-board="0" id="to_0_div">
           <table>
             <tr style="background-color: transparent;">
-              <td style="padding: 0;">Channel logic<small><br>(0=OR, 1=AND, 2=Majority)</small></td>
-              <td style="padding: 0;"><input style="width:40px" id="to_0_logic" onchange="update_trigger_output(0)"></td>
+              <td style="padding: 0;">Channel logic</td>
+              <td style="padding: 0;">
+                <select id="to_0_logic" onchange="update_trigger_output(0)">
+                  <option value="0">OR</option>
+                  <option value="1">AND</option>
+                  <option value="2">Majority</option>
+                </select>
+              </td>
             </tr>
             <tr style="background-color: transparent;">
               <td style="padding: 0;">Majority level</td>
@@ -1279,8 +1331,14 @@
         <div data-board="1" id="to_1_div">
           <table>
             <tr style="background-color: transparent;">
-              <td style="padding: 0;">Channel logic<small><br>(0=OR, 1=AND, 2=Majority)</small></td>
-              <td style="padding: 0;"><input style="width:40px" id="to_1_logic" onchange="update_trigger_output(1)"></td>
+              <td style="padding: 0;">Channel logic</td>
+              <td style="padding: 0;">
+                <select id="to_1_logic" onchange="update_trigger_output(1)">
+                  <option value="0">OR</option>
+                  <option value="1">AND</option>
+                  <option value="2">Majority</option>
+                </select>
+              </td>
             </tr>
             <tr style="background-color: transparent;">
               <td style="padding: 0;">Majority level</td>
@@ -1305,8 +1363,14 @@
         <div data-board="2" id="to_2_div">
           <table>
             <tr style="background-color: transparent;">
-              <td style="padding: 0;">Channel logic<small><br>(0=OR, 1=AND, 2=Majority)</small></td>
-              <td style="padding: 0;"><input style="width:40px" id="to_2_logic" onchange="update_trigger_output(2)"></td>
+              <td style="padding: 0;">Channel logic</td>
+              <td style="padding: 0;">
+                <select id="to_2_logic" onchange="update_trigger_output(2)">
+                  <option value="0">OR</option>
+                  <option value="1">AND</option>
+                  <option value="2">Majority</option>
+                </select>
+              </td>
             </tr>
             <tr style="background-color: transparent;">
               <td style="padding: 0;">Majority level</td>
@@ -1331,8 +1395,14 @@
         <div data-board="3" id="to_3_div">
           <table>
             <tr style="background-color: transparent;">
-              <td style="padding: 0;">Channel logic<small><br>(0=OR, 1=AND, 2=Majority)</small></td>
-              <td style="padding: 0;"><input style="width:40px" id="to_3_logic" onchange="update_trigger_output(3)"></td>
+              <td style="padding: 0;">Channel logic</td>
+              <td style="padding: 0;">
+                <select id="to_3_logic" onchange="update_trigger_output(3)">
+                  <option value="0">OR</option>
+                  <option value="1">AND</option>
+                  <option value="2">Majority</option>
+                </select>
+              </td>
             </tr>
             <tr style="background-color: transparent;">
               <td style="padding: 0;">Majority level</td>
@@ -1392,14 +1462,34 @@
       </td>
     </tr>
     <tr>
-      <td>LVDS mode<br><small>0=REGISTER<br>1=TRIGGER<br>2=BUSY/VETO/TRIGGER/RUN<br>3=LEGACY</small></td>
+      <td>LVDS mode</td>
       <td>
         <div data-board="0">
-          <label for="lvds_0_cfg0"> <input style="max-width:40px" id="lvds_0_cfg0" onchange="update_lvds(0)">LVDS 0-3 mode</label><br>
-          <label for="lvds_0_cfg1"> <input style="max-width:40px" id="lvds_0_cfg1" onchange="update_lvds(0)">LVDS 4-7 mode</label><br>
-          <label for="lvds_0_cfg2"> <input style="max-width:40px" id="lvds_0_cfg2" onchange="update_lvds(0)">LVDS 8-11 mode</label><br>
-          <label for="lvds_0_cfg3"> <input style="max-width:40px" id="lvds_0_cfg3" onchange="update_lvds(0)">LVDS 12-15 mode</label><br>
-          <br><small>For mode 2:</small><br>
+          LVDS 0-3 mode <select id="lvds_0_cfg0" onchange="update_lvds(0)">
+            <option value="0">REGISTER</option>
+            <option value="1">TRIGGER</option>
+            <option value="2">BUSY/VETO/TRIGGER/RUN</option>
+            <option value="3">LEGACY</option>
+          </select><br>
+          LVDS 4-7 mode <select id="lvds_0_cfg1" onchange="update_lvds(0)">
+            <option value="0">REGISTER</option>
+            <option value="1">TRIGGER</option>
+            <option value="2">BUSY/VETO/TRIGGER/RUN</option>
+            <option value="3">LEGACY</option>
+          </select><br>
+          LVDS 8-11 mode <select id="lvds_0_cfg2" onchange="update_lvds(0)">
+            <option value="0">REGISTER</option>
+            <option value="1">TRIGGER</option>
+            <option value="2">BUSY/VETO/TRIGGER/RUN</option>
+            <option value="3">LEGACY</option>
+          </select><br>
+          LVDS 12-15 mode <select id="lvds_0_cfg3" onchange="update_lvds(0)">
+            <option value="0">REGISTER</option>
+            <option value="1">TRIGGER</option>
+            <option value="2">BUSY/VETO/TRIGGER/RUN</option>
+            <option value="3">LEGACY</option>
+          </select><br>
+          <br><small>For BUSY/VETO/TRIGGER/RUN mode:</small><br>
           <label for="acq_0_lvdsbusy"> <input type="checkbox" id="acq_0_lvdsbusy"  onchange="update_acq(0)">Enable busy pin</label><br>
           <label for="acq_0_lvdsveto"> <input type="checkbox" id="acq_0_lvdsveto"  onchange="update_acq(0)">Enable veto pin</label><br>
           <label for="acq_0_lvdsrunin"><input type="checkbox" id="acq_0_lvdsrunin" onchange="update_acq(0)">Enable run pin</label><br>
@@ -1409,11 +1499,31 @@
       </td>
       <td>
         <div data-board="1">
-          <label for="lvds_1_cfg0"> <input style="max-width:40px" id="lvds_1_cfg0" onchange="update_lvds(1)">LVDS 0-3 mode</label><br>
-          <label for="lvds_1_cfg1"> <input style="max-width:40px" id="lvds_1_cfg1" onchange="update_lvds(1)">LVDS 4-7 mode</label><br>
-          <label for="lvds_1_cfg2"> <input style="max-width:40px" id="lvds_1_cfg2" onchange="update_lvds(1)">LVDS 8-11 mode</label><br>
-          <label for="lvds_1_cfg3"> <input style="max-width:40px" id="lvds_1_cfg3" onchange="update_lvds(1)">LVDS 12-15 mode</label><br>
-          <br><small>For mode 2:</small><br>
+          LVDS 0-3 mode <select id="lvds_1_cfg0" onchange="update_lvds(1)">
+            <option value="0">REGISTER</option>
+            <option value="1">TRIGGER</option>
+            <option value="2">BUSY/VETO/TRIGGER/RUN</option>
+            <option value="3">LEGACY</option>
+          </select><br>
+          LVDS 4-7 mode <select id="lvds_1_cfg1" onchange="update_lvds(1)">
+            <option value="0">REGISTER</option>
+            <option value="1">TRIGGER</option>
+            <option value="2">BUSY/VETO/TRIGGER/RUN</option>
+            <option value="3">LEGACY</option>
+          </select><br>
+          LVDS 8-11 mode <select id="lvds_1_cfg2" onchange="update_lvds(1)">
+            <option value="0">REGISTER</option>
+            <option value="1">TRIGGER</option>
+            <option value="2">BUSY/VETO/TRIGGER/RUN</option>
+            <option value="3">LEGACY</option>
+          </select><br>
+          LVDS 12-15 mode <select id="lvds_1_cfg3" onchange="update_lvds(1)">
+            <option value="0">REGISTER</option>
+            <option value="1">TRIGGER</option>
+            <option value="2">BUSY/VETO/TRIGGER/RUN</option>
+            <option value="3">LEGACY</option>
+          </select><br>
+          <br><small>For BUSY/VETO/TRIGGER/RUN mode:</small><br>
           <label for="acq_1_lvdsbusy"> <input type="checkbox" id="acq_1_lvdsbusy"  onchange="update_acq(1)">Enable busy pin</label><br>
           <label for="acq_1_lvdsveto"> <input type="checkbox" id="acq_1_lvdsveto"  onchange="update_acq(1)">Enable veto pin</label><br>
           <label for="acq_1_lvdsrunin"><input type="checkbox" id="acq_1_lvdsrunin" onchange="update_acq(1)">Enable run pin</label><br>
@@ -1423,11 +1533,31 @@
       </td>
       <td>
         <div data-board="2">
-          <label for="lvds_2_cfg0"> <input style="max-width:40px" id="lvds_2_cfg0" onchange="update_lvds(2)">LVDS 0-3 mode</label><br>
-          <label for="lvds_2_cfg1"> <input style="max-width:40px" id="lvds_2_cfg1" onchange="update_lvds(2)">LVDS 4-7 mode</label><br>
-          <label for="lvds_2_cfg2"> <input style="max-width:40px" id="lvds_2_cfg2" onchange="update_lvds(2)">LVDS 8-11 mode</label><br>
-          <label for="lvds_2_cfg3"> <input style="max-width:40px" id="lvds_2_cfg3" onchange="update_lvds(2)">LVDS 12-15 mode</label><br>
-          <br><small>For mode 2:</small><br>
+          LVDS 0-3 mode <select id="lvds_2_cfg0" onchange="update_lvds(2)">
+            <option value="0">REGISTER</option>
+            <option value="1">TRIGGER</option>
+            <option value="2">BUSY/VETO/TRIGGER/RUN</option>
+            <option value="3">LEGACY</option>
+          </select><br>
+          LVDS 4-7 mode <select id="lvds_2_cfg1" onchange="update_lvds(2)">
+            <option value="0">REGISTER</option>
+            <option value="1">TRIGGER</option>
+            <option value="2">BUSY/VETO/TRIGGER/RUN</option>
+            <option value="3">LEGACY</option>
+          </select><br>
+          LVDS 8-11 mode <select id="lvds_2_cfg2" onchange="update_lvds(2)">
+            <option value="0">REGISTER</option>
+            <option value="1">TRIGGER</option>
+            <option value="2">BUSY/VETO/TRIGGER/RUN</option>
+            <option value="3">LEGACY</option>
+          </select><br>
+          LVDS 12-15 mode <select id="lvds_2_cfg3" onchange="update_lvds(2)">
+            <option value="0">REGISTER</option>
+            <option value="1">TRIGGER</option>
+            <option value="2">BUSY/VETO/TRIGGER/RUN</option>
+            <option value="3">LEGACY</option>
+          </select><br>
+          <br><small>For BUSY/VETO/TRIGGER/RUN mode:</small><br>
           <label for="acq_2_lvdsbusy"> <input type="checkbox" id="acq_2_lvdsbusy"  onchange="update_acq(2)">Enable busy pin</label><br>
           <label for="acq_2_lvdsveto"> <input type="checkbox" id="acq_2_lvdsveto"  onchange="update_acq(2)">Enable veto pin</label><br>
           <label for="acq_2_lvdsrunin"><input type="checkbox" id="acq_2_lvdsrunin" onchange="update_acq(2)">Enable run pin</label><br>
@@ -1437,11 +1567,31 @@
       </td>
       <td>
         <div data-board="3">
-          <label for="lvds_3_cfg0"> <input style="max-width:40px" id="lvds_3_cfg0" onchange="update_lvds(3)">LVDS 0-3 mode</label><br>
-          <label for="lvds_3_cfg1"> <input style="max-width:40px" id="lvds_3_cfg1" onchange="update_lvds(3)">LVDS 4-7 mode</label><br>
-          <label for="lvds_3_cfg2"> <input style="max-width:40px" id="lvds_3_cfg2" onchange="update_lvds(3)">LVDS 8-11 mode</label><br>
-          <label for="lvds_3_cfg3"> <input style="max-width:40px" id="lvds_3_cfg3" onchange="update_lvds(3)">LVDS 12-15 mode</label><br>
-          <br><small>For mode 2:</small><br>
+          LVDS 0-3 mode <select id="lvds_3_cfg0" onchange="update_lvds(3)">
+            <option value="0">REGISTER</option>
+            <option value="1">TRIGGER</option>
+            <option value="2">BUSY/VETO/TRIGGER/RUN</option>
+            <option value="3">LEGACY</option>
+          </select><br>
+          LVDS 4-7 mode <select id="lvds_3_cfg1" onchange="update_lvds(3)">
+            <option value="0">REGISTER</option>
+            <option value="1">TRIGGER</option>
+            <option value="2">BUSY/VETO/TRIGGER/RUN</option>
+            <option value="3">LEGACY</option>
+          </select><br>
+          LVDS 8-11 mode <select id="lvds_3_cfg2" onchange="update_lvds(3)">
+            <option value="0">REGISTER</option>
+            <option value="1">TRIGGER</option>
+            <option value="2">BUSY/VETO/TRIGGER/RUN</option>
+            <option value="3">LEGACY</option>
+          </select><br>
+          LVDS 12-15 mode <select id="lvds_3_cfg3" onchange="update_lvds(3)">
+            <option value="0">REGISTER</option>
+            <option value="1">TRIGGER</option>
+            <option value="2">BUSY/VETO/TRIGGER/RUN</option>
+            <option value="3">LEGACY</option>
+          </select><br>
+          <br><small>For BUSY/VETO/TRIGGER/RUN mode:</small><br>
           <label for="acq_3_lvdsbusy"> <input type="checkbox" id="acq_3_lvdsbusy"  onchange="update_acq(3)">Enable busy pin</label><br>
           <label for="acq_3_lvdsveto"> <input type="checkbox" id="acq_3_lvdsveto"  onchange="update_acq(3)">Enable veto pin</label><br>
           <label for="acq_3_lvdsrunin"><input type="checkbox" id="acq_3_lvdsrunin" onchange="update_acq(3)">Enable run pin</label><br>
