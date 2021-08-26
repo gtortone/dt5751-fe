@@ -787,7 +787,7 @@ bool v1725CONET2::FillEventBank(char * pevent, uint32_t &timestamp)
       uint32_t toBeCopyed = 4; // Starting with the header
 			// We need to find out how many channels we can copy before reaching the limit...
 			int i;
-			for (i=8; i>0 ; --i){ //We have potentially 8 channels to copy
+			for (i=16; i>0 ; --i){ //We have potentially 16 channels to copy
         uint32_t channelSize = 0;
 				channelSize = *(src+toBeCopyed); // Get the size of the data for this channel
 				if (toBeCopyed + channelSize > limit_size) break; 

@@ -22,7 +22,8 @@
 #define V1725_BOARD_CFG_BIT_CLR             0x8008      /* write only; D32 */
  
 #define V1725RAW_BUFFER_ORGANIZATION          0x800C      /* R/W       ; D32 */ 
-#define V1725_CUSTOM_SIZE                     0x8020      /* R/W       ; D32 */
+#define V1725RAW_CUSTOM_SIZE                  0x8020      /* R/W       ; D32 */
+#define V1725ZLE_RECORD_LENGTH                0x8020      /* R/W       ; D32 */
 #define V1725ZLE_PRE_TRIGGER_SETTING          0x8038      /* R/W       ; D32 */ 
 #define V1725RAW_SELFTRIGGER_LOGIC            0x8084      /* R/W       ; D32 */ 
 #define V1725_ADC_CALIBRATION                 0x809C      /* R/W       ; D32 */ 

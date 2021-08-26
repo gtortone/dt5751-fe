@@ -26,20 +26,26 @@
     }
 
    function get_board_params(board_id) {
-	   var sampling_rate, sram_samples_per_chan, cs_factor, pt_factor;
+	   var sampling_rate, sram_samples_per_chan, cs_factor, pt_factor, pret_factor, zle_wndw_factor;
 	   var board_type = document.getElementById("board_type_" + board_id).value;
+     pret_factor = 4;
+     zle_wndw_factor = 2;
+     
+     // V1725s
      if (board_type == 0) {
        sampling_rate = 250e6;
        sram_samples_per_chan = 640e3;
-       cs_factor = 10;
+       cs_factor = is_zle(board_id) ? 4 : 10;
        pt_factor = 4; // Should be 2 according to manual, but 4 seems correct in reality
      }
      if (board_type == 1) {
        sampling_rate = 250e6;
        sram_samples_per_chan = 5.12e6;
-       cs_factor = 10;
+       cs_factor = is_zle(board_id) ? 4 : 10;
        pt_factor = 4; // Should be 2 according to manual, but 4 seems correct in reality
      }
+
+     // V1720s
      if (board_type == 2) {
        sampling_rate = 250e6;
        sram_samples_per_chan = 1e6;
@@ -64,7 +70,7 @@
        cs_factor = 2 * 1.25;
        pt_factor = 4;
      }
-     return [sampling_rate, sram_samples_per_chan, cs_factor, pt_factor];
+     return [sampling_rate, sram_samples_per_chan, cs_factor, pt_factor, pret_factor, zle_wndw_factor];
    }
 
    function get_board_sampling_rate_Hz(board_id) {
@@ -82,6 +88,14 @@
    function get_board_post_trigger_factor(board_id) {
      return get_board_params(board_id)[3];
    }
+
+   function get_board_pret_trigger_factor(board_id) {
+     return get_board_params(board_id)[4];
+   }
+
+   function get_zle_window_factor(board_id) {
+     return get_board_params(board_id)[5];
+   }
    
    function us_to_cs(length_us, board_id) {
      return us_to_samples(length_us, board_id) / get_board_custom_size_factor(board_id);
@@ -89,6 +103,14 @@
    
    function us_to_pt(length_us, board_id) {
      return us_to_samples(length_us, board_id) / get_board_post_trigger_factor(board_id);
+   }
+   
+   function us_to_pret(length_us, board_id) {
+     return us_to_samples(length_us, board_id) / get_board_pre_trigger_factor(board_id);
+   }
+   
+   function us_to_zlew(length_us, board_id) {
+     return us_to_samples(length_us, board_id) / get_zle_window_factor(board_id);
    }
    
    function us_to_samples(length_us, board_id) {
@@ -105,6 +127,14 @@
    
    function pt_to_us(post_trigger, board_id) {
      return samples_to_us(post_trigger * get_board_post_trigger_factor(board_id), board_id);
+   }
+   
+   function pret_to_us(pre_trigger, board_id) {
+     return samples_to_us(pre_trigger * get_board_pre_trigger_factor(board_id), board_id);
+   }
+   
+   function zlew_to_us(zle_window, board_id) {
+     return samples_to_us(post_trigger * get_zle_window_factor(board_id), board_id);
    }
    
    function buffer_code_details(buffer_code, board_id) {
@@ -358,6 +388,26 @@
       set_board_param(board_id, "Acq mode", new_val);
     }
 
+    function zle_baseline_updated(board_id) {
+      let val = parseInt(document.getElementById("zle_bl_" + board_id).innerText);
+      document.getElementById("zle_bl_" + board_id + "_mode").checked = (((val >> 24) & 0x1) == 1);
+      document.getElementById("zle_bl_" + board_id + "_val").value = ((val >> 0) & 0x3FFF);
+      document.getElementById("zle_bl_" + board_id + "_rms").value = ((val >> 16) & 0xFF);
+    }
+
+    function update_zle_baseline(board_id) {
+      let val = parseInt(document.getElementById("zle_bl_" + board_id + "_val").value);
+      if (val < 0 || val > 0x3FFF) {val = 0;}
+      let rms = parseInt(document.getElementById("zle_bl_" + board_id + "_rms").value);
+      if (rms < 0 || rms > 0xFF) {rms = 0;}
+      
+      let new_val = val | (rms << 16);
+
+      if (document.getElementById("zle_bl_" + board_id + "_mode").checked) { new_val |= (1<<24); }
+
+      set_board_param(board_id, "ZLEBaseline", new_val);
+    }
+
    function board_type_rdb_changed(board_id) {
      let val = parseInt(document.getElementById("board_type_rdb_" + board_id).innerText);
      let handled = false;
@@ -445,6 +495,16 @@
      set_board_param(board_id, "Post Trigger", us_to_pt(us, board_id));
    }
    
+   function set_pret_length(board_id) {
+     var us = document.getElementById("pret_length_" + board_id).value;
+     
+     if (!us) {
+       return;
+     }
+     
+     set_board_param(board_id, "Pre Trigger", us_to_pret(us, board_id));
+   }
+   
    function update_wf_lengths_readback(board_id) {
      var boxes = document.getElementsByClassName("customsize");
 
@@ -480,6 +540,25 @@
        
        var us = pt_to_us(pt, board_id);
        document.getElementById("pt_length_"+board_id).value = us;
+     }
+   }
+   
+   function update_pret_trigger_readback(board_id) {
+     var boxes = document.getElementsByClassName("pretrigger");
+
+     for (var i = 0; i < boxes.length; i++) {
+       if (boxes[i].dataset["board"] != board_id) {
+         continue;
+       }
+
+       var pt = parseInt(boxes[i].innerText);
+       
+       if (pt != pt) {
+         continue;
+       }
+       
+       var us = pret_to_us(pt, board_id);
+       document.getElementById("pret_length_"+board_id).value = us;
      }
    }
    
@@ -537,12 +616,26 @@
    function enable_changed(board_id) {
      let enabled = document.getElementById("enable_" + board_id).checked;
      let elems = document.querySelectorAll("[data-board='" + board_id + "']");
+     let board_is_zle = is_zle(board_id);
      
      for (var i = 0; i < elems.length; i++) {
-       elems[i].style.display = enabled ? "" : "none";
+       let show = enabled;
+
+       if (show && elems[i].dataset.zle == "1" && !board_is_zle) {
+         show = false;
+       }
+       if (show && elems[i].dataset.raw == "1" && board_is_zle) {
+         show = false;
+       }
+
+       elems[i].style.display = show ? "" : "none";
      }
 
      io_updated(board_id);
+   }
+
+   function is_zle(board_id) {
+     return document.getElementById("zle_fw_" + board_id).checked;
    }
   
 </script>
@@ -640,6 +733,13 @@
         <div class="modbvalue" style="display:none" id="board_type_rdb_3" onchange="board_type_rdb_changed(3)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Readback/Board3/Board type" ></div> 
       </td>
     </tr>
+    <tr>
+      <td>Has ZLE firmware</td>
+      <td><input type="checkbox" class="modbcheckbox" id="zle_fw_0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Has ZLE firmware" onchange="enable_changed(0)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" id="zle_fw_1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Has ZLE firmware" onchange="enable_changed(1)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" id="zle_fw_2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Has ZLE firmware" onchange="enable_changed(2)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" id="zle_fw_3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Has ZLE firmware" onchange="enable_changed(3)" onload="onchange()"></td>
+    </tr>
 
     
     <tr>
@@ -662,11 +762,11 @@
       <td><input type="checkbox" id="acq_3_count" data-board="3" onchange="update_acq(3)"></td>
     </tr>
     <tr>
-      <td>Allow trigger overlap</td>
-      <td><input type="checkbox" data-board="0" id="board_config_0_overlap" onchange="update_board_config(0)"></td>
-      <td><input type="checkbox" data-board="1" id="board_config_1_overlap" onchange="update_board_config(1)"></td>
-      <td><input type="checkbox" data-board="2" id="board_config_2_overlap" onchange="update_board_config(2)"></td>
-      <td><input type="checkbox" data-board="3" id="board_config_3_overlap" onchange="update_board_config(3)"></td>
+      <td>Allow trigger overlap<br><small>Only for RAW firmware</small></td>
+      <td><input type="checkbox" data-board="0" data-raw="1" id="board_config_0_overlap" onchange="update_board_config(0)"></td>
+      <td><input type="checkbox" data-board="1" data-raw="1" id="board_config_1_overlap" onchange="update_board_config(1)"></td>
+      <td><input type="checkbox" data-board="2" data-raw="1" id="board_config_2_overlap" onchange="update_board_config(2)"></td>
+      <td><input type="checkbox" data-board="3" data-raw="1" id="board_config_3_overlap" onchange="update_board_config(3)"></td>
     </tr>
 
 
@@ -679,110 +779,105 @@
     <tr>
       <td>
         Waveform Length (us)<br/>
-        <small>
-          Setting this affects <i>Custom Size</i>, <i>Almost Full</i> and <i>Buffer Organization</i>.
-        </small><br/>
+        <small>Setting this affects <i>Custom Size</i>, <i>Almost Full</i> and <i>Buffer Organization</i>.</small>
       </td>
-      <td>
-        <div data-board="0"><input id="wf_length_0" style="width:100px" class="blur_on_enter"onblur="set_wf_length(0)">us</div>
-      </td>
-      <td>
-        <div data-board="1"><input id="wf_length_1" style="width:100px" class="blur_on_enter"onblur="set_wf_length(1)">us</div>
-      </td>
-      <td>
-        <div data-board="2"><input id="wf_length_2" style="width:100px" class="blur_on_enter"onblur="set_wf_length(2)">us</div>
-      </td>
-      <td>
-        <div data-board="3"><input id="wf_length_3" style="width:100px" class="blur_on_enter"onblur="set_wf_length(3)">us</div>
-      </td>
+      <td><div data-board="0"><input id="wf_length_0" style="width:100px" class="blur_on_enter"onblur="set_wf_length(0)">us</div></td>
+      <td><div data-board="1"><input id="wf_length_1" style="width:100px" class="blur_on_enter"onblur="set_wf_length(1)">us</div></td>
+      <td><div data-board="2"><input id="wf_length_2" style="width:100px" class="blur_on_enter"onblur="set_wf_length(2)">us</div></td>
+      <td><div data-board="3"><input id="wf_length_3" style="width:100px" class="blur_on_enter"onblur="set_wf_length(3)">us</div></td>
     </tr>
     <tr>
-      <td>
-        Custom Size
-      </td>
-      <td >       
-        <div class="modbvalue customsize" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Custom size" onchange="update_wf_lengths_readback(0)" onload="onchange()" ></div> 
-      </td>
-      <td >       
-        <div class="modbvalue customsize" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Custom size" onchange="update_wf_lengths_readback(1)" onload="onchange()" ></div> 
-      </td>
-      <td >       
-        <div class="modbvalue customsize" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Custom size" onchange="update_wf_lengths_readback(2)" onload="onchange()" ></div> 
-      </td>
-      <td >       
-        <div class="modbvalue customsize" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Custom size" onchange="update_wf_lengths_readback(3)" onload="onchange()" ></div> 
-      </td>
+      <td>Custom size<br><small>AKA 'Record length' for ZLE firmware</small></td>
+      <td><div class="modbvalue customsize" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Custom size" onchange="update_wf_lengths_readback(0)" onload="onchange()" ></div></td>
+      <td><div class="modbvalue customsize" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Custom size" onchange="update_wf_lengths_readback(1)" onload="onchange()" ></div></td>
+      <td><div class="modbvalue customsize" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Custom size" onchange="update_wf_lengths_readback(2)" onload="onchange()" ></div></td>
+      <td><div class="modbvalue customsize" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Custom size" onchange="update_wf_lengths_readback(3)" onload="onchange()" ></div></td>
     </tr>
     <tr>
-      <td>
-        Almost Full
-      </td>
-      <td >       
-        <div class="modbvalue" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/almost_full" ></div> 
-      </td>
-      <td >       
-        <div class="modbvalue" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/almost_full" ></div> 
-      </td>
-      <td >       
-        <div class="modbvalue" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/almost_full" ></div> 
-      </td>
-      <td >       
-        <div class="modbvalue" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/almost_full" ></div> 
-      </td>
+      <td>Almost Full<br><small>Only for RAW firmware</small></td>
+      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/almost_full" ></div></td>
+      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/almost_full" ></div></td>
+      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/almost_full" ></div></td>
+      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/almost_full" ></div></td>
     </tr>
     <tr>
-      <td>
-        Buffer Organization
-      </td>
-      <td >       
-        <div class="modbvalue" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Buffer Organization" ></div> 
-      </td>
-      <td >       
-        <div class="modbvalue" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Buffer Organization" ></div> 
-      </td>
-      <td >       
-        <div class="modbvalue" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Buffer Organization" ></div> 
-      </td>
-      <td >       
-        <div class="modbvalue" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Buffer Organization" ></div> 
-      </td>
+      <td>Buffer Organization<br><small>Only for RAW firmware</small></td>
+      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Buffer Organization" ></div></td>
+      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Buffer Organization" ></div></td>
+      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Buffer Organization" ></div></td>
+      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Buffer Organization" ></div></td>
     </tr>
     <tr>
       <td>
         Post Trigger (us)<br/>
-        <small>
-          Setting this affects <i>Post Trigger</i>.
-        </small><br/>
+        <small>Setting this affects <i>Post Trigger</i>.<br>Only for RAW firmware</small>
       </td>
-      <td>
-        <div data-board="0"><input id="pt_length_0" style="width:100px" class="blur_on_enter" onblur="set_pt_length(0)">us</div>
-      </td>
-      <td>
-        <div data-board="1"><input id="pt_length_1" style="width:100px" class="blur_on_enter" onblur="set_pt_length(1)">us</div>
-      </td>
-      <td>
-        <div data-board="2"><input id="pt_length_2" style="width:100px" class="blur_on_enter" onblur="set_pt_length(2)">us</div>
-      </td>
-      <td>
-        <div data-board="3"><input id="pt_length_3" style="width:100px" class="blur_on_enter" onblur="set_pt_length(3)">us</div>
-      </td>
+      <td><div data-board="0"><input id="pt_length_0" data-raw="1" style="width:100px" class="blur_on_enter" onblur="set_pt_length(0)">us</div></td>
+      <td><div data-board="1"><input id="pt_length_1" data-raw="1" style="width:100px" class="blur_on_enter" onblur="set_pt_length(1)">us</div></td>
+      <td><div data-board="2"><input id="pt_length_2" data-raw="1" style="width:100px" class="blur_on_enter" onblur="set_pt_length(2)">us</div></td>
+      <td><div data-board="3"><input id="pt_length_3" data-raw="1" style="width:100px" class="blur_on_enter" onblur="set_pt_length(3)">us</div></td>
+    </tr>
+    <tr>
+      <td>Post Trigger<br><small>Only for RAW firmware</small></td>
+      <td><div class="modbvalue posttrigger" data-raw="1" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Post Trigger" onchange="update_post_trigger_readback(0)" onload="onchange()"></div></td>
+      <td><div class="modbvalue posttrigger" data-raw="1" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Post Trigger" onchange="update_post_trigger_readback(1)" onload="onchange()"></div></td>
+      <td><div class="modbvalue posttrigger" data-raw="1" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Post Trigger" onchange="update_post_trigger_readback(2)" onload="onchange()"></div></td>
+      <td><div class="modbvalue posttrigger" data-raw="1" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Post Trigger" onchange="update_post_trigger_readback(3)" onload="onchange()"></div></td>
     </tr>
     <tr>
       <td>
-        Post Trigger
+        Pre Trigger (us)<br/>
+        <small>Setting this affects <i>Pre Trigger</i>.<br>Only for ZLE firmware</small>
       </td>
-        <td >       
-          <div class="modbvalue posttrigger" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Post Trigger" onchange="update_post_trigger_readback(0)" onload="onchange()"></div> 
-        </td>
-        <td >       
-          <div class="modbvalue posttrigger" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Post Trigger" onchange="update_post_trigger_readback(1)" onload="onchange()"></div> 
-        </td>
-        <td >       
-          <div class="modbvalue posttrigger" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Post Trigger" onchange="update_post_trigger_readback(2)" onload="onchange()"></div> 
-        </td>
-        <td >       
-          <div class="modbvalue posttrigger" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Post Trigger" onchange="update_post_trigger_readback(3)" onload="onchange()"></div> 
-        </td>
+      <td><div data-board="0"><input id="pret_length_0" data-zle="1" style="width:100px" class="blur_on_enter" onblur="set_pret_length(0)">us</div></td>
+      <td><div data-board="1"><input id="pret_length_1" data-zle="1" style="width:100px" class="blur_on_enter" onblur="set_pret_length(1)">us</div></td>
+      <td><div data-board="2"><input id="pret_length_2" data-zle="1" style="width:100px" class="blur_on_enter" onblur="set_pret_length(2)">us</div></td>
+      <td><div data-board="3"><input id="pret_length_3" data-zle="1" style="width:100px" class="blur_on_enter" onblur="set_pret_length(3)">us</div></td>
+    </tr>
+    <tr>
+      <td>Pre Trigger<br><small>Only for ZLE firmware</small></td>
+      <td><div class="modbvalue pretrigger" data-zle="1" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Pre Trigger" onchange="update_pre_trigger_readback(0)" onload="onchange()"></div></td>
+      <td><div class="modbvalue pretrigger" data-zle="1" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Pre Trigger" onchange="update_pre_trigger_readback(1)" onload="onchange()"></div></td>
+      <td><div class="modbvalue pretrigger" data-zle="1" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Pre Trigger" onchange="update_pre_trigger_readback(2)" onload="onchange()"></div></td>
+      <td><div class="modbvalue pretrigger" data-zle="1" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Pre Trigger" onchange="update_pre_trigger_readback(3)" onload="onchange()"></div></td>
+    </tr>
+    <tr>
+      <td>Enable ZLE compression<br><small>Only for ZLE firmware</small></td>
+      <td><input type="checkbox" class="modbcheckbox" data-zle="1" id="enable_zle_0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Enable ZLE" onchange="enable_changed(0)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" data-zle="1" id="enable_zle_1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Enable ZLE" onchange="enable_changed(1)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" data-zle="1" id="enable_zle_2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Enable ZLE" onchange="enable_changed(2)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" data-zle="1" id="enable_zle_3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Enable ZLE" onchange="enable_changed(3)" onload="onchange()"></td>
+    </tr>
+    <tr>
+      <td>ZLE threshold (ADC from baseline, signed)<br><small>Only for ZLE firmware</small></td>
+      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/ZLESignedThresh"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/ZLESignedThresh"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/ZLESignedThresh"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/ZLESignedThresh"></div></td>
+    </tr>
+    <tr>
+      <td>ZLE pre-window (N*2 samples are recorded!)<br><small>Only for ZLE firmware</small></td>
+      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/ZLENBinsBefore"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/ZLENBinsBefore"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/ZLENBinsBefore"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/ZLENBinsBefore"></div></td>
+    </tr>
+    <tr>
+      <td>ZLE post-window (N*2 samples are recorded!)<br><small>Only for ZLE firmware</small></td>
+      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/ZLENBinsAfter"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/ZLENBinsAfter"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/ZLENBinsAfter"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/ZLENBinsAfter"></div></td>
+    </tr>
+    <tr>
+      <td>ZLE baseline settings<br><small>Only for ZLE firmware</small></td>
+      <td>
+        <div data-board="0" data-zle="1">
+        <label for="zle_bl_0_mode"><input type="checkbox" id="zle_bl_0_fixed" onchange="update_zle_baseline(0)">Use fixed baseline</label><br>
+        <input data-board="0" id="zle_bl_0_val" style="width:40px" onchange="update_zle_baseline(0)">Fixed baseline (ADC)<br>
+        <input data-board="0" id="zle_bl_0_rms" style="width:40px" onchange="update_zle_baseline(0)">Baseline noise (ADC)
+        </div>
+      </td>
     </tr>
     <tr>
       <td>
@@ -870,11 +965,11 @@
       </td>
     </tr>
     <tr>
-      <td>Enable test pattern</td>
-      <td><input type="checkbox" data-board="0" id="board_config_0_testpattern" onchange="update_board_config(0)"></td>
-      <td><input type="checkbox" data-board="1" id="board_config_1_testpattern" onchange="update_board_config(1)"></td>
-      <td><input type="checkbox" data-board="2" id="board_config_2_testpattern" onchange="update_board_config(2)"></td>
-      <td><input type="checkbox" data-board="3" id="board_config_3_testpattern" onchange="update_board_config(3)"></td>
+      <td>Enable test pattern<br><small>Only for RAW firmware</small></td>
+      <td><input type="checkbox" data-board="0" data-raw="1" id="board_config_0_testpattern" onchange="update_board_config(0)"></td>
+      <td><input type="checkbox" data-board="1" data-raw="1" id="board_config_1_testpattern" onchange="update_board_config(1)"></td>
+      <td><input type="checkbox" data-board="2" data-raw="1" id="board_config_2_testpattern" onchange="update_board_config(2)"></td>
+      <td><input type="checkbox" data-board="3" data-raw="1" id="board_config_3_testpattern" onchange="update_board_config(3)"></td>
     </tr>
     
 
@@ -1426,11 +1521,11 @@
 
 
     <tr>
-      <td>Board configuration<br><small>Computed from test pattern, trigger overlap and trigger polarity</small></td>
-      <td><div class="modbvalue" data-format="x" data-board="0" id="board_config_0" onchange="board_config_changed(0)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Board configuration" ></div></td>
-      <td><div class="modbvalue" data-format="x" data-board="1" id="board_config_1" onchange="board_config_changed(1)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Board configuration" ></div></td>
-      <td><div class="modbvalue" data-format="x" data-board="2" id="board_config_2" onchange="board_config_changed(2)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Board configuration" ></div></td>
-      <td><div class="modbvalue" data-format="x" data-board="3" id="board_config_3" onchange="board_config_changed(3)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Board configuration" ></div></td>
+      <td>Board configuration<br><small>Computed from test pattern, trigger overlap and trigger polarity<br>Only for RAW firmware</small></td>
+      <td><div class="modbvalue" data-format="x" data-raw="1" data-board="0" id="board_config_0" onchange="board_config_changed(0)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Board configuration" ></div></td>
+      <td><div class="modbvalue" data-format="x" data-raw="1" data-board="1" id="board_config_1" onchange="board_config_changed(1)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Board configuration" ></div></td>
+      <td><div class="modbvalue" data-format="x" data-raw="1" data-board="2" id="board_config_2" onchange="board_config_changed(2)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Board configuration" ></div></td>
+      <td><div class="modbvalue" data-format="x" data-raw="1" data-board="3" id="board_config_3" onchange="board_config_changed(3)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Board configuration" ></div></td>
     </tr>
     <tr>
       <td>Readout channel mask</td>
@@ -1473,6 +1568,13 @@
       <td><span class="modbvalue" id="acq_1" data-board="1" data-format="x" onchange="acq_updated(1)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Acq mode"></span></td>
       <td><span class="modbvalue" id="acq_2" data-board="2" data-format="x" onchange="acq_updated(2)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Acq mode"></span></td>
       <td><span class="modbvalue" id="acq_3" data-board="3" data-format="x" onchange="acq_updated(3)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Acq mode"></span></td>
+    </tr>
+    <tr>
+      <td>ZLE baseline<br><small>Computed from ZLE baseline settings<br>Only for ZLE firmware</small></td>
+      <td><span class="modbvalue" id="zle_bl_0" data-board="0" data-format="x" onchange="zle_baseline_updated(0)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/ZLEBaseline"></span></td>
+      <td><span class="modbvalue" id="zle_bl_1" data-board="1" data-format="x" onchange="zle_baseline_updated(1)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/ZLEBaseline"></span></td>
+      <td><span class="modbvalue" id="zle_bl_2" data-board="2" data-format="x" onchange="zle_baseline_updated(2)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/ZLEBaseline"></span></td>
+      <td><span class="modbvalue" id="zle_bl_3" data-board="3" data-format="x" onchange="zle_baseline_updated(3)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/ZLEBaseline"></span></td>
     </tr>
 
   </table>
