@@ -975,6 +975,12 @@ INT poll_event(INT source, INT count, BOOL test)
   register int i;
 
   for (i = 0; i < count; i++) {
+    for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
+      if(itv1725->IsConnected()) {
+        itv1725->IssueSwTrigIfNeeded();
+      }
+    }
+
     bool evtReady = true;
     unmergedModuleToRead = -1;
 

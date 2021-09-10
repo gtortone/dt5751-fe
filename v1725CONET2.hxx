@@ -105,6 +105,7 @@ public:
     DWORD     zle_baseline[16];         //!< 0x1n34@[31.. 0] - ZLE only
     DWORD     dac[16];                  //!< 0x1n98@[15.. 0]
     BOOL      dynamic_range_2v[16];     //!< 0x1n28@[0]
+    float     sw_trig_rate_Hz;          //!< Software-only
   } config; //!< instance of config structure
 
   /* Static */
@@ -143,6 +144,7 @@ public:
   bool FillBufferLevelBank(char *);
   bool IsZLEData();
 
+  void IssueSwTrigIfNeeded();
   bool SendTrigger();
   bool Poll(DWORD*);
   int SetBoardRecord(HNDLE h, void(*cb_func)(INT,INT,void*));
@@ -234,7 +236,7 @@ private:
    * incrementation and an increment/decrement of this variable.   */
   std::atomic<int> num_events_in_rb_;  //!< Number of events stored in ring buffer
 
-
+  timeval last_sw_trig_time;
 
   Bool_t kFALSE = false;
 

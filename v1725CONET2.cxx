@@ -147,23 +147,24 @@ const char * v1725CONET2::config_str_board[] = {\
     "[13] 10000",\
     "[14] 10000",\
     "[15] 10000",\
-	"Dynamic Range 2V (y) 0.5V (n) = BOOL[16] :",\
-	"[0] y",\
-	"[1] y",\
-	"[2] y",\
-	"[3] y",\
-	"[4] y",\
-	"[5] y",\
-	"[6] y",\
-	"[7] y",\
-	"[8] y",\
-	"[9] y",\
-	"[10] y",\
-	"[11] y",\
-	"[12] y",\
-	"[13] y",\
-	"[14] y",\
-	"[15] y",\
+    "Dynamic Range 2V (y) 0.5V (n) = BOOL[16] :",\
+    "[0] y",\
+    "[1] y",\
+    "[2] y",\
+    "[3] y",\
+    "[4] y",\
+    "[5] y",\
+    "[6] y",\
+    "[7] y",\
+    "[8] y",\
+    "[9] y",\
+    "[10] y",\
+    "[11] y",\
+    "[12] y",\
+    "[13] y",\
+    "[14] y",\
+    "[15] y",\
+    "Software trigger rate (Hz) = FLOAT : 0",\
     NULL
 };
 
@@ -481,6 +482,8 @@ bool v1725CONET2::StartRun()
   }
 
 	std::cout << "reinitializing" << std::endl;
+
+  gettimeofday(&last_sw_trig_time, NULL);
 	
 	//Re-read the record from ODB, it may have changed
 	int size = sizeof(V1725_CONFIG_SETTINGS);
@@ -895,6 +898,25 @@ bool v1725CONET2::FillBufferLevelBank(char * pevent)
   return (sCAEN == CAENComm_Success);
 
 }
+//
+//--------------------------------------------------------------------------------
+/**
+ * \brief   Handle periodic software triggers if enabled by the user. 
+ *
+ * If the user has set the ODB key "Software trigger rate (Hz)" to > 0,
+ * issue a software trigger if enough time has elapsed since we last sent a trigger.
+ */
+void v1725CONET2::IssueSwTrigIfNeeded() {
+  if (config.sw_trig_rate_Hz > 0) {
+    timeval now;
+    gettimeofday(&now, NULL);
+
+    if ((now.tv_sec - last_sw_trig_time.tv_sec + (1e-6 * (now.tv_usec - last_sw_trig_time.tv_usec))) > 1./config.sw_trig_rate_Hz) {
+      SendTrigger();
+      last_sw_trig_time = now;
+    }
+  }
+}
 
 //
 //--------------------------------------------------------------------------------
@@ -1064,7 +1086,8 @@ int v1725CONET2::InitializeForAcq()
         
   // Do special board reset for lockup prevention                                                 
 	DWORD reg;
-  // Clear the board                                                         
+  // Clear the board                     
+  CheckEvent();                                    
 	sCAEN = WriteReg_(V1725_SW_RESET, 0x1);
 	
 	// Need time for the PLL to lock
@@ -1164,8 +1187,7 @@ int v1725CONET2::InitializeForAcq()
     break;
   }
 
-	//PAA
-
+  // Initial acquisition mode. We'll set more bits for enabling the board later.
   WriteReg_(V1725_ACQUISITION_CONTROL,     config.acq_mode);
 
   if (config.has_zle_firmware) {
