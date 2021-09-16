@@ -166,6 +166,8 @@ uint32_t timestamp_offset[NBLINKSPERFE*NB1725PERLINK]; //!< trigger time stamp o
 BOOL enableChronobox = true;
 BOOL enableMerging = true;
 int unmergedModuleToRead = -1;
+BOOL writePartiallyMergedEvents = false;
+BOOL flushBuffersAtEndOfRun = false;
 
 // __________________________________________________________________
 /*-- MIDAS Function declarations -----------------------------------------*/
@@ -363,12 +365,16 @@ INT frontend_init(){
 
   {
     // Create flags for whether to enable Chronobox, and whether to merge data from all boards in same event.
-    char cb_path[255], merge_path[255];
+    char cb_path[255], merge_path[255], partial_path[255], flush_path[255];
     int size_bool = sizeof(BOOL);
     sprintf(cb_path, "/Equipment/%s/Settings/Enable chronobox", equipment[0].name);
     sprintf(merge_path, "/Equipment/%s/Settings/Merge data from boards", equipment[0].name);
+    sprintf(partial_path, "/Equipment/%s/Settings/Write partially merged events", equipment[0].name);
+    sprintf(flush_path, "/Equipment/%s/Settings/Flush buffers at end of run", equipment[0].name);
     db_get_value(hDB, 0, cb_path, &enableChronobox, &size_bool, TID_BOOL, TRUE);
     db_get_value(hDB, 0, merge_path, &enableMerging, &size_bool, TID_BOOL, TRUE);
+    db_get_value(hDB, 0, partial_path, &writePartiallyMergedEvents, &size_bool, TID_BOOL, TRUE);
+    db_get_value(hDB, 0, flush_path, &flushBuffersAtEndOfRun, &size_bool, TID_BOOL, TRUE);
   }
 
   // --- Suppress watchdog for PICe for now  ; what is this???
@@ -543,12 +549,16 @@ INT begin_of_run(INT run_number, char *error)
 
   {
     // Create/read flags for whether to enable Chronobox, and whether to merge data from all boards in same event.
-    char cb_path[255], merge_path[255];
+    char cb_path[255], merge_path[255], partial_path[255], flush_path[255];
     sprintf(cb_path, "/Equipment/%s/Settings/Enable chronobox", equipment[0].name);
     sprintf(merge_path, "/Equipment/%s/Settings/Merge data from boards", equipment[0].name);
+    sprintf(partial_path, "/Equipment/%s/Settings/Write partially merged events", equipment[0].name);
+    sprintf(flush_path, "/Equipment/%s/Settings/Flush buffers at end of run", equipment[0].name);
     INT size = sizeof(BOOL);
     db_get_value(hDB, 0, cb_path, &enableChronobox, &size, TID_BOOL, TRUE);
     db_get_value(hDB, 0, merge_path, &enableMerging, &size, TID_BOOL, TRUE);
+    db_get_value(hDB, 0, partial_path, &writePartiallyMergedEvents, &size, TID_BOOL, TRUE);
+    db_get_value(hDB, 0, flush_path, &flushBuffersAtEndOfRun, &size, TID_BOOL, TRUE);
   }
 
   if (enableChronobox && !enableMerging) {
@@ -717,7 +727,8 @@ void * link_thread(void * arg)
   pthread_exit((void*)&thread_retval[link]);
 }
 
-int wait_counter = 0;
+timeval wait_start;
+
 // Check how many events we have in the ring buffer
 BOOL wait_buffer_empty(int transition, BOOL first)
  {
@@ -727,19 +738,29 @@ BOOL wait_buffer_empty(int transition, BOOL first)
      // Some funny business here... need to pause the readout on the threads before
      // making the chronobox stop call... some sort of contention for the system resources.
      if (enableChronobox) {
-      stopRunInProgress = true;
-      usleep(500);
-      chronobox_start_stop(false);
-      stopRunInProgress = false;
-      sleep(1);
+       stopRunInProgress = true;
+       usleep(500);
+       chronobox_start_stop(false);
+       stopRunInProgress = false;
+       sleep(1);
+       // We'll stop the V1725s later
+    } else {
+      for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
+        if (itv1725->IsConnected()) {  // Skip unconnected board
+          itv1725->StopRun();
+        }
+      }
     }
-     wait_counter = 0;
-     return FALSE;
-   }
 
-   // Stop the deferred transition after 100 checks.  If not finished, will never finish.
-   wait_counter++;
-   if(wait_counter > 100) return TRUE;
+     gettimeofday(&wait_start, NULL);
+
+     if (flushBuffersAtEndOfRun) {
+       cm_msg(MINFO, __FUNCTION__, "Deferring transition to flush more data from boards");
+       return FALSE;
+     } else {
+       return TRUE;
+     }
+   }
 
    bool haveEventsInBuffer = false;
    for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
@@ -747,13 +768,24 @@ BOOL wait_buffer_empty(int transition, BOOL first)
        haveEventsInBuffer = true;
      }
    }
-
+   
    // Stay in deferred transition till all events are cleared
    if(haveEventsInBuffer){
-     printf("Deferred transition: still have events\n");
-     return FALSE;
+
+     double wait_timeout_secs = 15;
+     timeval now;
+     gettimeofday(&now, NULL);
+ 
+     if (now.tv_sec - wait_start.tv_sec + 1e-6 * (now.tv_usec - wait_start.tv_usec) > wait_timeout_secs) {
+        cm_msg(MINFO, __FUNCTION__, "Still have data on boards, but taking too long to flush it all. Completing transition now.");
+        return TRUE;
+     } else {
+        printf("Deferred transition: still have events\n");
+        return FALSE;
+     }
    }
 
+  cm_msg(MINFO, __FUNCTION__, "Finished flushing data from ring buffers");
    printf("Deferred transition: cleared all events\n");
    return TRUE;
  }
@@ -795,24 +827,27 @@ INT end_of_run(INT run_number, char *error)
     // Stop run
     for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
       if (itv1725->IsConnected()) {  // Skip unconnected board
-        result = itv1725->StopRun();
+        if (enableChronobox) {
+          // If no chronobox, we've already stopped the boards.
+          result = itv1725->StopRun();
+          
+          if(!result) {
+            cm_msg(MERROR, "EOR", "Could not stop the run for module %d", itv1725->GetModuleID());
+          }
+        }
 
-        if(!result)
-          cm_msg(MERROR, "EOR",
-                 "Could not stop the run for module %d", itv1725->GetModuleID());
-
-	printf("Number of events in ring buffer for module-%i: %i\n",itv1725->GetModuleID(),itv1725->GetNumEventsInRB());
+	        printf("Number of events in ring buffer for module-%i: %i\n",itv1725->GetModuleID(),itv1725->GetNumEventsInRB());
 
         rb_delete(itv1725->GetRingBufferHandle());
         itv1725->SetRingBufferHandle(-1);
-	itv1725->ResetNumEventsInRB();
+	      itv1725->ResetNumEventsInRB();
       }
     }
 
     // Info about event in HW buffer
     result = ov1725[0].Poll(&eStored);
     if(eStored != 0x0) {
-      cm_msg(MERROR, "EOR", "Events left in the v1725-%i: %d",itv1725->GetModuleID(),eStored);
+      cm_msg(MERROR, "EOR", "Events left in the v1725-%d: %d",ov1725[0].GetModuleID(), eStored);
     }
 
   }
@@ -1136,6 +1171,22 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
     return 0;
   }
 
+  int minEventId = -1;
+  DWORD numConnectedBoards = 0;
+
+  if (enableMerging && !enableChronobox) {
+    // Merge by event ID
+    for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
+      if (! itv1725->IsConnected()) continue;   // Skip unconnected board
+
+      numConnectedBoards++;
+      int this_id = itv1725->PeekRBEventID();
+      if ((this_id > -1 && this_id < minEventId) || (minEventId == -1)) {
+        minEventId = this_id;
+      }
+    }
+  }
+
   for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
     if (! itv1725->IsConnected()) continue;   // Skip unconnected board
 
@@ -1147,6 +1198,10 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
     }
 
     if (!enableMerging && itv1725->GetModuleID() != unmergedModuleToRead) {
+      continue;
+    }
+
+    if (enableMerging && !enableChronobox && itv1725->PeekRBEventID() != minEventId) {
       continue;
     }
 
@@ -1165,34 +1220,22 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
 
 
   // Check the timestamps
-  if(timestamps.size() > 1){
+  if (timestamps.size() > 1) {
     for(unsigned int i = 1; i < timestamps.size(); i++){
       uint32_t diff1 = timestamps[0]-timestamps[i];
       uint32_t diff2 = timestamps[i]-timestamps[0];
       uint32_t diff = (diff1 < diff2) ? diff1 : diff2;
       double fdiff = diff*0.000000008;
 
-      printf("idx:%i sze:%zu CB:0x%x [%i]:0x%x %i %f %f \n",i, timestamps.size(), timestamps[0], i,  timestamps[i], diff, timestamps[i]*0.000000008,fdiff);
-
-#if(0)
-//#ifndef DISABLE_TIMESTAMP_CHECK
-      if(diff > 5000){ // allow at most 5000 timestamps difference
-
-	// Only print the error message once
-	if(!eor_transition_called){
-	  cm_msg(MERROR,"read_trigger_event", "Error in timestamp matching between event fragments 0 and %i.  Timestamps (val val diff): 0x%x 0x%x 0x%x\n",
-		 i, timestamps[0],timestamps[i],diff);
-	  printf("%i 0x%x 0x%x 0x%x 0x%x \n",i, timestamps[0],timestamps[i],timestamps[0]-timestamps[i],diff);
-
-	  // Stop the run!
-	  cm_transition(TR_STOP, 0, NULL, 0, TR_DETACH, 0);
-	  eor_transition_called = true;
-	}
-      }
-#endif
-
+      printf("evt: %i, idx:%i sze:%zu [0]:0x%08x [%i]:0x%08x diff:%i secs:%f diff_secs:%f \n", minEventId, i, timestamps.size(), timestamps[0], i,  timestamps[i], diff, timestamps[i]*0.000000008,fdiff);
     }
+  } else {
+    printf("evt: %i, only 1 timestamp, [0]:0x%08x secs:%f\n", minEventId, timestamps[0], timestamps[0]*0.000000008);
+  }
 
+  if (enableMerging && !enableChronobox && !writePartiallyMergedEvents && timestamps.size() != numConnectedBoards) {
+    printf("Skipping event %d as only have data from %d/%d boards.\n", minEventId, (DWORD)timestamps.size(), numConnectedBoards);
+    return 0;
   }
 
   INT ev_size = bk_size(pevent);

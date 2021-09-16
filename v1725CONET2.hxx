@@ -183,6 +183,7 @@ public:
   int GetNumEventsInRB() {                //! returns number of events in ring buffer
     return num_events_in_rb_.load();
   }
+  int PeekRBEventID();
   DataType GetDataType();
   int GetVerbosity(){
     return verbosity_;

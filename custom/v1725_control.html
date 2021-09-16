@@ -674,6 +674,28 @@
       <td>Merge data from multiple boards into a single event</td>
       <td><input type="checkbox" class="modbcheckbox" data-odb-path="/Equipment/V1725_Data00/Settings/Merge data from boards" data-odb-editable="1"></td>
     </tr>
+    <tr>
+      <td>
+        Write partially merged events<br>
+        <div style="font-size:small; max-width:300px">
+          If the chronobox is disabled but we're still merging events, we'll do it by Event ID.<br>
+          If a board is BUSY, should we still write the data from the other boards, or only write events 
+          when we have data from all boards?
+        </div>
+      </td>
+      <td><input type="checkbox" class="modbcheckbox" data-odb-path="/Equipment/V1725_Data00/Settings/Write partially merged events" data-odb-editable="1"></td>
+    </tr>
+    <tr>
+      <td>
+        Defer end-of-run to write final events<br>
+        <div style="font-size:small; max-width:300px">
+          If boards/frontend have unwritten events at the end of the run, should we try to write them during a 
+          "deferred transition" or just drop that data (ending the run immediately)? There could be many thousands
+          of events stored, so the transition could take up to 20s to complete if this is enabled.
+        </div>
+      </td>
+      <td><input type="checkbox" class="modbcheckbox" data-odb-path="/Equipment/V1725_Data00/Settings/Flush buffers at end of run" data-odb-editable="1"></td>
+    </tr>
   </table>
 
   <table class="mtable">

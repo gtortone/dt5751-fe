@@ -740,6 +740,25 @@ bool v1725CONET2::ReadEvent(void *wp)
 }
 
 
+int v1725CONET2::PeekRBEventID() {
+
+  DWORD *src=NULL;
+  int status = rb_get_rp(this->GetRingBufferHandle(), (void**)&src, 500);
+  if (status == DB_TIMEOUT) {
+    cm_msg(MERROR,"FillEventBank", "Got rp timeout for module %d", this->GetModuleID());
+    printf("### num events: %d\n", this->GetNumEventsInRB());
+    return -1;
+  }
+
+
+  if ((*src & 0xF0000000) != 0xA0000000){
+    cm_msg(MERROR,"FillEventBank","Incorrect hearder for board:%d (0x%x)", this->GetModuleID(), *src);
+    return -1;
+  }
+
+  return (*(src+2)) & 0xFFFFFF;
+}
+
 //
 //--------------------------------------------------------------------------------
 bool v1725CONET2::FillEventBank(char * pevent, uint32_t &timestamp)
