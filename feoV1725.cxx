@@ -772,7 +772,7 @@ BOOL wait_buffer_empty(int transition, BOOL first)
    // Stay in deferred transition till all events are cleared
    if(haveEventsInBuffer){
 
-     double wait_timeout_secs = 15;
+     double wait_timeout_secs = 10;
      timeval now;
      gettimeofday(&now, NULL);
  
@@ -1171,18 +1171,31 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
     return 0;
   }
 
-  int minEventId = -1;
+  int64_t minTimestamp = 0xFFFFFFFF;
+  int64_t rolloverTime = 0x80000000;
   DWORD numConnectedBoards = 0;
 
   if (enableMerging && !enableChronobox) {
-    // Merge by event ID
+    // Merge by timestamp
     for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
       if (! itv1725->IsConnected()) continue;   // Skip unconnected board
 
       numConnectedBoards++;
-      int this_id = itv1725->PeekRBEventID();
-      if ((this_id > -1 && this_id < minEventId) || (minEventId == -1)) {
-        minEventId = this_id;
+      int64_t thisTimestamp = itv1725->PeekRBTimestamp();
+
+      //printf("this: %08lx, curr min: %08lx, rollover: %d\n", thisTimestamp, minTimestamp, std::abs(thisTimestamp - minTimestamp) > rolloverTime / 2);
+
+      if (minTimestamp == 0xFFFFFFFF) {
+        // First timestamp
+        minTimestamp = thisTimestamp;
+      } else if (std::abs(thisTimestamp - minTimestamp) > rolloverTime / 2) {
+        // Had rollover
+        if (thisTimestamp > minTimestamp) {
+          minTimestamp = thisTimestamp;
+        }
+      } else if (thisTimestamp < minTimestamp) {
+        // No rollover
+        minTimestamp = thisTimestamp;
       }
     }
   }
@@ -1201,7 +1214,16 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
       continue;
     }
 
-    if (enableMerging && !enableChronobox && itv1725->PeekRBEventID() != minEventId) {
+    DWORD tsThreshold = 2;
+    DWORD thisTimestamp = itv1725->PeekRBTimestamp();
+    DWORD deltaTimestamp = thisTimestamp - minTimestamp;
+
+    if (deltaTimestamp > 0x7FFFFFFF) {
+      // Handle rollover
+      deltaTimestamp -= 0x7FFFFFFF;
+    }
+
+    if (enableMerging && !enableChronobox && deltaTimestamp > tsThreshold) {
       continue;
     }
 
@@ -1227,14 +1249,14 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
       uint32_t diff = (diff1 < diff2) ? diff1 : diff2;
       double fdiff = diff*0.000000008;
 
-      printf("evt: %i, idx:%i sze:%zu [0]:0x%08x [%i]:0x%08x diff:%i secs:%f diff_secs:%f \n", minEventId, i, timestamps.size(), timestamps[0], i,  timestamps[i], diff, timestamps[i]*0.000000008,fdiff);
+      printf("idx:%i sze:%zu [0]:0x%08x [%i]:0x%08x diff:%i secs:%f diff_secs:%f \n", i, timestamps.size(), timestamps[0], i,  timestamps[i], diff, timestamps[i]*0.000000008,fdiff);
     }
   } else {
-    printf("evt: %i, only 1 timestamp, [0]:0x%08x secs:%f\n", minEventId, timestamps[0], timestamps[0]*0.000000008);
+    printf("only 1 timestamp, [0]:0x%08x secs:%f\n", timestamps[0], timestamps[0]*0.000000008);
   }
 
   if (enableMerging && !enableChronobox && !writePartiallyMergedEvents && timestamps.size() != numConnectedBoards) {
-    printf("Skipping event %d as only have data from %d/%d boards.\n", minEventId, (DWORD)timestamps.size(), numConnectedBoards);
+    printf("Skipping event at time 0x%08x as only have data from %d/%d boards.\n", minTimestamp, (DWORD)timestamps.size(), numConnectedBoards);
     return 0;
   }
 

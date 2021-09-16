@@ -740,6 +740,25 @@ bool v1725CONET2::ReadEvent(void *wp)
 }
 
 
+DWORD v1725CONET2::PeekRBTimestamp() {
+
+  DWORD *src=NULL;
+  int status = rb_get_rp(this->GetRingBufferHandle(), (void**)&src, 500);
+  if (status == DB_TIMEOUT) {
+    cm_msg(MERROR,"FillEventBank", "Got rp timeout for module %d", this->GetModuleID());
+    printf("### num events: %d\n", this->GetNumEventsInRB());
+    return 0xFFFFFFFF;
+  }
+
+
+  if ((*src & 0xF0000000) != 0xA0000000){
+    cm_msg(MERROR,"FillEventBank","Incorrect hearder for board:%d (0x%x)", this->GetModuleID(), *src);
+    return 0xFFFFFFFF;
+  }
+
+  return (*(src+3)) & 0x7FFFFFFF;
+}
+
 int v1725CONET2::PeekRBEventID() {
 
   DWORD *src=NULL;
@@ -1139,8 +1158,8 @@ int v1725CONET2::InitializeForAcq()
   uint32_t version = 0;
   uint32_t prev_chan = 0;
   // Hardcode correct firmware verisons
-	const uint32_t amc_fw_ver = 0x19010007;  // 0x14048c02; for ZLE
-	const uint32_t roc_fw_ver = 0x17200410;  // 0x1331040c; for ZLE
+	const uint32_t amc_fw_ver = 0x44260008;  // 0x14048c02; for ZLE
+	const uint32_t roc_fw_ver = 0x4b060417;  // 0x1331040c; for ZLE
   for(int iCh=0;iCh<16;iCh++) {
     addr = 0x108c | (iCh << 8);
     sCAEN = ReadReg_(addr, &version);

@@ -184,6 +184,7 @@ public:
     return num_events_in_rb_.load();
   }
   int PeekRBEventID();
+  DWORD PeekRBTimestamp();
   DataType GetDataType();
   int GetVerbosity(){
     return verbosity_;
