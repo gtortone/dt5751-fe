@@ -769,10 +769,10 @@ BOOL wait_buffer_empty(int transition, BOOL first)
      }
    }
 
-   bool haveEventsInBuffer = false;
+   bool haveEventsInBuffer = true;
    for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-     if(itv1725->IsConnected() && (itv1725->GetNumEventsInRB() != 0)) {
-       haveEventsInBuffer = true;
+     if(itv1725->IsConnected() && (itv1725->GetNumEventsInRB() == 0)) {
+       haveEventsInBuffer = false;
      }
    }
    
