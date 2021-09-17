@@ -1034,7 +1034,8 @@ INT poll_event(INT source, INT count, BOOL test)
         }
       }
     } else {
-      //ready for readout when data is present on any ring buffer
+      // Ready for readout when data is present on any ring buffer.
+      // Read from the module with the most number of events backlogged.
       evtReady = false;
       int maxNumEvents = -1;
 
@@ -1237,13 +1238,13 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
     uint32_t timestamp;
     itv1725->FillEventBank(pevent,timestamp);
 
+    // Save timestamp for ZLE bank.
+    timestamps.push_back((timestamp & 0x7fffffff));
+
     if (!enableMerging) {
       // Only saving data from 1 board.
       break;
     }
-
-    // Save timestamp for ZLE bank.
-    timestamps.push_back((timestamp & 0x7fffffff));
   }
 
 
