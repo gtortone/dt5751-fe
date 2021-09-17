@@ -168,6 +168,7 @@ BOOL enableMerging = true;
 int unmergedModuleToRead = -1;
 BOOL writePartiallyMergedEvents = false;
 BOOL flushBuffersAtEndOfRun = false;
+INT timestampMatchingThreshold = 50;
 
 // __________________________________________________________________
 /*-- MIDAS Function declarations -----------------------------------------*/
@@ -365,16 +366,19 @@ INT frontend_init(){
 
   {
     // Create flags for whether to enable Chronobox, and whether to merge data from all boards in same event.
-    char cb_path[255], merge_path[255], partial_path[255], flush_path[255];
+    char cb_path[255], merge_path[255], partial_path[255], flush_path[255], thresh_path[255];
     int size_bool = sizeof(BOOL);
+    int size_dword = sizeof(DWORD);
     sprintf(cb_path, "/Equipment/%s/Settings/Enable chronobox", equipment[0].name);
     sprintf(merge_path, "/Equipment/%s/Settings/Merge data from boards", equipment[0].name);
     sprintf(partial_path, "/Equipment/%s/Settings/Write partially merged events", equipment[0].name);
     sprintf(flush_path, "/Equipment/%s/Settings/Flush buffers at end of run", equipment[0].name);
+    sprintf(thresh_path, "/Equipment/%s/Settings/TS match thresh (clock ticks)", equipment[0].name);
     db_get_value(hDB, 0, cb_path, &enableChronobox, &size_bool, TID_BOOL, TRUE);
     db_get_value(hDB, 0, merge_path, &enableMerging, &size_bool, TID_BOOL, TRUE);
     db_get_value(hDB, 0, partial_path, &writePartiallyMergedEvents, &size_bool, TID_BOOL, TRUE);
     db_get_value(hDB, 0, flush_path, &flushBuffersAtEndOfRun, &size_bool, TID_BOOL, TRUE);
+    db_get_value(hDB, 0, thresh_path, &timestampMatchingThreshold, &size_dword, TID_DWORD, TRUE);
   }
 
   // --- Suppress watchdog for PICe for now  ; what is this???
@@ -549,16 +553,19 @@ INT begin_of_run(INT run_number, char *error)
 
   {
     // Create/read flags for whether to enable Chronobox, and whether to merge data from all boards in same event.
-    char cb_path[255], merge_path[255], partial_path[255], flush_path[255];
+    char cb_path[255], merge_path[255], partial_path[255], flush_path[255], thresh_path[255];
     sprintf(cb_path, "/Equipment/%s/Settings/Enable chronobox", equipment[0].name);
     sprintf(merge_path, "/Equipment/%s/Settings/Merge data from boards", equipment[0].name);
     sprintf(partial_path, "/Equipment/%s/Settings/Write partially merged events", equipment[0].name);
     sprintf(flush_path, "/Equipment/%s/Settings/Flush buffers at end of run", equipment[0].name);
+    sprintf(thresh_path, "/Equipment/%s/Settings/TS match thresh (clock ticks)", equipment[0].name);
     INT size = sizeof(BOOL);
     db_get_value(hDB, 0, cb_path, &enableChronobox, &size, TID_BOOL, TRUE);
     db_get_value(hDB, 0, merge_path, &enableMerging, &size, TID_BOOL, TRUE);
     db_get_value(hDB, 0, partial_path, &writePartiallyMergedEvents, &size, TID_BOOL, TRUE);
     db_get_value(hDB, 0, flush_path, &flushBuffersAtEndOfRun, &size, TID_BOOL, TRUE);
+    size = sizeof(DWORD);
+    db_get_value(hDB, 0, thresh_path, &timestampMatchingThreshold, &size, TID_DWORD, TRUE);
   }
 
   if (enableChronobox && !enableMerging) {
@@ -1214,7 +1221,6 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
       continue;
     }
 
-    DWORD tsThreshold = 2;
     DWORD thisTimestamp = itv1725->PeekRBTimestamp();
     DWORD deltaTimestamp = thisTimestamp - minTimestamp;
 
@@ -1223,7 +1229,7 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
       deltaTimestamp -= 0x7FFFFFFF;
     }
 
-    if (enableMerging && !enableChronobox && deltaTimestamp > tsThreshold) {
+    if (enableMerging && !enableChronobox && deltaTimestamp > timestampMatchingThreshold) {
       continue;
     }
 
