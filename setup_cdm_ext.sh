@@ -1,10 +1,9 @@
-#!/usr/bin/bash
 # This script should be run after the CDM boots
 # (e.g. after the VME crate is power-cycled) to ensure
 # it gets into a good state.
-
-# This version configures the board to output a 50MHz clock 
-# based only on internal clocks (no external reference).
+#
+# This version is to be used if the CDM should take a clock
+# signal from an EXTERNAL source (e.g. the chronobox).
 
 CDM_IPADDR=172.16.21.84
 
@@ -19,7 +18,7 @@ esper-tool write -d 1 $CDM_IPADDR template current_setup
 sleep 1
 
 # 0 for internal, 1 for eSATA, 2 for external
-esper-tool write -d 0 $CDM_IPADDR cdm sel_ext
+esper-tool write -d 2 $CDM_IPADDR cdm sel_ext
 esper-tool write -d 0 $CDM_IPADDR cdm sel_nim
 esper-tool write -d 0 $CDM_IPADDR cdm sel_atomic_clk
 
