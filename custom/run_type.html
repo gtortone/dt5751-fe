@@ -7,14 +7,14 @@
    <script src="midas.js"></script>
    <script src="mhttpd.js"></script>
    <script src="jquery.min.js"></script>
-   <title>Run type</title>
+   <title>Chronobox configuration</title>
 
    <style>
       .mtable td { padding: 10px; }
    </style>
 
    <script>
-   var chrono_url = "chronobox"
+   var chrono_url = "../chronobox"
 
 	 function arrays_equal(a, b) {
 	   if (a === b) return true;
@@ -66,16 +66,13 @@
    }
    
    var chrono_set_okay = {};
-   var v1725_set_okay = {};
    
    function new_chrono_setup() {
      $("#chrono_status").text("Starting chronobox setup");
-     $("#v1725_status").text("V1725s do not need to be touched");
      $("#status").show();
      $(".instructions").hide();
      $("#instructions").hide();
 	   chrono_set_okay = {};
-	   v1725_set_okay = {};
    }
    
    function is_chrono_okay() {
@@ -101,29 +98,6 @@
 	   }
 	 }
 
-   function is_v1725_okay() {
-     for (var k in v1725_set_okay) {
-       if (!v1725_set_okay[k]) {
-         return false;
-       }
-     }
-     return true;
-   }
-   
-   async function wait_for_all_v1725_okay(timeout_ms) {
-     var start_time = new Date().getTime()
-
-     while (true) {
-       if (is_v1725_okay()) {
-         return true;
-       }
-       if (new Date() > start_time + timeout_ms) {
-         return false;
-       }
-       await new Promise(resolve => setTimeout(resolve, 10));
-     }
-   }
-   
    function notify_chrono_state(instructions_div) {
      wait_for_all_chrono_okay(5000).then(
         () => {
@@ -136,21 +110,6 @@
           } else {
             $("#chrono_status").text("Chronobox setup failed");
             alert("Chronobox setup failed");
-          }
-        }
-     );
-   }
-   
-   function notify_v1725_state() {
-     wait_for_all_v1725_okay(5000).then(
-        () => {
-        	if (Object.keys(v1725_set_okay).length == 0) {
-            $("#v1725_status").text("V1725s not touched");
-        	} else if (is_v1725_okay()) {
-            $("#v1725_status").text("V1725s set up correctly");
-          } else {
-            $("#v1725_status").text("V1725 setup failed");
-            alert("V1725 setup failed");
           }
         }
      );
@@ -190,14 +149,14 @@
      notify_chrono_state("#clock_instructions");	   
    }
    
-   function set_normal() {
+   function set_selftrigger() {
      var ext = parseInt($("#trigger_extend").val());
      var maj = parseInt($("#trigger_majority").val());
      var sel = parseInt($("#self_trigger").val());
-     set_normal_with_params(ext, maj, sel);
+     set_selftrigger_with_params(ext, maj, sel);
    }
    
-   function set_normal_with_params(trigger_extend, trigger_majority, self_trigger) {
+   function set_selftrigger_with_params(trigger_extend, trigger_majority, self_trigger) {
 	   // trigger_extend in 16ns bins
      new_chrono_setup();
      chrono_set_and_validate("mod_tdm", "ch_enable", [0x3F3F3F7F]);
@@ -209,33 +168,6 @@
      if (trigger_extend !== undefined) {
        chrono_set_and_validate("mod_tdm", "ch_extend", [trigger_extend]);
      }
-     if (self_trigger !== undefined && self_trigger == self_trigger && self_trigger != "") {
-    	 if (self_trigger < 0) {
-    		 self_trigger = self_trigger * -1;
-    	 }
-    	 
-       $("#v1725_status").text("Starting V1725 setup");
-    	 v1725_set_okay = {};
-    	 var baseline = 15500;
-    	 var t = baseline - self_trigger;
-    	 var t_array = [t,t,t,t,t,t,t,t,t,t,t,t,t,t,t,t];
-    	 var boards = ["Board0", "Board1", "Board2", "Board3"];
-    	 
-    	 for (var b in boards) {
-    		 let board = boards[b];
-    		 v1725_set_okay[board] = false;
-    		 var path = "/Equipment/V1725_Data00/Settings/" + board + "/SelfTrigger_Threshold";
-    		 mjsonrpc_db_set_value(path, t_array).then(function(rpc) {
-    			 if (rpc.result.status[0] == 1) {
-    				 v1725_set_okay[board] = true;
-    			 }
-    		 }).catch(function(error) {
-    	     mjsonrpc_error_alert(error);
-    	   });
-    	 }
-     }
-  
-     notify_v1725_state();  
      notify_chrono_state("#normal_instructions");   
    }
    
@@ -257,15 +189,14 @@
 <div id="mmain">
 
   <p class="mfont" style="padding-left:10px; padding-right:10px">
-	  This page will edit the chronobox (and sometimes the V1725) settings for different data types.
+	  This page will edit the chronobox settings for different data types.
 	  For all types it sets up <code>ch_enable</code> and <code>ext_trig_ena</code> on the chronobox.
-	  For "normal" data it will also set up <code>ch_extend</code> and <code>top_min</code> on the chronobox,
-	  and <code>SelfTrigger_Threshold</code> on the V1725s.
+	  For self-trigger data it will also set up <code>ch_extend</code> and <code>top_min</code> on the chronobox.
   </p>
   
   <table class="mtable">
     <tr>
-      <th colspan="2" class="mtableheader">Change run type</th>
+      <th colspan="2" class="mtableheader">Change chronobox config</th>
     </tr>
     <tr>
       <th>Laser</th>
@@ -288,10 +219,10 @@
       </td>
     </tr>
     <tr>
-      <th>Physics</th>     
+      <th>Self-trigger</th>     
       <td>
         <small>
-          In a physics run, the V1725s tell the chronobox when they see a hit, and
+          In a self-trigger run, the V1725s tell the chronobox when they see a hit, and
           <br>the chronobox issues a trigger if there are N hits in a given time window.
         </small>
         <br>
@@ -312,25 +243,9 @@
               <input type="number" style="font-size:18px; width:70px" id="trigger_majority">
             </td>
           </tr>
-          <tr>
-            <td>
-              <label for="self_trigger">
-                V1725 self-trigger threshold<br/>
-                <small>
-                  Number of ADC below baseline.<br>
-                  Assumes all channels have a baseline of 15500.<br>
-                  1mV is ~ 8ADC, so 200mV is ~ 1600ADC.<br>
-                  Leave blank to not touch the existing thresholds.
-                </small>
-              </label>
-            </td>
-            <td>
-              <input type="number" style="font-size:18px; width:70px" id="self_trigger">
-            </td>
-          </tr>
 	        <tr>
 	          <td colspan="2">
-              <input type="button" class="mbutton" value="Set up physics run" onclick="set_normal(); event.preventDefault()">
+              <input type="button" class="mbutton" value="Set up self-trigger run" onclick="set_selftrigger(); event.preventDefault()">
             </td>
           </tr>
         </table>
@@ -346,10 +261,6 @@
       <th>Chronobox</th>
       <td id="chrono_status"></td>
     </tr>
-    <tr>
-      <th>V1725s</th>
-      <td id="v1725_status"></td>
-    </tr>
   </table>
 
   <table class="mtable" style="display:none" id="instructions">
@@ -361,7 +272,7 @@
         <ul>
           <li>Turn on the laser</li>
           <li>Connect the "LASER" cable to CLKIN1 of the Chronobox</li>
-          <li><a href="/?cmd=custom&page=V1725%20Setup">Set appropriate waveform length and post-trigger settings</a></li>
+          <li><a href="?cmd=custom&page=V1725B%20Control">Set appropriate waveform length and post-trigger settings</a></li>
           <li>Start the run</li>
         </ul>
       </td>
@@ -370,7 +281,7 @@
       <td>
         <ul>
           <li>Connect the "CLOCK" cable to CLKIN1 of the Chronobox</li>
-          <li><a href="/?cmd=custom&page=V1725%20Setup">Set appropriate waveform length and post-trigger settings</a></li>
+          <li><a href="?cmd=custom&page=V1725B%20Control">Set appropriate waveform length and post-trigger settings</a></li>
           <li>Start the run</li>
         </ul>
       </td>
@@ -378,7 +289,7 @@
     <tr id="normal_instructions" class="instructions" style="display:none">
       <td>
         <ul>
-          <li><a href="/?cmd=custom&page=V1725%20Setup">Set appropriate waveform length and post-trigger settings</a></li>
+          <li><a href="?cmd=custom&page=V1725B%20Control">Set appropriate waveform length and post-trigger settings</a></li>
           <li>Start the run</li>
         </ul>
       </td>
