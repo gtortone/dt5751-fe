@@ -163,6 +163,7 @@ bool stopRunInProgress = false; //!<
 bool eor_transition_called = false; // already called EOR
 uint32_t timestamp_offset[NBLINKSPERFE*NB1725PERLINK]; //!< trigger time stamp offsets
 
+std::string chronoboxIP = "172.16.4.71";
 BOOL enableChronobox = true;
 BOOL enableMerging = true;
 int unmergedModuleToRead = -1;
@@ -303,11 +304,15 @@ INT chronobox_start_stop(bool start){
 
   int status;
   if(start){
-    status = system("esper-tool write -d true 192.168.1.3 mod_tdm run");
+    char cmd[255];
+    sprintf(cmd, "esper-tool write -d true %s mod_tdm run", chronoboxIP.c_str());
+    status = system(cmd);
     printf("Started chronobox run; status = %i\n",status);
   }else{
+    char cmd[255];
     printf("Stopping chronobox run\n");
-    status = system("esper-tool write -d false 192.168.1.3 mod_tdm run");
+    sprintf(cmd, "esper-tool write -d false %s mod_tdm run", chronoboxIP.c_str());
+    status = system(cmd);
     printf("Stopped chronobox run; status = %i\n",status);
   }
 
@@ -366,15 +371,17 @@ INT frontend_init(){
 
   {
     // Create flags for whether to enable Chronobox, and whether to merge data from all boards in same event.
-    char cb_path[255], merge_path[255], partial_path[255], flush_path[255], thresh_path[255];
+    char cb_path[255], cb_ip_path[255], merge_path[255], partial_path[255], flush_path[255], thresh_path[255];
     int size_bool = sizeof(BOOL);
     int size_dword = sizeof(DWORD);
     sprintf(cb_path, "/Equipment/%s/Settings/Enable chronobox", equipment[0].name);
+    sprintf(cb_ip_path, "/Equipment/%s/Settings/Chronobox IP Address", equipment[0].name);
     sprintf(merge_path, "/Equipment/%s/Settings/Merge data from boards", equipment[0].name);
     sprintf(partial_path, "/Equipment/%s/Settings/Write partially merged events", equipment[0].name);
     sprintf(flush_path, "/Equipment/%s/Settings/Flush buffers at end of run", equipment[0].name);
     sprintf(thresh_path, "/Equipment/%s/Settings/TS match thresh (clock ticks)", equipment[0].name);
     db_get_value(hDB, 0, cb_path, &enableChronobox, &size_bool, TID_BOOL, TRUE);
+    db_get_value_string(hDB, 0, cb_ip_path, 0, &chronoboxIP, TRUE, 128);
     db_get_value(hDB, 0, merge_path, &enableMerging, &size_bool, TID_BOOL, TRUE);
     db_get_value(hDB, 0, partial_path, &writePartiallyMergedEvents, &size_bool, TID_BOOL, TRUE);
     db_get_value(hDB, 0, flush_path, &flushBuffersAtEndOfRun, &size_bool, TID_BOOL, TRUE);
@@ -483,7 +490,9 @@ INT frontend_init(){
   //  Socket to talk to clients
   void *context = zmq_ctx_new ();
   subscriber = zmq_socket (context, ZMQ_SUB);
-  int rc = zmq_connect (subscriber, "tcp://chronobox:5555");
+  char zmq_port[255];
+  sprintf(zmq_port, "tcp://%s:5555", chronoboxIP.c_str());
+  int rc = zmq_connect (subscriber, zmq_port);
   // Without message
   zmq_setsockopt (subscriber, ZMQ_SUBSCRIBE, "", 0);
   printf (" This subscriber is connecting to the ChronoBox Publisher context: %p *subscriber: %p rc:%d \n"
@@ -553,14 +562,16 @@ INT begin_of_run(INT run_number, char *error)
 
   {
     // Create/read flags for whether to enable Chronobox, and whether to merge data from all boards in same event.
-    char cb_path[255], merge_path[255], partial_path[255], flush_path[255], thresh_path[255];
+    char cb_path[255], cb_ip_path[255], merge_path[255], partial_path[255], flush_path[255], thresh_path[255];
     sprintf(cb_path, "/Equipment/%s/Settings/Enable chronobox", equipment[0].name);
+    sprintf(cb_ip_path, "/Equipment/%s/Settings/Chronobox IP Address", equipment[0].name);
     sprintf(merge_path, "/Equipment/%s/Settings/Merge data from boards", equipment[0].name);
     sprintf(partial_path, "/Equipment/%s/Settings/Write partially merged events", equipment[0].name);
     sprintf(flush_path, "/Equipment/%s/Settings/Flush buffers at end of run", equipment[0].name);
     sprintf(thresh_path, "/Equipment/%s/Settings/TS match thresh (clock ticks)", equipment[0].name);
     INT size = sizeof(BOOL);
     db_get_value(hDB, 0, cb_path, &enableChronobox, &size, TID_BOOL, TRUE);
+    db_get_value_string(hDB, 0, cb_ip_path, 0, &chronoboxIP, TRUE, 128);
     db_get_value(hDB, 0, merge_path, &enableMerging, &size, TID_BOOL, TRUE);
     db_get_value(hDB, 0, partial_path, &writePartiallyMergedEvents, &size, TID_BOOL, TRUE);
     db_get_value(hDB, 0, flush_path, &flushBuffersAtEndOfRun, &size, TID_BOOL, TRUE);
