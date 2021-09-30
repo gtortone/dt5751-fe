@@ -1,5 +1,17 @@
 # DS-Proto DAQ Release Notes
 
+## v1.2.0
+
+### New features
+
+* Add setup script for setting up CDM to use external clock source.
+* Make the chronobox IP address configurable in the ODB.
+
+### Bugfixes
+
+N/A
+
+
 ## v1.1.0
 
 ### New features
