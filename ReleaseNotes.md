@@ -1,5 +1,16 @@
 # DS-Proto DAQ Release Notes
 
+## v1.2.1
+
+### New features
+
+* Improve chronobox webpage to have fewer hard-coded parameters.
+
+### Bugfixes
+
+N/A
+
+
 ## v1.2.0
 
 ### New features
