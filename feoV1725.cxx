@@ -1149,7 +1149,7 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
     // Try to receive ZMQ data from chronobox.
     // Use ZMQ_DONTWAIT to prevent blocking.
     // But retry several times in case message is delayed.
-    float zmq_timeout_ms = 100;
+    float zmq_timeout_ms = 2000;
     float zmq_retry_wait_ms = 1;
     float zmq_time = 0;
 

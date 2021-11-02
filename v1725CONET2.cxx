@@ -756,7 +756,7 @@ DWORD v1725CONET2::PeekRBTimestamp() {
     return 0xFFFFFFFF;
   }
 
-  return (*(src+3)) & 0x7FFFFFFF;
+  return (*(src+3));
 }
 
 int v1725CONET2::PeekRBEventID() {
