@@ -9,11 +9,11 @@
 # This version is to be used if the CDM should use only
 # INTERNAL oscillators to generate the clock (no external source).
 #
-# This version should work with CDM firmware versions close to 2.0.3
+# This version should work with CDM firmware versions close to 0.2.454
 # Use  `esper-tool read <ip_addr> build version_sh` to see what you're running.
-# E.g. `esper-tool read 172.16.21.84 build version_sh`.
+# E.g. `esper-tool read 172.16.21.85 build version_sh`.
 
-CDM_IPADDR=172.16.21.84
+CDM_IPADDR=172.16.21.85
 
 function write_lmk {
     # Args for this bash function: param_name value
@@ -23,7 +23,7 @@ function write_lmk {
 }
 
 echo "Configuring CDM (will take a few seconds)..."
-#esper-tool write -d 1 $CDM_IPADDR template current_setup
+esper-tool write -d 1 $CDM_IPADDR template current_setup
 
 sleep 1
 
@@ -45,7 +45,9 @@ write_lmk clkin_sel_mode 0
 write_lmk clkin_sel_pol false
 write_lmk clkin0_out_mux 2
 write_lmk clkin1_out_mux 2
-write_lmk clkin_override true
+# CLKin_override not found for this CDM? Can 'ls' it, but not read/write...
+# Fortunately it seems to default to 'true' anyway.
+#write_lmk CLKin_override true
 write_lmk hldo_en false
 write_lmk clkin0_r 1
 write_lmk clkin1_r 1
@@ -63,9 +65,9 @@ write_lmk oscout_fmt 0
 echo "Waiting for PLLs to stabilize..."
 sleep 5
 
-# Check freqeuency
-echo "Checking output frequency. Value should be close to 50MHz:"
-esper-tool read $CDM_IPADDR cdm cc_freq
+# Check freqeuency - param not present on CDM2
+#echo "Checking output frequency. Value should be close to 50MHz:"
+#esper-tool read $CDM_IPADDR cdm cc_freq
 
 # Check PLL locks
 echo "Checking PLL lock status. Both values should be 1:"
