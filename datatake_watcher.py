@@ -13,6 +13,7 @@ October 2021
 """
 
 import midas.client
+import time
 
 def data_callback(client, path, odb_value):
 
@@ -22,9 +23,12 @@ def data_callback(client, path, odb_value):
         if log == 0:
             client.trigger_internal_alarm("Data Logging","Writing to disk is DISABLED","Warning")
             
+        time.sleep(5)
         event_rate=client.odb_get("/Equipment/V1725_Data00/Statistics/Events per sec.")
         if event_rate < 1:
             client.trigger_internal_alarm("Event Rate",f"Event rate is {event_rate:1.0f} Hz")
+        else:
+            client.reset_alarm("Event Rate")
   
 
 if __name__ == "__main__":
