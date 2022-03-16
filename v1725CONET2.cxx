@@ -756,7 +756,7 @@ DWORD v1725CONET2::PeekRBTimestamp() {
     return 0xFFFFFFFF;
   }
 
-  return (*(src+3)) & 0x7FFFFFFF;
+  return (*(src+3));
 }
 
 int v1725CONET2::PeekRBEventID() {
@@ -1260,6 +1260,16 @@ int v1725CONET2::InitializeForAcq()
 	//set specfic channel values
 
 	usleep(200000);
+
+  for (int iCoup=0; iCoup<8; iCoup++) {
+    if (config.has_zle_firmware) {
+      WriteReg_(V1725ZLE_CHANNEL_LOGIC     + (iCoup<<9), config.selftrigger_logic[iCoup]);
+    } else {
+      // Registers 0x1084, 0x1284, 0x1484 etc...
+      WriteReg_(V1725RAW_CHANNEL_LOGIC     + (iCoup<<9), config.selftrigger_logic[iCoup]);
+    }
+  }
+
 #ifdef NO_V1725
 	for (int iChan=0; iChan<8; iChan++) {
 #else
@@ -1268,7 +1278,6 @@ int v1725CONET2::InitializeForAcq()
 
     if (config.has_zle_firmware) {
   		WriteReg_(V1725ZLE_CHANNEL_THRESHOLD + (iChan<<8), config.selftrigger_threshold[iChan]);
-      WriteReg_(V1725ZLE_CHANNEL_LOGIC     + (iChan<<8), config.selftrigger_logic[iChan]);
       WriteReg_(V1725ZLE_ZS_NSAMP_BEFORE   + (iChan<<8), config.zle_bins_before[iChan]);
       WriteReg_(V1725ZLE_ZS_NSAMP_AFTER    + (iChan<<8), config.zle_bins_after[iChan]);
       WriteReg_(V1725ZLE_ZS_BASELINE       + (iChan<<8), config.zle_baseline[iChan]);
@@ -1295,7 +1304,6 @@ int v1725CONET2::InitializeForAcq()
       WriteReg_(V1725ZLE_INPUT_CONTROL + (iChan<<8), input_control);
     } else {
   		WriteReg_(V1725RAW_CHANNEL_THRESHOLD + (iChan<<8), config.selftrigger_threshold[iChan]);
-      WriteReg_(V1725RAW_CHANNEL_LOGIC     + (iChan<<8), config.selftrigger_logic[iChan]);
     }
 		
 		WriteReg_(V1725_DYNAMIC_RANGE       + (iChan<<8), config.dynamic_range_2v[iChan] ? 0 : 1);
