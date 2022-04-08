@@ -22,15 +22,35 @@ function write_lmk {
     if [[ $status != 0 ]]; then echo Command \"esper-tool write -d $2 $CDM_IPADDR lmk $1\" failed with status $status!; fi
 }
 
+function write_cdm {
+    # Args for this bash function: param_name value
+    esper-tool write -d $2 $CDM_IPADDR cdm $1
+    status=$?
+    if [[ $status != 0 ]]; then echo Command \"esper-tool write -d $2 $CDM_IPADDR cdm $1\" failed with status $status!; fi
+}
+
 echo "Configuring CDM (will take a few seconds)..."
 #esper-tool write -d 1 $CDM_IPADDR template current_setup
 
 sleep 1
 
-# 0 for internal, 1 for eSATA, 2 for extsernal
-esper-tool write -d 0 $CDM_IPADDR cdm sel_ext
-esper-tool write -d 0 $CDM_IPADDR cdm sel_nim
-esper-tool write -d 0 $CDM_IPADDR cdm sel_atomic_clk
+# 0 for internal, 1 for eSATA, 2 for external
+write_cdm sel_ext 0
+write_cdm sel_nim 0
+write_cdm sel_atomic_clk 0
+write_cdm esata_os_bypass 1
+write_cdm esata_max_on 4294967295
+write_cdm ext_max_on  4294967295
+write_cdm ext_os_bypass 1
+write_cdm man_max_on_1 50000000
+write_cdm man_max_on_2 25000000
+write_cdm man_os_bypass_0 1
+write_cdm man_os_bypass_1 0
+write_cdm man_os_bypass_2 1
+write_cdm man_period_en_0 0
+write_cdm man_period_en_1 0
+write_cdm man_period_en_2 1
+write_cdm man_period_2 50000000
 
 # 2 for external, 0 for internal
 write_lmk clkin_sel_mode 0
