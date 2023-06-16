@@ -25,7 +25,6 @@
 #define DT5751RAW_CUSTOM_SIZE                  0x8020      /* R/W       ; D32 */
 #define DT5751ZLE_RECORD_LENGTH                0x8020      /* R/W       ; D32 */
 #define DT5751ZLE_PRE_TRIGGER_SETTING          0x8038      /* R/W       ; D32 */ 
-#define DT5751RAW_SELFTRIGGER_LOGIC            0x8084      /* R/W       ; D32 */ 
 #define DT5751_ADC_CALIBRATION                 0x809C      /* R/W       ; D32 */ 
 #define DT5751_ACQUISITION_CONTROL             0x8100      /* R/W       ; D32 */ 
 #define DT5751_ACQUISITION_STATUS              0x8104      /* read  only; D32 */ 
@@ -49,7 +48,6 @@
 #define DT5751_BOARD_FAILURE_STATUS            0x8178      /* R/W       ; D32 */
 #define DT5751_FP_LVDS_IO_CRTL                 0x81A0      /* R/W       ; D32 */
 #define DT5751_BUFFER_OCCUPANCY_GAIN           0x81B4      /* R/W       ; D32 */
-#define DT5751_CHANNELS_SHUTDOWN               0x81C0      /* W         ; D32 */
 #define DT5751_EXTENDED_VETO_DELAY             0x8170      /* R/W       ; D32 */
 
 #define DT5751_VME_CONTROL                     0xEF00      /* R/W       ; D32 */ 
@@ -63,27 +61,22 @@
 #define DT5751_SCRATCH                         0xEF20      /* R/W       ; D32 */ 
 #define DT5751_SW_RESET                        0xEF24      /* write only; D32 */ 
 #define DT5751_SW_CLEAR                        0xEF28      /* write only; D32 */ 
-#define DT5751_FLASH_ENABLE                    0xEF2C      /* R/W       ; D32 */ 
-#define DT5751_FLASH_DATA                      0xEF30      /* R/W       ; D32 */ 
 #define DT5751_CONFIG_RELOAD                   0xEF34      /* write only; D32 */ 
 #define DT5751_CONFIG_ROM                      0xF000      /* read  only; D32 */ 
 
-#define DT5751_DYNAMIC_RANGE                   0x1028      /* For channel 0 **** */
 #define DT5751ZLE_ZS_BASELINE                  0x1034      /* For channel 0 **** */
 #define DT5751ZLE_ZS_NSAMP_BEFORE              0x1054      /* For channel 0 **** */
 #define DT5751ZLE_ZS_NSAMP_AFTER               0x1058      /* For channel 0 **** */
 #define DT5751ZLE_ZS_THRESHOLD                 0x105C      /* For channel 0 **** */
 #define DT5751ZLE_CHANNEL_THRESHOLD            0x1060      /* For channel 0 */
 #define DT5751ZLE_INPUT_CONTROL                0x1064      /* For channel 0 */
-#define DT5751ZLE_CHANNEL_LOGIC                0x1068      /* For channel 0 */
-#define DT5751_PULSE_WIDTH                     0x1070      /* For channel 0 **** */
 #define DT5751RAW_CHANNEL_THRESHOLD            0x1080      /* For channel 0 */
-#define DT5751RAW_CHANNEL_LOGIC                0x1084      /* For channel 0 */
 #define DT5751_CHANNEL_STATUS                  0x1088      /* For channel 0 */
 #define DT5751_FPGA_FWREV                      0x108C      /* For channel 0 */
-#define DT5751_BUFFER_OCCUPANCY                0x1094      /* For channel 0 */
 #define DT5751_CHANNEL_DAC                     0x1098      /* For channel 0 */
 #define DT5751_CHANNEL_TEMPERATURE             0x10A8      /* For channel 0 */
+
+// bitmasks
 
 #define DT5751_RUN_START                             0x0001
 #define DT5751_RUN_STOP                              0x0002
@@ -101,12 +94,7 @@
 #define DT5751_ZLE                                   0x0006
 #define DT5751_ZS_AMP                                0x0007
 
-#define DT5751_EVENT_CONFIG_ALL_ADC        0x01000000
-#define DT5751_SOFT_TRIGGER                0x80000000
-#define DT5751_EXTERNAL_TRIGGER            0x40000000
 #define DT5751_ALIGN64                           0x20
-#define DT5751_DONE                                 0
 
 #endif
-
 

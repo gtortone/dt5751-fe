@@ -97,14 +97,12 @@ public:
     BOOL      enable_zle;               //!< 0x8064@[31.. 0] - ZLE only
     DWORD     almost_full;              //!< 0x816C@[31.. 0] - NON-ZLE only
     DWORD     fp_lvds_io_ctrl;          //!< 0x81A0@[31.. 0]
-    DWORD     selftrigger_threshold[16];//!< 0x1n80@[11.. 0] for NON-ZLE / 0x1n60@[11.. 0] for ZLE
-    DWORD     selftrigger_logic[8];     //!< 0x1n84@[11.. 0] for NON-ZLE / 0x1n68@[11.. 0] for ZLE
-    INT       zle_signed_threshold[16]; //!< 0x1n5C@[31.. 0] - ZLE only
-    DWORD     zle_bins_before[16];      //!< 0x1n54@[31.. 16]- ZLE only
-    DWORD     zle_bins_after[16];       //!< 0x1n58@[15.. 0] - ZLE only
-    DWORD     zle_baseline[16];         //!< 0x1n34@[31.. 0] - ZLE only
-    DWORD     dac[16];                  //!< 0x1n98@[15.. 0]
-    BOOL      dynamic_range_2v[16];     //!< 0x1n28@[0]
+    DWORD     selftrigger_threshold[4]; //!< 0x1n80@[11.. 0] for NON-ZLE / 0x1n60@[11.. 0] for ZLE
+    INT       zle_signed_threshold[4];  //!< 0x1n5C@[31.. 0] - ZLE only
+    DWORD     zle_bins_before[4];       //!< 0x1n54@[31.. 16]- ZLE only
+    DWORD     zle_bins_after[4];        //!< 0x1n58@[15.. 0] - ZLE only
+    DWORD     zle_baseline[4];          //!< 0x1n34@[31.. 0] - ZLE only
+    DWORD     dac[4];                   //!< 0x1n98@[15.. 0]
     float     sw_trig_rate_Hz;          //!< Software-only
   } config; //!< instance of config structure
 

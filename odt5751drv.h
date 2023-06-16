@@ -26,7 +26,6 @@ CAENComm_ErrorCode odt5751_ChannelDACGet(int handle, uint32_t channel, uint32_t 
 CAENComm_ErrorCode odt5751_AcqCtl(int handle, uint32_t operation);
 CAENComm_ErrorCode odt5751_ChannelConfig(int handle, uint32_t operation);
 CAENComm_ErrorCode odt5751_info(int handle, int *nchannels, uint32_t *data);
-CAENComm_ErrorCode odt5751_BufferOccupancy(int handle, uint32_t channel, uint32_t *data);
 CAENComm_ErrorCode odt5751_Status(int handle);
 CAENComm_ErrorCode odt5751_Setup(int handle, int mode);
 

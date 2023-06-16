@@ -1208,7 +1208,7 @@ INT read_temperature(char *pevent, INT off) {
     char bankName[5];
     sprintf(bankName,"TP%02d", itdt5751->GetModuleID());
     bk_create(pevent, bankName, TID_DWORD, (void **)&pdata);
-    for (int i=0;i<16;i++) {
+    for (int i=0;i<4;i++) {
      addr = DT5751_CHANNEL_TEMPERATURE | (i << 8);
      itdt5751->ReadReg(addr, &temp);
      *pdata++ =  temp;

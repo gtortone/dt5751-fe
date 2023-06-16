@@ -198,16 +198,6 @@ CAENComm_ErrorCode odt5751_info(int handle, int *nchannels, uint32_t *data)
 }
 
 /*****************************************************************/
-CAENComm_ErrorCode odt5751_BufferOccupancy(int handle, uint32_t channel, uint32_t *data)
-{
-  uint32_t reg;
-
-  reg = DT5751_BUFFER_OCCUPANCY + (channel<<16);
-  return  CAENComm_Read32(handle, reg, data);  
-}
-
-
-/*****************************************************************/
 CAENComm_ErrorCode odt5751_Status(int handle)
 {
   CAENComm_ErrorCode sCAEN;

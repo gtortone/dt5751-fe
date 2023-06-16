@@ -27,7 +27,7 @@ const char * dt5751CONET2::config_str_board[] = {\
     "Board Configuration = DWORD : 16",\
     "Buffer organization = INT : 10",\
     "Custom size = INT : 40",\
-    "Channel Mask = DWORD : 0xFFFF",\
+    "Channel Mask = DWORD : 0xF",\
     "Trigger Source = DWORD : 1073741824",\
     "Trigger Output = DWORD : 1073741824",\
     "Post Trigger = DWORD : 100",\
@@ -36,134 +36,36 @@ const char * dt5751CONET2::config_str_board[] = {\
     "Enable ZLE = BOOL : n",\
     "almost_full = DWORD : 512",\
     "Front panel LVDS IO = DWORD : 0x1100",\
-    "SelfTrigger_Threshold = DWORD[16] :",\
+    "SelfTrigger_Threshold = DWORD[4] :",\
     "[0] 3870",\
     "[1] 3870",\
     "[2] 3870",\
     "[3] 3870",\
-    "[4] 3870",\
-    "[5] 3870",\
-    "[6] 3870",\
-    "[7] 3870",\
-    "[8] 3870",\
-    "[9] 3870",\
-    "[10] 3870",\
-    "[11] 3870",\
-    "[12] 3870",\
-    "[13] 3870",\
-    "[14] 3870",\
-    "[15] 3870",\
-    "SelfTrigger_Logic = DWORD[8] :",\
-    "[0] 3",\
-    "[1] 3",\
-    "[2] 3",\
-    "[3] 3",\
-    "[4] 3",\
-    "[5] 3",\
-    "[6] 3",\
-    "[7] 3",\
-    "ZLESignedThresh = INT[16] :",\
+    "ZLESignedThresh = INT[4] :",\
     "[0] -5",\
     "[1] -5",\
     "[2] -5",\
     "[3] -5",\
-    "[4] -5",\
-    "[5] -5",\
-    "[6] -5",\
-    "[7] -5",\
-    "[8] -5",\
-    "[9] -5",\
-    "[10] -5",\
-    "[11] -5",\
-    "[12] -5",\
-    "[13] -5",\
-    "[14] -5",\
-    "[15] -5",\
-    "ZLENBinsBefore = DWORD[16] :",\
+    "ZLENBinsBefore = DWORD[4] :",\
     "[0] 0x5",\
     "[1] 0x5",\
     "[2] 0x5",\
     "[3] 0x5",\
-    "[4] 0x5",\
-    "[5] 0x5",\
-    "[6] 0x5",\
-    "[7] 0x5",\
-    "[8] 0x5",\
-    "[9] 0x5",\
-    "[10] 0x5",\
-    "[11] 0x5",\
-    "[12] 0x5",\
-    "[13] 0x5",\
-    "[14] 0x5",\
-    "[15] 0x5",\
-    "ZLENBinsAfter = DWORD[16] :",\
+    "ZLENBinsAfter = DWORD[4] :",\
     "[0] 0x5",\
     "[1] 0x5",\
     "[2] 0x5",\
     "[3] 0x5",\
-    "[4] 0x5",\
-    "[5] 0x5",\
-    "[6] 0x5",\
-    "[7] 0x5",\
-    "[8] 0x5",\
-    "[9] 0x5",\
-    "[10] 0x5",\
-    "[11] 0x5",\
-    "[12] 0x5",\
-    "[13] 0x5",\
-    "[14] 0x5",\
-    "[15] 0x5",\
-    "ZLEBaseline = DWORD[16] :",\
+    "ZLEBaseline = DWORD[4] :",\
     "[0] 0x30000",\
     "[1] 0x30000",\
     "[2] 0x30000",\
     "[3] 0x30000",\
-    "[4] 0x30000",\
-    "[5] 0x30000",\
-    "[6] 0x30000",\
-    "[7] 0x30000",\
-    "[8] 0x30000",\
-    "[9] 0x30000",\
-    "[10] 0x30000",\
-    "[11] 0x30000",\
-    "[12] 0x30000",\
-    "[13] 0x30000",\
-    "[14] 0x30000",\
-    "[15] 0x30000",\
-    "DAC = DWORD[16] :",\
+    "DAC = DWORD[4] :",\
     "[0] 10000",\
     "[1] 10000",\
     "[2] 10000",\
     "[3] 10000",\
-    "[4] 10000",\
-    "[5] 10000",\
-    "[6] 10000",\
-    "[7] 10000",\
-    "[8] 10000",\
-    "[9] 10000",\
-    "[10] 10000",\
-    "[11] 10000",\
-    "[12] 10000",\
-    "[13] 10000",\
-    "[14] 10000",\
-    "[15] 10000",\
-    "Dynamic Range 2V (y) 0.5V (n) = BOOL[16] :",\
-    "[0] y",\
-    "[1] y",\
-    "[2] y",\
-    "[3] y",\
-    "[4] y",\
-    "[5] y",\
-    "[6] y",\
-    "[7] y",\
-    "[8] y",\
-    "[9] y",\
-    "[10] y",\
-    "[11] y",\
-    "[12] y",\
-    "[13] y",\
-    "[14] y",\
-    "[15] y",\
     "Software trigger rate (Hz) = FLOAT : 0",\
     NULL
 };
@@ -828,7 +730,7 @@ bool dt5751CONET2::FillEventBank(char * pevent, uint32_t &timestamp)
       uint32_t toBeCopyed = 4; // Starting with the header
 			// We need to find out how many channels we can copy before reaching the limit...
 			int i;
-			for (i=16; i>0 ; --i){ //We have potentially 16 channels to copy
+			for (i=4; i>0 ; --i){ //We have potentially 4 channels to copy
         uint32_t channelSize = 0;
 				channelSize = *(src+toBeCopyed); // Get the size of the data for this channel
 				if (toBeCopyed + channelSize > limit_size) break; 
@@ -1160,7 +1062,7 @@ int dt5751CONET2::InitializeForAcq()
   // Hardcode correct firmware verisons
 	const uint32_t amc_fw_ver = 0x44260008;  // 0x14048c02; for ZLE
 	const uint32_t roc_fw_ver = 0x4b060417;  // 0x1331040c; for ZLE
-  for(int iCh=0;iCh<16;iCh++) {
+  for(int iCh=0;iCh<4;iCh++) {
     addr = 0x108c | (iCh << 8);
     sCAEN = ReadReg_(addr, &version);
     if((iCh != 0) && (prev_chan != version)) {
@@ -1193,7 +1095,7 @@ int dt5751CONET2::InitializeForAcq()
   }
 
   // Verify Board Type
-  const uint32_t dt5751_board_type = 0x0e;
+  const uint32_t dt5751_board_type = 0x05;
   sCAEN = ReadReg_(DT5751_BOARD_INFO, &version);
   if((version & 0xFF) != dt5751_board_type)
     cm_msg(MINFO,"InitializeForAcq","*** WARNING *** Trying to use a dt5751 frontend with another"
@@ -1261,19 +1163,10 @@ int dt5751CONET2::InitializeForAcq()
 
 	usleep(200000);
 
-  for (int iCoup=0; iCoup<8; iCoup++) {
-    if (config.has_zle_firmware) {
-      WriteReg_(DT5751ZLE_CHANNEL_LOGIC     + (iCoup<<9), config.selftrigger_logic[iCoup]);
-    } else {
-      // Registers 0x1084, 0x1284, 0x1484 etc...
-      WriteReg_(DT5751RAW_CHANNEL_LOGIC     + (iCoup<<9), config.selftrigger_logic[iCoup]);
-    }
-  }
-
 #ifdef NO_DT5751
 	for (int iChan=0; iChan<8; iChan++) {
 #else
-	for (int iChan=0; iChan<16; iChan++) {
+	for (int iChan=0; iChan<4; iChan++) {
 #endif
 
     if (config.has_zle_firmware) {
@@ -1305,8 +1198,6 @@ int dt5751CONET2::InitializeForAcq()
     } else {
   		WriteReg_(DT5751RAW_CHANNEL_THRESHOLD + (iChan<<8), config.selftrigger_threshold[iChan]);
     }
-		
-		WriteReg_(DT5751_DYNAMIC_RANGE       + (iChan<<8), config.dynamic_range_2v[iChan] ? 0 : 1);
 		WriteReg_(DT5751_CHANNEL_DAC         + (iChan<<8), config.dac[iChan]);	
 	}		
 
@@ -1319,7 +1210,7 @@ int dt5751CONET2::InitializeForAcq()
 	// Now we check to see when the calibration has finished.
 	// by checking register 0x1n88.
 	DWORD temp;
-	for (int i=0;i<16;i++) {
+	for (int i=0;i<4;i++) {
 		addr = DT5751_CHANNEL_STATUS | (i << 8);
 		ReadReg_(addr,&temp);
 		//		printf("Channel (%i) %x Status: %x\n",i,addr,temp);
