@@ -1,2 +1,0 @@
-#!/bin/sh
-picocom /dev/ttyUSB0 -b 115200 -l
