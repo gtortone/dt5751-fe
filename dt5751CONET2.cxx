@@ -1,13 +1,13 @@
 /*****************************************************************************/
 /**
-\file v1725CONET2.cxx
+\file dt5751CONET2.cxx
 
 ## Contents
 
-This file contains the class implementation for the v1725 module driver.
+This file contains the class implementation for the DT5751 module driver.
  *****************************************************************************/
 
-#include "v1725CONET2.hxx"
+#include "dt5751CONET2.hxx"
 #include <execinfo.h>
 #include <algorithm>
 #include <vector>
@@ -20,7 +20,7 @@ This file contains the class implementation for the v1725 module driver.
 #define MAX_QT_WORDS 2000
 
 //! Configuration string for this board. (ODB: /Equipment/[eq_name]/Settings/[board_name]/)
-const char * v1725CONET2::config_str_board[] = {\
+const char * dt5751CONET2::config_str_board[] = {\
     "Enable = BOOL : y",\
     "Has ZLE firmware = BOOL : n",\
     "Acq mode = INT : 5",\
@@ -168,7 +168,7 @@ const char * v1725CONET2::config_str_board[] = {\
     NULL
 };
 
-const char v1725CONET2::history_settings[][NAME_LENGTH] = { "eStored", "busy", "rb_level" };
+const char dt5751CONET2::history_settings[][NAME_LENGTH] = { "eStored", "busy", "rb_level" };
 
 /**
  * \brief   Constructor for the module object
@@ -180,7 +180,7 @@ const char v1725CONET2::history_settings[][NAME_LENGTH] = { "eStored", "busy", "
  * \param   [in]  board     Board number on the optical link
  * \param   [in]  moduleID  Unique ID assigned to module
  */
-v1725CONET2::v1725CONET2(int feindex, int link, int board, int moduleID, HNDLE hDB)
+dt5751CONET2::dt5751CONET2(int feindex, int link, int board, int moduleID, HNDLE hDB)
 : feIndex_(feindex), link_(link), board_(board), moduleID_(moduleID), odb_handle_(hDB), num_events_in_rb_(0)
 {
   device_handle_ = -1;
@@ -197,11 +197,11 @@ v1725CONET2::v1725CONET2(int feindex, int link, int board, int moduleID, HNDLE h
 
 }
 /**
- * Move constructor needed because we're putting v1725CONET2 objects in a vector which requires
+ * Move constructor needed because we're putting dt5751CONET2 objects in a vector which requires
  * either the copy or move operation.  The implicit move constructor (or copy constructor)
  * cannot be created by the compiler because our class contains an atomic object with a
  * deleted copy constructor. */
-v1725CONET2::v1725CONET2(v1725CONET2&& other) noexcept
+dt5751CONET2::dt5751CONET2(dt5751CONET2&& other) noexcept
 : feIndex_(std::move(other.feIndex_)), link_(std::move(other.link_)), board_(std::move(other.board_)),
     moduleID_(std::move(other.moduleID_)), odb_handle_(std::move(other.odb_handle_)),
         num_events_in_rb_(other.num_events_in_rb_.load())
@@ -219,7 +219,7 @@ v1725CONET2::v1725CONET2(v1725CONET2&& other) noexcept
 
 
 }
-v1725CONET2& v1725CONET2::operator=(v1725CONET2&& other) noexcept
+dt5751CONET2& dt5751CONET2::operator=(dt5751CONET2&& other) noexcept
 {
   if (this != &other){  //if trying to assign object to itself
 
@@ -250,7 +250,7 @@ v1725CONET2& v1725CONET2::operator=(v1725CONET2&& other) noexcept
  *
  * Nothing to do.
  */
-v1725CONET2::~v1725CONET2()
+dt5751CONET2::~dt5751CONET2()
 {
 }
 
@@ -261,7 +261,7 @@ v1725CONET2::~v1725CONET2()
  *
  * \return  name string
  */
-std::string v1725CONET2::GetName()
+std::string dt5751CONET2::GetName()
 {
   std::stringstream txt;
   txt << "F" << std::setfill('0') << std::setw(2) << feIndex_
@@ -279,7 +279,7 @@ std::string v1725CONET2::GetName()
  *
  * \return  true if board is connected
  */
-bool v1725CONET2::IsConnected()
+bool dt5751CONET2::IsConnected()
 {
   return (device_handle_ >= 0) && config.enable;
 }
@@ -291,7 +291,7 @@ bool v1725CONET2::IsConnected()
  *
  * \return  true if run is started
  */
-bool v1725CONET2::IsRunning()
+bool dt5751CONET2::IsRunning()
 {
   return running_;
 }
@@ -303,14 +303,14 @@ bool v1725CONET2::IsRunning()
  *
  * \return  CAENComm Error Code (see CAENComm.h)
  */
-v1725CONET2::ConnectErrorCode v1725CONET2::Connect()
+dt5751CONET2::ConnectErrorCode dt5751CONET2::Connect()
 {
   return Connect(2, 5);  //reasonable default values
 }
 
 //
 //--------------------------------------------------------------------------------
-v1725CONET2::ConnectErrorCode v1725CONET2::Connect(int connAttemptsMax, int secondsBeforeTimeout)
+dt5751CONET2::ConnectErrorCode dt5751CONET2::Connect(int connAttemptsMax, int secondsBeforeTimeout)
 {
   if (verbosity_) std::cout << GetName() << "::Connect()\n";
 
@@ -328,7 +328,7 @@ v1725CONET2::ConnectErrorCode v1725CONET2::Connect(int connAttemptsMax, int seco
   pthread_cond_t cv = PTHREAD_COND_INITIALIZER;
 
   pthread_t con_thread;
-  volatile struct v1725CONET2::thread_args con_thread_args = { this , &sCAEN, &cv };
+  volatile struct dt5751CONET2::thread_args con_thread_args = { this , &sCAEN, &cv };
   timespec wait_time;
   wait_time.tv_nsec = 0;
   int status;
@@ -342,7 +342,7 @@ v1725CONET2::ConnectErrorCode v1725CONET2::Connect(int connAttemptsMax, int seco
 
   for (int i = 0; i < connAttemptsMax; ++i){
 
-    status = pthread_create(&con_thread, NULL, &v1725CONET2::connectThread, (void*)&con_thread_args);
+    status = pthread_create(&con_thread, NULL, &dt5751CONET2::connectThread, (void*)&con_thread_args);
     if(status){
       cm_msg(MERROR,"Connect", "Couldn't create thread for link %d board %d. Return code: %d",
           this->GetLink(), this->GetBoard(), status);
@@ -405,17 +405,17 @@ v1725CONET2::ConnectErrorCode v1725CONET2::Connect(int connAttemptsMax, int seco
 
 //
 //--------------------------------------------------------------------------------
-void * v1725CONET2::connectThread(void * arg){
+void * dt5751CONET2::connectThread(void * arg){
 
-  v1725CONET2::thread_args * t_args = (v1725CONET2::thread_args*)arg;
+  dt5751CONET2::thread_args * t_args = (dt5751CONET2::thread_args*)arg;
 
   std::cout << "Opening device (i,l,b) = ("
-      << t_args->v1725->feIndex_ << ","
-      << t_args->v1725->link_ << ","
-      << t_args->v1725->board_ << ")" << std::endl;
+      << t_args->dt5751->feIndex_ << ","
+      << t_args->dt5751->link_ << ","
+      << t_args->dt5751->board_ << ")" << std::endl;
 
-  *(t_args->errcode) = CAENComm_OpenDevice(CAENComm_OpticalLink, t_args->v1725->link_, t_args->v1725->board_,
-      0, &(t_args->v1725->device_handle_));
+  *(t_args->errcode) = CAENComm_OpenDevice(CAENComm_OpticalLink, t_args->dt5751->link_, t_args->dt5751->board_,
+      0, &(t_args->dt5751->device_handle_));
   pthread_cond_signal(t_args->cv);
 
   return NULL;
@@ -428,7 +428,7 @@ void * v1725CONET2::connectThread(void * arg){
  *
  * \return  CAENComm Error Code (see CAENComm.h)
  */
-bool v1725CONET2::Disconnect()
+bool dt5751CONET2::Disconnect()
 {
   if (verbosity_) std::cout << GetName() << "::Disconnect()\n";
 
@@ -468,7 +468,7 @@ bool v1725CONET2::Disconnect()
  *
  * \return  CAENComm Error Code (see CAENComm.h)
  */
-bool v1725CONET2::StartRun()
+bool dt5751CONET2::StartRun()
 {
   if (verbosity_) std::cout << GetName() << "::StartRun()\n";
 
@@ -486,13 +486,13 @@ bool v1725CONET2::StartRun()
   gettimeofday(&last_sw_trig_time, NULL);
 	
 	//Re-read the record from ODB, it may have changed
-	int size = sizeof(V1725_CONFIG_SETTINGS);
+	int size = sizeof(DT5751_CONFIG_SETTINGS);
 	db_get_record(odb_handle_, settings_handle_, &config, &size, 0);
 	
 	int status = InitializeForAcq();
 	if (status == -1){std::cout << "Failed to Acq " << std::endl; return false;  }
 
-  CAENComm_ErrorCode e = AcqCtl_(V1725_RUN_START);
+  CAENComm_ErrorCode e = AcqCtl_(DT5751_RUN_START);
   if (e == CAENComm_Success){
     running_=true;
 	}else{
@@ -512,7 +512,7 @@ bool v1725CONET2::StartRun()
  *
  * \return  CAENComm Error Code (see CAENComm.h)
  */
-bool v1725CONET2::StopRun()
+bool dt5751CONET2::StopRun()
 {
   if (verbosity_) std::cout << GetName() << "::StopRun()\n";
 
@@ -525,7 +525,7 @@ bool v1725CONET2::StopRun()
     return false;
   }
 
-  CAENComm_ErrorCode e = AcqCtl_(V1725_RUN_STOP);
+  CAENComm_ErrorCode e = AcqCtl_(DT5751_RUN_STOP);
   if (e == CAENComm_Success)
     running_=false;
   else
@@ -542,42 +542,42 @@ bool v1725CONET2::StopRun()
  *
  * Write to Acquisition Control reg
  *
- * \param   [in]  operation acquisition mode (see v1725.h)
+ * \param   [in]  operation acquisition mode (see dt5751.h)
  * \return  CAENComm Error Code (see CAENComm.h)
  */
-CAENComm_ErrorCode v1725CONET2::AcqCtl_(uint32_t operation)
+CAENComm_ErrorCode dt5751CONET2::AcqCtl_(uint32_t operation)
 {
 
   uint32_t reg;
   CAENComm_ErrorCode sCAEN;
 
-  sCAEN = CAENComm_Read32(device_handle_, V1725_ACQUISITION_CONTROL, &reg);
+  sCAEN = CAENComm_Read32(device_handle_, DT5751_ACQUISITION_CONTROL, &reg);
 
   switch (operation) {
-  case V1725_RUN_START:
-    sCAEN = CAENComm_Write32(device_handle_, V1725_ACQUISITION_CONTROL, (reg | 0x4));
+  case DT5751_RUN_START:
+    sCAEN = CAENComm_Write32(device_handle_, DT5751_ACQUISITION_CONTROL, (reg | 0x4));
     break;
-  case V1725_RUN_STOP:
-    sCAEN = CAENComm_Write32(device_handle_, V1725_ACQUISITION_CONTROL, (reg & ~( 0x4)));
+  case DT5751_RUN_STOP:
+    sCAEN = CAENComm_Write32(device_handle_, DT5751_ACQUISITION_CONTROL, (reg & ~( 0x4)));
 
     break;
-  case V1725_REGISTER_RUN_MODE:
-    sCAEN = CAENComm_Write32(device_handle_, V1725_ACQUISITION_CONTROL, 0x100);
+  case DT5751_REGISTER_RUN_MODE:
+    sCAEN = CAENComm_Write32(device_handle_, DT5751_ACQUISITION_CONTROL, 0x100);
     break;
-  case V1725_SIN_RUN_MODE:
-    sCAEN = CAENComm_Write32(device_handle_, V1725_ACQUISITION_CONTROL, 0x101);
+  case DT5751_SIN_RUN_MODE:
+    sCAEN = CAENComm_Write32(device_handle_, DT5751_ACQUISITION_CONTROL, 0x101);
     break;
-  case V1725_SIN_GATE_RUN_MODE:
-    sCAEN = CAENComm_Write32(device_handle_, V1725_ACQUISITION_CONTROL, 0x102);
+  case DT5751_SIN_GATE_RUN_MODE:
+    sCAEN = CAENComm_Write32(device_handle_, DT5751_ACQUISITION_CONTROL, 0x102);
     break;
-  case V1725_MULTI_BOARD_SYNC_MODE:
-    sCAEN = CAENComm_Write32(device_handle_, V1725_ACQUISITION_CONTROL, 0x103);
+  case DT5751_MULTI_BOARD_SYNC_MODE:
+    sCAEN = CAENComm_Write32(device_handle_, DT5751_ACQUISITION_CONTROL, 0x103);
     break;
-  case V1725_COUNT_ACCEPTED_TRIGGER:
-    sCAEN = CAENComm_Write32(device_handle_, V1725_ACQUISITION_CONTROL, (reg & ~( 0x8)));
+  case DT5751_COUNT_ACCEPTED_TRIGGER:
+    sCAEN = CAENComm_Write32(device_handle_, DT5751_ACQUISITION_CONTROL, (reg & ~( 0x8)));
     break;
-  case V1725_COUNT_ALL_TRIGGER:
-    sCAEN = CAENComm_Write32(device_handle_, V1725_ACQUISITION_CONTROL, (reg | 0x8));
+  case DT5751_COUNT_ALL_TRIGGER:
+    sCAEN = CAENComm_Write32(device_handle_, DT5751_ACQUISITION_CONTROL, (reg | 0x8));
     break;
   default:
     printf("operation %d not defined\n", operation);
@@ -594,12 +594,12 @@ CAENComm_ErrorCode v1725CONET2::AcqCtl_(uint32_t operation)
  *
  * Write to Acquisition Control reg
  *
- * \param   [in]  operation acquisition mode (see v1725.h)
+ * \param   [in]  operation acquisition mode (see dt5751.h)
  * \return  CAENComm Error Code (see CAENComm.h)
  */
-CAENComm_ErrorCode v1725CONET2::WriteChannelConfig_(uint32_t operation)
+CAENComm_ErrorCode dt5751CONET2::WriteChannelConfig_(uint32_t operation)
 {
-  return ov1725_ChannelConfig(device_handle_, operation);
+  return odt5751_ChannelConfig(device_handle_, operation);
 }
 
 //
@@ -611,7 +611,7 @@ CAENComm_ErrorCode v1725CONET2::WriteChannelConfig_(uint32_t operation)
  * \param   [out] val      value read from register
  * \return  CAENComm Error Code (see CAENComm.h)
  */
-CAENComm_ErrorCode v1725CONET2::ReadReg_(DWORD address, DWORD *val)
+CAENComm_ErrorCode dt5751CONET2::ReadReg_(DWORD address, DWORD *val)
 {
   if (verbosity_ >= 2) {
     std::cout << GetName() << "::ReadReg(" << std::hex << address << ")" << std::endl;
@@ -629,7 +629,7 @@ CAENComm_ErrorCode v1725CONET2::ReadReg_(DWORD address, DWORD *val)
  * \param   [in]  val      value to write to the register
  * \return  CAENComm Error Code (see CAENComm.h)
  */
-CAENComm_ErrorCode v1725CONET2::WriteReg_(DWORD address, DWORD val)
+CAENComm_ErrorCode dt5751CONET2::WriteReg_(DWORD address, DWORD val)
 {
 
 #define SIZE 100
@@ -656,14 +656,14 @@ CAENComm_ErrorCode v1725CONET2::WriteReg_(DWORD address, DWORD val)
 
 //
 //--------------------------------------------------------------------------------
-bool v1725CONET2::ReadReg(DWORD address, DWORD *val)
+bool dt5751CONET2::ReadReg(DWORD address, DWORD *val)
 {
   return (ReadReg_(address, val) == CAENComm_Success);
 }
 
 //
 //--------------------------------------------------------------------------------
-bool v1725CONET2::WriteReg(DWORD address, DWORD val)
+bool dt5751CONET2::WriteReg(DWORD address, DWORD val)
 {
   return (WriteReg_(address, val) == CAENComm_Success);
 }
@@ -678,13 +678,13 @@ bool v1725CONET2::WriteReg(DWORD address, DWORD val)
  * \param   [out]  val     Number of events stored
  * \return  CAENComm Error Code (see CAENComm.h)
  */
-bool v1725CONET2::Poll(DWORD *val)
+bool dt5751CONET2::Poll(DWORD *val)
 {
   if (!IsConnected()) {
     return false;
   }
 
-  CAENComm_ErrorCode sCAEN = CAENComm_Read32(device_handle_, V1725_EVENT_STORED, val);
+  CAENComm_ErrorCode sCAEN = CAENComm_Read32(device_handle_, DT5751_EVENT_STORED, val);
   return (sCAEN == CAENComm_Success);
 }
 
@@ -693,16 +693,16 @@ bool v1725CONET2::Poll(DWORD *val)
 
 //
 //--------------------------------------------------------------------------------
-bool v1725CONET2::CheckEvent()
+bool dt5751CONET2::CheckEvent()
 {
   DWORD vmeStat, eStored;
-  this->ReadReg(V1725_VME_STATUS, &vmeStat);
+  this->ReadReg(DT5751_VME_STATUS, &vmeStat);
   return (vmeStat & 0x1);
 }
 
 //
 //--------------------------------------------------------------------------------
-bool v1725CONET2::ReadEvent(void *wp)
+bool dt5751CONET2::ReadEvent(void *wp)
 {
   CAENComm_ErrorCode sCAEN;
   
@@ -710,16 +710,16 @@ bool v1725CONET2::ReadEvent(void *wp)
   int dwords_read_total = 0, dwords_read = 0;
 
 	// Block read to get all data from board.  
-  sCAEN = ReadReg_(V1725_EVENT_SIZE, &size_remaining_dwords);
+  sCAEN = ReadReg_(DT5751_EVENT_SIZE, &size_remaining_dwords);
 	while ((size_remaining_dwords > 0) && (sCAEN == CAENComm_Success)) {
     
     //calculate amount of data to be read in this iteration
     to_read_dwords = (size_remaining_dwords > MAX_BLT_READ_SIZE_BYTES/sizeof(DWORD)) ?
       MAX_BLT_READ_SIZE_BYTES/sizeof(DWORD) : size_remaining_dwords;
-    sCAEN = CAENComm_BLTRead(device_handle_, V1725_EVENT_READOUT_BUFFER, (DWORD *)pdata, to_read_dwords, &dwords_read);
+    sCAEN = CAENComm_BLTRead(device_handle_, DT5751_EVENT_READOUT_BUFFER, (DWORD *)pdata, to_read_dwords, &dwords_read);
     
     if (verbosity_>=2) std::cout << sCAEN << " = BLTRead(handle=" << device_handle_
-                                 << ", addr=" << V1725_EVENT_READOUT_BUFFER
+                                 << ", addr=" << DT5751_EVENT_READOUT_BUFFER
                                  << ", pdata=" << pdata
                                  << ", to_read_dwords=" << to_read_dwords
                                  << ", dwords_read returned " << dwords_read << ");" << std::endl;
@@ -740,7 +740,7 @@ bool v1725CONET2::ReadEvent(void *wp)
 }
 
 
-DWORD v1725CONET2::PeekRBTimestamp() {
+DWORD dt5751CONET2::PeekRBTimestamp() {
 
   DWORD *src=NULL;
   int status = rb_get_rp(this->GetRingBufferHandle(), (void**)&src, 500);
@@ -759,7 +759,7 @@ DWORD v1725CONET2::PeekRBTimestamp() {
   return (*(src+3));
 }
 
-int v1725CONET2::PeekRBEventID() {
+int dt5751CONET2::PeekRBEventID() {
 
   DWORD *src=NULL;
   int status = rb_get_rp(this->GetRingBufferHandle(), (void**)&src, 500);
@@ -780,7 +780,7 @@ int v1725CONET2::PeekRBEventID() {
 
 //
 //--------------------------------------------------------------------------------
-bool v1725CONET2::FillEventBank(char * pevent, uint32_t &timestamp)
+bool dt5751CONET2::FillEventBank(char * pevent, uint32_t &timestamp)
 {
   if (! this->IsConnected()) {
     cm_msg(MERROR,"FillEventBank","Board %d disconnected", this->GetModuleID());
@@ -820,7 +820,7 @@ bool v1725CONET2::FillEventBank(char * pevent, uint32_t &timestamp)
   bk_create(pevent, bankName, TID_DWORD, (void **)&dest);
 
 
-  uint32_t limit_size = (V1725_MAX_EVENT_SIZE-bk_size(pevent))/4; // what space is left in the event (in DWORDS)
+  uint32_t limit_size = (DT5751_MAX_EVENT_SIZE-bk_size(pevent))/4; // what space is left in the event (in DWORDS)
   if (size_words > limit_size) {
 //    printf("Event with size: %u (Module %02d) bigger than max %u, event truncated\n", size_words, this->GetModuleID(), limit_size);
     cm_msg(MERROR,"FillEventBank","Event with size: %u (Module %02d) bigger than max %u, event truncated", size_words, this->GetModuleID(), limit_size);
@@ -844,7 +844,7 @@ bool v1725CONET2::FillEventBank(char * pevent, uint32_t &timestamp)
 		}
 		else {
 			//      printf("Raw mode with long waveforms, exceeding the limit: event skipped\n");
-      cm_msg(MERROR,"FillEventBank","Raw mode with long waveforms, exceeding the limit: event skipped. Size dwords %d from module %d. Free space left %d dwords of %d bytes.", size_words, this->GetModuleID(), limit_size, V1725_MAX_EVENT_SIZE);
+      cm_msg(MERROR,"FillEventBank","Raw mode with long waveforms, exceeding the limit: event skipped. Size dwords %d from module %d. Free space left %d dwords of %d bytes.", size_words, this->GetModuleID(), limit_size, DT5751_MAX_EVENT_SIZE);
       *(src + 0) = 0xA0000004; // Event Size set to 0 data (4 DWORDS for the the header ==> TO be checked !)
 			size_copied = 4;
 		}
@@ -874,7 +874,7 @@ bool v1725CONET2::FillEventBank(char * pevent, uint32_t &timestamp)
 
 //
 //--------------------------------------------------------------------------------
-bool v1725CONET2::FillBufferLevelBank(char * pevent)
+bool dt5751CONET2::FillBufferLevelBank(char * pevent)
 {
   if (! this->IsConnected()) {
     cm_msg(MERROR,"FillBufferLevelBank","Board %d disconnected", this->GetModuleID());
@@ -889,13 +889,13 @@ bool v1725CONET2::FillBufferLevelBank(char * pevent)
   snprintf(statBankName, sizeof(statBankName), "BL%02d", this->GetModuleID());
   bk_create(pevent, statBankName, TID_DWORD, (void **)&pdata);
 
-  //Get v1725 buffer level
-  sCAEN = ReadReg_(V1725_EVENT_STORED, &eStored);
+  //Get dt5751 buffer level
+  sCAEN = ReadReg_(DT5751_EVENT_STORED, &eStored);
 
   if (config.has_zle_firmware) {
     almostFull = 0;
   } else {
-    sCAEN = ReadReg_(V1725RAW_ALMOST_FULL_LEVEL, &almostFull);
+    sCAEN = ReadReg_(DT5751RAW_ALMOST_FULL_LEVEL, &almostFull);
   }
   
   //Get ring buffer level
@@ -903,7 +903,7 @@ bool v1725CONET2::FillBufferLevelBank(char * pevent)
 
   *pdata++ = eStored;
   /***
-   * Note: There is no register in the v1725 indicating a busy
+   * Note: There is no register in the dt5751 indicating a busy
    * signal being output.  So we have to deduce it from the buffer
    * level and the almost full setting
    */
@@ -944,7 +944,7 @@ bool v1725CONET2::FillBufferLevelBank(char * pevent)
  * If the user has set the ODB key "Software trigger rate (Hz)" to > 0,
  * issue a software trigger if enough time has elapsed since we last sent a trigger.
  */
-void v1725CONET2::IssueSwTrigIfNeeded() {
+void dt5751CONET2::IssueSwTrigIfNeeded() {
   if (config.sw_trig_rate_Hz > 0) {
     timeval now;
     gettimeofday(&now, NULL);
@@ -966,7 +966,7 @@ void v1725CONET2::IssueSwTrigIfNeeded() {
  *
  * \return  CAENComm Error Code (see CAENComm.h)
  */
-bool v1725CONET2::SendTrigger()
+bool dt5751CONET2::SendTrigger()
 {
   if (verbosity_) std::cout << GetName() << "::SendTrigger()" << std::endl;
   if (!IsConnected()) {
@@ -976,7 +976,7 @@ bool v1725CONET2::SendTrigger()
 
   if (verbosity_) std::cout << "Sending Trigger (l,b) = (" << link_ << "," << board_ << ")" << std::endl;
 
-  return (WriteReg(V1725_SW_TRIGGER, 0x1) == CAENComm_Success);
+  return (WriteReg(DT5751_SW_TRIGGER, 0x1) == CAENComm_Success);
 }
 
 //
@@ -985,27 +985,27 @@ bool v1725CONET2::SendTrigger()
  * \brief   Set the ODB record for this board
  *
  * Create a record for the board with settings from the configuration
- * string (v1725CONET2::config_str_board) if it doesn't exist or merge with
+ * string (dt5751CONET2::config_str_board) if it doesn't exist or merge with
  * existing record. Create hotlink with callback function for when the
  * record is updated.  Get the handle to the record.
  *
  * Ex: For a frontend with index number 2 and board number 0, this
  * record will be created/merged:
  *
- * /Equipment/FEV1725I2/Settings/Board0
+ * /Equipment/FEDT5751I2/Settings/Board0
  *
  * \param   [in]  h        main ODB handle
  * \param   [in]  cb_func  Callback function to call when record is updated
  * \return  ODB Error Code (see midas.h)
  */
-int v1725CONET2::SetBoardRecord(HNDLE h, void(*cb_func)(INT,INT,void*))
+int dt5751CONET2::SetBoardRecord(HNDLE h, void(*cb_func)(INT,INT,void*))
 {
   char set_str[200];
 
   if(feIndex_ == -1)
-    snprintf(set_str, sizeof(set_str), "/Equipment/V1725_Data/Settings/Board%d", moduleID_ % 8);
+    snprintf(set_str, sizeof(set_str), "/Equipment/DT5751_Data/Settings/Board%d", moduleID_ % 8);
   else
-    snprintf(set_str, sizeof(set_str), "/Equipment/V1725_Data%02d/Settings/Board%d", feIndex_, moduleID_ % 8);
+    snprintf(set_str, sizeof(set_str), "/Equipment/DT5751_Data%02d/Settings/Board%d", feIndex_, moduleID_ % 8);
 
   if (verbosity_) std::cout << GetName() << "::SetBoardRecord(" << h << "," << set_str << ",...)" << std::endl;
   int status,size;
@@ -1017,7 +1017,7 @@ int v1725CONET2::SetBoardRecord(HNDLE h, void(*cb_func)(INT,INT,void*))
   }
 
   //hotlink
-  size = sizeof(V1725_CONFIG_SETTINGS);
+  size = sizeof(DT5751_CONFIG_SETTINGS);
   status = db_open_record(h, settings_handle_, &config, size, MODE_READ, cb_func, NULL);
   if (status != DB_SUCCESS){
     cm_msg(MERROR,"SetBoardRecord","Couldn't create hotlink for %s. Return code: %d", set_str, status);
@@ -1045,15 +1045,15 @@ int v1725CONET2::SetBoardRecord(HNDLE h, void(*cb_func)(INT,INT,void*))
  * \param   [in]  cb_func  Callback function to call when record is updated
  * \return  ODB Error Code (see midas.h)
  */
-int v1725CONET2::SetHistoryRecord(HNDLE h, void(*cb_func)(INT,INT,void*))
+int dt5751CONET2::SetHistoryRecord(HNDLE h, void(*cb_func)(INT,INT,void*))
 {
-  char settings_path[200] = "/Equipment/V1725_BufLvl/Settings/";
+  char settings_path[200] = "/Equipment/DT5751_BufLvl/Settings/";
   char names_path[200];
 
   if(feIndex_ == -1)
-    snprintf(settings_path, sizeof(settings_path), "/Equipment/V1725_BufLvl/Settings/");
+    snprintf(settings_path, sizeof(settings_path), "/Equipment/DT5751_BufLvl/Settings/");
   else
-    snprintf(settings_path, sizeof(settings_path), "/Equipment/V1725_BufLvl%02d/Settings/", feIndex_);
+    snprintf(settings_path, sizeof(settings_path), "/Equipment/DT5751_BufLvl%02d/Settings/", feIndex_);
 
 //  if (verbosity_) std::cout << GetName() << "::SetHistoryRecord(" << h << "," << settings_path << ",...)" << std::endl;
   int status;//,size;
@@ -1103,7 +1103,7 @@ int v1725CONET2::SetHistoryRecord(HNDLE h, void(*cb_func)(INT,INT,void*))
  *
  * \return  0 on success, -1 on error
  */
-int v1725CONET2::InitializeForAcq()
+int dt5751CONET2::InitializeForAcq()
 {
   if (verbosity_) std::cout << GetName() << "::InitializeForAcq()" << std::endl;
 
@@ -1126,25 +1126,25 @@ int v1725CONET2::InitializeForAcq()
 	DWORD reg;
   // Clear the board                     
   CheckEvent();                                    
-	sCAEN = WriteReg_(V1725_SW_RESET, 0x1);
+	sCAEN = WriteReg_(DT5751_SW_RESET, 0x1);
 	
 	// Need time for the PLL to lock
 	ss_sleep(500);
 
 	// Leave FP IO stuff disabled for now... will setup later...	
 	// Clear done by accessing Buffer Origanization later on
-	//  sCAEN = WriteReg_(V1725_SW_CLEAR, 0x1);
+	//  sCAEN = WriteReg_(DT5751_SW_CLEAR, 0x1);
   
-  // Set register V1725_FP_IO_CONTROL (0x811C) to default settings
+  // Set register DT5751_FP_IO_CONTROL (0x811C) to default settings
   // (output trigger) will set the board that output the clock later
-  sCAEN = WriteReg_(V1725_FP_IO_CONTROL, 0x00000000);
+  sCAEN = WriteReg_(DT5751_FP_IO_CONTROL, 0x00000000);
 	usleep(200000);
 
-	int size = sizeof(V1725_CONFIG_SETTINGS);
+	int size = sizeof(DT5751_CONFIG_SETTINGS);
 	db_get_record(odb_handle_, settings_handle_, &config, &size, 0);
 
-	sCAEN = WriteReg_(V1725_FP_IO_CONTROL,        config.fp_io_ctrl);	                                                 
-  sCAEN = WriteReg_(V1725_FP_LVDS_IO_CRTL,      config.fp_lvds_io_ctrl);
+	sCAEN = WriteReg_(DT5751_FP_IO_CONTROL,        config.fp_io_ctrl);	                                                 
+  sCAEN = WriteReg_(DT5751_FP_LVDS_IO_CRTL,      config.fp_lvds_io_ctrl);
 
   std::stringstream ss_fw_datatype;
   ss_fw_datatype << "Module " << moduleID_ << ", ";
@@ -1168,9 +1168,9 @@ int v1725CONET2::InitializeForAcq()
     }
     prev_chan = version;
   }
-	//  cm_msg(MINFO,"feoV1725","Format: YMDD:XX.YY");
+	//  cm_msg(MINFO,"feoDT5751","Format: YMDD:XX.YY");
 
-#ifndef NO_V1725
+#ifndef NO_DT5751
   if(version != amc_fw_ver)
     cm_msg(MERROR,"InitializeForAcq","Incorrect AMC Firmware Version: 0x%08x, 0x%08x expected", version, amc_fw_ver);
   else
@@ -1179,33 +1179,33 @@ int v1725CONET2::InitializeForAcq()
 
   // read ROC firmware revision
   // Format as above
-  sCAEN = ReadReg_(V1725_ROC_FPGA_FW_REV, &version);
+  sCAEN = ReadReg_(DT5751_ROC_FPGA_FW_REV, &version);
   switch (version)
   {
   case roc_fw_ver:
     ss_fw_datatype << "ROC FW: 0x" << std::hex << version << ", ";
     break;
   default:
-#ifndef NO_V1725
+#ifndef NO_DT5751
     cm_msg(MERROR,"InitializeForAcq","Incorrect ROC Firmware Version: 0x%08x, 0x%08x expected", version, roc_fw_ver);
 #endif
     break;
   }
 
   // Verify Board Type
-  const uint32_t v1725_board_type = 0x0e;
-  sCAEN = ReadReg_(V1725_BOARD_INFO, &version);
-  if((version & 0xFF) != v1725_board_type)
-    cm_msg(MINFO,"InitializeForAcq","*** WARNING *** Trying to use a v1725 frontend with another"
+  const uint32_t dt5751_board_type = 0x0e;
+  sCAEN = ReadReg_(DT5751_BOARD_INFO, &version);
+  if((version & 0xFF) != dt5751_board_type)
+    cm_msg(MINFO,"InitializeForAcq","*** WARNING *** Trying to use a dt5751 frontend with another"
 		" type of board (0x%x).   Results will be unexpected! ",version);
 
   // Record board type in the ODB.
   char rdb_str[200];
 
   if(feIndex_ == -1)
-    snprintf(rdb_str, sizeof(rdb_str), "/Equipment/V1725_Data/Readback/Board%d/Board type", moduleID_ % 8);
+    snprintf(rdb_str, sizeof(rdb_str), "/Equipment/DT5751_Data/Readback/Board%d/Board type", moduleID_ % 8);
   else
-    snprintf(rdb_str, sizeof(rdb_str), "/Equipment/V1725_Data%02d/Readback/Board%d/Board type", feIndex_, moduleID_ % 8);
+    snprintf(rdb_str, sizeof(rdb_str), "/Equipment/DT5751_Data%02d/Readback/Board%d/Board type", feIndex_, moduleID_ % 8);
 
   db_set_value(odb_handle_, 0, rdb_str, &version, sizeof(version), 1, TID_DWORD);
 
@@ -1226,18 +1226,18 @@ int v1725CONET2::InitializeForAcq()
   }
 
   // Initial acquisition mode. We'll set more bits for enabling the board later.
-  WriteReg_(V1725_ACQUISITION_CONTROL,     config.acq_mode);
+  WriteReg_(DT5751_ACQUISITION_CONTROL,     config.acq_mode);
 
   if (config.has_zle_firmware) {
-	  WriteReg_(V1725_BOARD_CONFIG,               0); // Many fewer options.
-    WriteReg_(V1725ZLE_RECORD_LENGTH,           config.custom_size);
-    WriteReg_(V1725ZLE_PRE_TRIGGER_SETTING,     config.pre_trigger);
+	  WriteReg_(DT5751_BOARD_CONFIG,               0); // Many fewer options.
+    WriteReg_(DT5751ZLE_RECORD_LENGTH,           config.custom_size);
+    WriteReg_(DT5751ZLE_PRE_TRIGGER_SETTING,     config.pre_trigger);
   } else {
-	  WriteReg_(V1725_BOARD_CONFIG,               config.board_config);
-    WriteReg_(V1725RAW_BUFFER_ORGANIZATION,     config.buffer_organization);
-    WriteReg_(V1725RAW_CUSTOM_SIZE,             config.custom_size);
-    WriteReg_(V1725RAW_POST_TRIGGER_SETTING,    config.post_trigger);
-    WriteReg_(V1725RAW_ALMOST_FULL_LEVEL,       config.almost_full);
+	  WriteReg_(DT5751_BOARD_CONFIG,               config.board_config);
+    WriteReg_(DT5751RAW_BUFFER_ORGANIZATION,     config.buffer_organization);
+    WriteReg_(DT5751RAW_CUSTOM_SIZE,             config.custom_size);
+    WriteReg_(DT5751RAW_POST_TRIGGER_SETTING,    config.post_trigger);
+    WriteReg_(DT5751RAW_ALMOST_FULL_LEVEL,       config.almost_full);
   }
 	
 	/* A bug exists in the firmware where if the channel mask is 0 (all channels
@@ -1248,12 +1248,12 @@ int v1725CONET2::InitializeForAcq()
 		return FE_ERR_HW;
 	}
 	
-	WriteReg_(V1725_CHANNEL_EN_MASK,         config.channel_mask);
-	WriteReg_(V1725_TRIG_SRCE_EN_MASK,       config.trigger_source);
-	WriteReg_(V1725_FP_TRIGGER_OUT_EN_MASK,  config.trigger_output);
-	WriteReg_(V1725_MONITOR_MODE,            0x3); // Buffer Occupancy mode;
-	WriteReg_(V1725_BLT_EVENT_NB,            0x1); // TL? max number of events per BLT is 1?
-	WriteReg_(V1725_VME_CONTROL,             V1725_ALIGN64);
+	WriteReg_(DT5751_CHANNEL_EN_MASK,         config.channel_mask);
+	WriteReg_(DT5751_TRIG_SRCE_EN_MASK,       config.trigger_source);
+	WriteReg_(DT5751_FP_TRIGGER_OUT_EN_MASK,  config.trigger_output);
+	WriteReg_(DT5751_MONITOR_MODE,            0x3); // Buffer Occupancy mode;
+	WriteReg_(DT5751_BLT_EVENT_NB,            0x1); // TL? max number of events per BLT is 1?
+	WriteReg_(DT5751_VME_CONTROL,             DT5751_ALIGN64);
 
 
 	printf("..............................Now other settings...\n");
@@ -1263,29 +1263,29 @@ int v1725CONET2::InitializeForAcq()
 
   for (int iCoup=0; iCoup<8; iCoup++) {
     if (config.has_zle_firmware) {
-      WriteReg_(V1725ZLE_CHANNEL_LOGIC     + (iCoup<<9), config.selftrigger_logic[iCoup]);
+      WriteReg_(DT5751ZLE_CHANNEL_LOGIC     + (iCoup<<9), config.selftrigger_logic[iCoup]);
     } else {
       // Registers 0x1084, 0x1284, 0x1484 etc...
-      WriteReg_(V1725RAW_CHANNEL_LOGIC     + (iCoup<<9), config.selftrigger_logic[iCoup]);
+      WriteReg_(DT5751RAW_CHANNEL_LOGIC     + (iCoup<<9), config.selftrigger_logic[iCoup]);
     }
   }
 
-#ifdef NO_V1725
+#ifdef NO_DT5751
 	for (int iChan=0; iChan<8; iChan++) {
 #else
 	for (int iChan=0; iChan<16; iChan++) {
 #endif
 
     if (config.has_zle_firmware) {
-  		WriteReg_(V1725ZLE_CHANNEL_THRESHOLD + (iChan<<8), config.selftrigger_threshold[iChan]);
-      WriteReg_(V1725ZLE_ZS_NSAMP_BEFORE   + (iChan<<8), config.zle_bins_before[iChan]);
-      WriteReg_(V1725ZLE_ZS_NSAMP_AFTER    + (iChan<<8), config.zle_bins_after[iChan]);
-      WriteReg_(V1725ZLE_ZS_BASELINE       + (iChan<<8), config.zle_baseline[iChan]);
+  		WriteReg_(DT5751ZLE_CHANNEL_THRESHOLD + (iChan<<8), config.selftrigger_threshold[iChan]);
+      WriteReg_(DT5751ZLE_ZS_NSAMP_BEFORE   + (iChan<<8), config.zle_bins_before[iChan]);
+      WriteReg_(DT5751ZLE_ZS_NSAMP_AFTER    + (iChan<<8), config.zle_bins_after[iChan]);
+      WriteReg_(DT5751ZLE_ZS_BASELINE       + (iChan<<8), config.zle_baseline[iChan]);
 
       DWORD thresh_comp = config.zle_signed_threshold[iChan] > 0 ? config.zle_signed_threshold[iChan] : (0x80000000 | (-1*config.zle_signed_threshold[iChan]));
-      WriteReg_(V1725ZLE_ZS_THRESHOLD      + (iChan<<8), thresh_comp);
+      WriteReg_(DT5751ZLE_ZS_THRESHOLD      + (iChan<<8), thresh_comp);
 
-      // V1725ZLE_INPUT_CONTROL controls whether ZLE is enabled AND whether to trigger when
+      // DT5751ZLE_INPUT_CONTROL controls whether ZLE is enabled AND whether to trigger when
       // under thresh or over thresh. For RAW firmware, the polarity is defined in the
       // BOARD_CONFIG register, but that bit doesn't apply here. Instead we read the board
       // config parameter and apply the setting to INPUT_CONTROL.
@@ -1301,26 +1301,26 @@ int v1725CONET2::InitializeForAcq()
         input_control |= (0x1 << 7);
       }
 
-      WriteReg_(V1725ZLE_INPUT_CONTROL + (iChan<<8), input_control);
+      WriteReg_(DT5751ZLE_INPUT_CONTROL + (iChan<<8), input_control);
     } else {
-  		WriteReg_(V1725RAW_CHANNEL_THRESHOLD + (iChan<<8), config.selftrigger_threshold[iChan]);
+  		WriteReg_(DT5751RAW_CHANNEL_THRESHOLD + (iChan<<8), config.selftrigger_threshold[iChan]);
     }
 		
-		WriteReg_(V1725_DYNAMIC_RANGE       + (iChan<<8), config.dynamic_range_2v[iChan] ? 0 : 1);
-		WriteReg_(V1725_CHANNEL_DAC         + (iChan<<8), config.dac[iChan]);	
+		WriteReg_(DT5751_DYNAMIC_RANGE       + (iChan<<8), config.dynamic_range_2v[iChan] ? 0 : 1);
+		WriteReg_(DT5751_CHANNEL_DAC         + (iChan<<8), config.dac[iChan]);	
 	}		
 
 	// Wait for 200ms after channing DAC offsets, before starting calibration. 
 	usleep(200000);
 
-#ifndef NO_V1725
+#ifndef NO_DT5751
 	// Start the ADC calibration
-  WriteReg_(V1725_ADC_CALIBRATION , 1);
+  WriteReg_(DT5751_ADC_CALIBRATION , 1);
 	// Now we check to see when the calibration has finished.
 	// by checking register 0x1n88.
 	DWORD temp;
 	for (int i=0;i<16;i++) {
-		addr = V1725_CHANNEL_STATUS | (i << 8);
+		addr = DT5751_CHANNEL_STATUS | (i << 8);
 		ReadReg_(addr,&temp);
 		//		printf("Channel (%i) %x Status: %x\n",i,addr,temp);
 		if((temp & 0x4) == 0x4){
@@ -1356,7 +1356,7 @@ int v1725CONET2::InitializeForAcq()
 	sCAEN = ReadReg_(0x8100, &reg);
 	printf("Board acquisition control 0x%x\n",reg);
 	
-	sCAEN = ReadReg_(V1725_ACQUISITION_STATUS, &reg);  // 0x8104
+	sCAEN = ReadReg_(DT5751_ACQUISITION_STATUS, &reg);  // 0x8104
 	ss_fw_datatype << ", Acq Reg: 0x" << std::hex << reg;
 	cm_msg(MINFO, "InitializeForAcq", ss_fw_datatype.str().c_str());
 	
@@ -1381,7 +1381,7 @@ int v1725CONET2::InitializeForAcq()
  * configuration (0x8000)
  *
  */
-v1725CONET2::DataType v1725CONET2::GetDataType()
+dt5751CONET2::DataType dt5751CONET2::GetDataType()
 {
         
   // Set ZLE or Raw
@@ -1410,7 +1410,7 @@ v1725CONET2::DataType v1725CONET2::GetDataType()
  *
  * \return  true if data is ZLE
  */
-bool v1725CONET2::IsZLEData(){
+bool dt5751CONET2::IsZLEData(){
   return ((data_type_ == ZLEPack2)||(data_type_ == ZLEPack25));
 }
 

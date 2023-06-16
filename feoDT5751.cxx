@@ -1,12 +1,12 @@
 /*****************************************************************************/
 /**
-\file feoV1725.cxx
+\file feoDT5751.cxx
 
 \mainpage
 
 \section contents Contents
 
-Standard Midas Frontend for Optical access to the CAEN v1725 using the A3818 CONET2 driver
+Standard Midas Frontend for Optical access to the CAEN DT5751 using the A3818 CONET2 driver
 
 \subsection organization File organization
 
@@ -42,27 +42,25 @@ occations:
 \subsection notes Notes about this frontend
 
 This frontend has been designed so that it should compile and work
-by default without actual actual access to v1725 hardware. We have turned
+by default without actual actual access to DT5751 hardware. We have turned
 off portions of code which make use of the driver to the actual hardware.
 Where data acquisition should be performed, we generate random data instead
-(see v1725CONET2::ReadEvent()). See usage below to use real hardware.
-
-
+(see dt5751CONET2::ReadEvent()). See usage below to use real hardware.
 
 The code to use real hardware assumes this setup:
 - 1 A3818 PCI-e board per PC to receive optical connections
 - NBLINKSPERA3818 links per A3818 board
 - NBLINKSPERFE optical links controlled by each frontend
-- NB1725PERLINK v1725 modules per optical link (daisy chained)
-- NBV1725TOTAL v1725 modules in total
+- NBDT5751PERLINK  modules per optical link (daisy chained)
+- NBDT5751TOTAL DT5751 modules in total
 - The event builder mechanism is used
 
 \subsection usage Usage
 
 
 \subsubsection real Real hardware
-Adjust NBLINKSPERA3818, NBLINKSPERFE, NB1725PERLINK and NBV1725TOTAL below according
-to your setup.  NBV1725TOTAL / (NBLINKSPERFE * NB1725PERLINK) frontends
+Adjust NBLINKSPERA3818, NBLINKSPERFE, NBDT5751PERLINK and NBDT5751TOTAL below according
+to your setup.  NBDT5751TOTAL / (NBLINKSPERFE * NBDT5751PERLINK) frontends
 must be started in total. When a frontend is started, it must be assigned an index
 number:
 
@@ -75,15 +73,13 @@ For example, consider the following setup:
 
     NBLINKSPERA3818    4     // Number of optical links used per A3818
     NBLINKSPERFE       1     // Number of optical links controlled by each frontend
-    NB1725PERLINK      2     // Number of daisy-chained v1725s per optical link
-    NBV1725TOTAL       32    // Number of v1725 boards in total
+    NBDT5751PERLINK    2     // Number of daisy-chained DT5751s per optical link
+    NBDT5751TOTAL      32    // Number of DT5751 boards in total
 
 We will need 32/(2*2) = 8 frontends (8 indexes; from 0 to 7).  Each frontend
-controls 2*2 = 4 v1725 boards.  Compile and run:
+controls 2*2 = 4 DT5751 boards.  Compile and run:
 
-    ./feoV1725.exe
-
-
+    ./feodt5751.exe
 
  *****************************************************************************/
 
@@ -100,20 +96,17 @@ controls 2*2 = 4 v1725 boards.  Compile and run:
 
 #include "midas.h"
 #include "mfe.h"
-#include "v1725CONET2.hxx"
-
-#include <zmq.h>
-//#include <zmq.hpp>
+#include "dt5751CONET2.hxx"
 
 // __________________________________________________________________
-// --- General feov1725 parameters
+// --- General feodt5751 parameters
 
 
 #ifndef NBLINKSPERA3818
 #define NBLINKSPERA3818   1   //!< Number of optical links used per A3818
 #define NBLINKSPERFE      1   //!< Number of optical links controlled by each frontend
-#define NB1725PERLINK     1   //!< Number of daisy-chained v1725s per optical link
-#define NBV1725TOTAL      1  //!< Number of v1725 boards in total
+#define NBDT5751PERLINK     1   //!< Number of daisy-chained dt5751s per optical link
+#define NBDT5751TOTAL      1  //!< Number of dt5751 boards in total
 #define NBCORES           8   //!< Number of cpu cores, for process/thread locking
 #endif
 
@@ -123,7 +116,7 @@ controls 2*2 = 4 v1725 boards.  Compile and run:
 #define  EQ_EVID   1                //!< Event ID
 #define  EQ_TRGMSK 0                //!< Trigger mask (overwritten in code)
                                     //!< based on feIndex (see _init)
-#define  FE_NAME   "feov1725MTI"       //!< Frontend name
+#define  FE_NAME   "feodt5751MTI"       //!< Frontend name
 
 #define UNUSED(x) ((void)(x)) //!< Suppress compiler warnings
 const bool SYNCEVENTS_DEBUG = true;
@@ -143,16 +136,16 @@ char const *frontend_file_name = (char*)__FILE__;
 BOOL frontend_call_loop = FALSE;
 //! a frontend status page is displayed with this frequency in ms
 INT display_period = 000;
-//! maximum event size produced by this frontend (from #define in v1725CONET2.hxx)
-INT max_event_size = V1725_MAX_EVENT_SIZE;
+//! maximum event size produced by this frontend (from #define in dt5751CONET2.hxx)
+INT max_event_size = DT5751_MAX_EVENT_SIZE;
 //! maximum event size for fragmented events (EQ_FRAGMENTED)
 INT max_event_size_frag = 5 * 1024 * 1024;
 
 //! buffer size to hold events
 //! Very large events - don't consume too much memory
-#if V1725_MAX_EVENT_SIZE > 30000000
+#if DT5751_MAX_EVENT_SIZE > 30000000
 INT event_buffer_size = 10 * max_event_size + 10000;
-#elif V1725_MAX_EVENT_SIZE > 10000000
+#elif DT5751_MAX_EVENT_SIZE > 10000000
 INT event_buffer_size = 20 * max_event_size + 10000;
 #else
 INT event_buffer_size = 30 * max_event_size + 10000;
@@ -161,10 +154,9 @@ INT event_buffer_size = 30 * max_event_size + 10000;
 bool runInProgress = false; //!< run is in progress
 bool stopRunInProgress = false; //!<
 bool eor_transition_called = false; // already called EOR
-uint32_t timestamp_offset[NBLINKSPERFE*NB1725PERLINK]; //!< trigger time stamp offsets
+uint32_t timestamp_offset[NBLINKSPERFE*NBDT5751PERLINK]; //!< trigger time stamp offsets
 
 std::string chronoboxIP = "172.16.4.71";
-BOOL enableChronobox = true;
 BOOL enableMerging = true;
 int unmergedModuleToRead = -1;
 BOOL writePartiallyMergedEvents = false;
@@ -198,7 +190,7 @@ BOOL equipment_common_overwrite = false;
 EQUIPMENT equipment[] =
 {
     {
-        "V1725_Data%02d",           /* equipment name */
+        "DT5751_Data%02d",           /* equipment name */
         {
             EQ_EVID, EQ_TRGMSK,     /* event ID, trigger mask */
 #if USE_SYSTEM_BUFFER
@@ -226,7 +218,7 @@ EQUIPMENT equipment[] =
     },
 
     {
-        "V1725_BufLvl%02d",             /* equipment name */
+        "DT5751_BufLvl%02d",             /* equipment name */
         {
             100, 0x1000,            /* event ID, corrected with feIndex, trigger mask */
             "SYSTEM",               /* event buffer */
@@ -245,7 +237,7 @@ EQUIPMENT equipment[] =
         read_buffer_level,       /* readout routine */
     },
     {
-      "V1725_Temp%02d",             /* equipment name */
+      "DT5751_Temp%02d",             /* equipment name */
       {
 	100, 0x1000,            /* event ID, corrected with feIndex, trigger mask */
 	"SYSTEM",               /* event buffer */
@@ -266,14 +258,13 @@ EQUIPMENT equipment[] =
     {""}
 };
 
-std::vector<v1725CONET2> ov1725; //!< objects for the v1725 modules controlled by this frontend
-std::vector<v1725CONET2>::iterator itv1725;  //!< Main thread iterator
-std::vector<v1725CONET2>::iterator itv1725_thread[NBLINKSPERFE];  //!< Link threads iterators
+std::vector<dt5751CONET2> odt5751; //!< objects for the dt5751 modules controlled by this frontend
+std::vector<dt5751CONET2>::iterator itdt5751;  //!< Main thread iterator
+std::vector<dt5751CONET2>::iterator itdt5751_thread[NBLINKSPERFE];  //!< Link threads iterators
 
 pthread_t tid[NBLINKSPERFE];                            //!< Thread ID
 int thread_retval[NBLINKSPERFE] = {0};                  //!< Thread return value
 int thread_link[NBLINKSPERFE];                          //!< Link number associated with each thread
-bool is_first_event = true;
 
 /********************************************************************/
 /********************************************************************/
@@ -290,10 +281,10 @@ bool is_first_event = true;
 void seq_callback(INT h, INT hseq, void *info){
   KEY key;
 
-  for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-    if (hseq == itv1725->GetSettingsHandle()){
+  for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
+    if (hseq == itdt5751->GetSettingsHandle()){
       db_get_key(h, hseq, &key);
-      itv1725->SetSettingsTouched(true);
+      itdt5751->SetSettingsTouched(true);
       cm_msg(MINFO, "seq_callback", "Settings %s touched. Changes will take effect at start of next run.", key.name);
     }
   }
@@ -380,7 +371,6 @@ INT frontend_init(){
     sprintf(partial_path, "/Equipment/%s/Settings/Write partially merged events", equipment[0].name);
     sprintf(flush_path, "/Equipment/%s/Settings/Flush buffers at end of run", equipment[0].name);
     sprintf(thresh_path, "/Equipment/%s/Settings/TS match thresh (clock ticks)", equipment[0].name);
-    db_get_value(hDB, 0, cb_path, &enableChronobox, &size_bool, TID_BOOL, TRUE);
     db_get_value_string(hDB, 0, cb_ip_path, 0, &chronoboxIP, TRUE, 128);
     db_get_value(hDB, 0, merge_path, &enableMerging, &size_bool, TID_BOOL, TRUE);
     db_get_value(hDB, 0, partial_path, &writePartiallyMergedEvents, &size_bool, TID_BOOL, TRUE);
@@ -391,16 +381,16 @@ INT frontend_init(){
   // --- Suppress watchdog for PICe for now  ; what is this???
   cm_set_watchdog_params(FALSE, 0);
 
-  int nExpected = 0; //Number of v1725 boards we expect to activate
-  int nActive = 0;   //Number of v1725 boards activated at the end of frontend_init
-  std::vector<std::pair<int,int> > errBoards;  //v1725 boards which we couldn't connect to
+  int nExpected = 0; //Number of dt5751 boards we expect to activate
+  int nActive = 0;   //Number of dt5751 boards activated at the end of frontend_init
+  std::vector<std::pair<int,int> > errBoards;  //dt5751 boards which we couldn't connect to
 
-  if((NBV1725TOTAL % (NB1725PERLINK*NBLINKSPERFE)) != 0){
+  if((NBDT5751TOTAL % (NBDT5751PERLINK*NBLINKSPERFE)) != 0){
     printf("Incorrect setup: the number of boards controlled by each frontend"
-           " is not a fraction of the total number of boards. %i %i %i\n",NBV1725TOTAL,NB1725PERLINK,NBLINKSPERFE);
+           " is not a fraction of the total number of boards. %i %i %i\n",NBDT5751TOTAL,NBDT5751PERLINK,NBLINKSPERFE);
   }
 
-  int maxIndex = (NBV1725TOTAL/NB1725PERLINK)/NBLINKSPERFE - 1;
+  int maxIndex = (NBDT5751TOTAL/NBDT5751PERLINK)/NBLINKSPERFE - 1;
   if(feIndex < 0 || feIndex > maxIndex){
     printf("Front end index (%i) must be between 0 and %d\n", feIndex, maxIndex);
     exit(FE_ERR_HW);
@@ -409,26 +399,26 @@ INT frontend_init(){
   int firstLink = (feIndex % (NBLINKSPERA3818 / NBLINKSPERFE)) * NBLINKSPERFE;
   int lastLink = firstLink + NBLINKSPERFE - 1;
   for (int iLink=firstLink; iLink <= lastLink; iLink++) {
-    for (int iBoard=0; iBoard < NB1725PERLINK; iBoard++) {
+    for (int iBoard=0; iBoard < NBDT5751PERLINK; iBoard++) {
       printf("==== feIndex:%d, Link:%d, Board:%d ====\n", feIndex, iLink, iBoard);
 
       // Compose unique module ID
-      int moduleID = feIndex*NBLINKSPERFE*NB1725PERLINK + (iLink-firstLink)*NB1725PERLINK + iBoard;
+      int moduleID = feIndex*NBLINKSPERFE*NBDT5751PERLINK + (iLink-firstLink)*NBDT5751PERLINK + iBoard;
 
       // Create module objects
-      ov1725.emplace_back(feIndex, iLink, iBoard, moduleID, hDB);
-      ov1725.back().SetVerbosity(0);
+      odt5751.emplace_back(feIndex, iLink, iBoard, moduleID, hDB);
+      odt5751.back().SetVerbosity(0);
 
       // Open Optical interface
-      switch(ov1725.back().Connect()){
-      case v1725CONET2::ConnectSuccess:
+      switch(odt5751.back().Connect()){
+      case dt5751CONET2::ConnectSuccess:
         nActive++;
         break;
-      case v1725CONET2::ConnectErrorCaenComm:
-      case v1725CONET2::ConnectErrorTimeout:
+      case dt5751CONET2::ConnectErrorCaenComm:
+      case dt5751CONET2::ConnectErrorTimeout:
         errBoards.push_back(std::pair<int,int>(iLink,iBoard));
         break;
-      case v1725CONET2::ConnectErrorAlreadyConnected:
+      case dt5751CONET2::ConnectErrorAlreadyConnected:
         //do nothing
         break;
       default:
@@ -436,7 +426,7 @@ INT frontend_init(){
         break;
       }
 
-      if(!((iLink == lastLink) && (iBoard == (NB1725PERLINK-1)))){
+      if(!((iLink == lastLink) && (iBoard == (NBDT5751PERLINK-1)))){
         printf("Sleeping for %d milliseconds before next board\n", SLEEP_TIME_BETWEEN_CONNECTS);
         ss_sleep(SLEEP_TIME_BETWEEN_CONNECTS);
       }
@@ -447,26 +437,26 @@ INT frontend_init(){
    * to db_open_record.  The location of the object in memory must not change after
    * doing that. */
   int nInitOk = 0;
-  for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
+  for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
     // Setup ODB record (create if necessary)
-    itv1725->SetBoardRecord(hDB,seq_callback);
+    itdt5751->SetBoardRecord(hDB,seq_callback);
     // Set history ODB record (create if necessary)
-    itv1725->SetHistoryRecord(hDB,seq_callback);
+    itdt5751->SetHistoryRecord(hDB,seq_callback);
 
-    if (itv1725->IsEnabled()) {
+    if (itdt5751->IsEnabled()) {
       nExpected++;
     }
 
-    if (! itv1725->IsConnected()) continue;   // Skip unconnected board
+    if (! itdt5751->IsConnected()) continue;   // Skip unconnected board
 
-    int status = itv1725->InitializeForAcq();
+    int status = itdt5751->InitializeForAcq();
     nInitOk += status;
   }
 
   // Abort if board status not Ok.
   if (nInitOk != 0) return FE_ERR_HW;
 
-  printf(">>> End of Init. %d active v1725. Expected %d\n\n", nActive, nExpected);
+  printf(">>> End of Init. %d active dt5751. Expected %d\n\n", nActive, nExpected);
 
   if (nActive < nExpected){
     cm_msg(MERROR, __FUNCTION__, "Unexpected number of active boards (%d vs %d)", nActive, nExpected);
@@ -482,26 +472,8 @@ INT frontend_init(){
     printf("ERROR setting cpu affinity for main thread: %s\n", strerror(errno));
   }
 
-  // Setup a deferred transition to wait till the V1725 buffer is empty.
+  // Setup a deferred transition to wait till the DT5751 buffer is empty.
   cm_register_deferred_transition(TR_STOP, wait_buffer_empty);
-
-  //-begin - ZMQ----------------------------------------------------------
-
-  //  Socket to talk to clients
-  void *context = zmq_ctx_new ();
-  subscriber = zmq_socket (context, ZMQ_SUB);
-  char zmq_port[255];
-  sprintf(zmq_port, "tcp://%s:5555", chronoboxIP.c_str());
-  int rc = zmq_connect (subscriber, zmq_port);
-  // Without message
-  zmq_setsockopt (subscriber, ZMQ_SUBSCRIBE, "", 0);
-  printf (" This subscriber is connecting to the ChronoBox Publisher context: %p *subscriber: %p rc:%d \n"
-	  , context, subscriber, rc);
-
-  // Need to discard the first ZMQ bank.
-  is_first_event = true;
-
-  //-end - ZMQ----------------------------------------------------------
 
   return SUCCESS;
 }
@@ -519,9 +491,9 @@ INT frontend_exit(){
 
   set_equipment_status(equipment[0].name, "Exiting...", "#FFFF00");
 
-  for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-    if (itv1725->IsConnected()){
-      itv1725->Disconnect();
+  for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
+    if (itdt5751->IsConnected()){
+      itdt5751->Disconnect();
     }
   }
   set_equipment_status(equipment[0].name, "Exited", "#00ff00");
@@ -570,7 +542,6 @@ INT begin_of_run(INT run_number, char *error)
     sprintf(flush_path, "/Equipment/%s/Settings/Flush buffers at end of run", equipment[0].name);
     sprintf(thresh_path, "/Equipment/%s/Settings/TS match thresh (clock ticks)", equipment[0].name);
     INT size = sizeof(BOOL);
-    db_get_value(hDB, 0, cb_path, &enableChronobox, &size, TID_BOOL, TRUE);
     db_get_value_string(hDB, 0, cb_ip_path, 0, &chronoboxIP, TRUE, 128);
     db_get_value(hDB, 0, merge_path, &enableMerging, &size, TID_BOOL, TRUE);
     db_get_value(hDB, 0, partial_path, &writePartiallyMergedEvents, &size, TID_BOOL, TRUE);
@@ -579,45 +550,40 @@ INT begin_of_run(INT run_number, char *error)
     db_get_value(hDB, 0, thresh_path, &timestampMatchingThreshold, &size, TID_DWORD, TRUE);
   }
 
-  if (enableChronobox && !enableMerging) {
+  if (!enableMerging) {
     cm_msg(MERROR, __FUNCTION__, "Invalid setup - you must merge data from all boards if running with the chronobox.");
     sprintf(error, "Invalid setup - you must merge data from all boards if running with the chronobox.");
     return FE_ERR_ODB;
   }
 
-  if (enableChronobox) {
-    /// Make sure the chronobox is stopped
-    chronobox_start_stop(false);
-  }
-
-  for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-    if (! itv1725->IsConnected()) continue;   // Skip unconnected board
+  for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
+    if (! itdt5751->IsConnected()) continue;   // Skip unconnected board
     DWORD vmeAcq, vmeStat;
-    itv1725->ReadReg(V1725_ACQUISITION_STATUS, &vmeAcq);//Test the PLL lock once (it may have happened earlier)
+    itdt5751->ReadReg(DT5751_ACQUISITION_STATUS, &vmeAcq);//Test the PLL lock once (it may have happened earlier)
     if ((vmeAcq & 0x80) == 0) {
-      cm_msg(MERROR,"BeginOfRun","V1725 PLL loss lock Board (sometime in the past):%d (vmeAcq=0x%x)"
-             ,itv1725->GetModuleID(), vmeAcq);
+      cm_msg(MERROR,"BeginOfRun","DT5751 PLL loss lock Board (sometime in the past):%d (vmeAcq=0x%x)"
+             ,itdt5751->GetModuleID(), vmeAcq);
       // PLL loss lock reset by the VME_STATUS read!
-      itv1725->ReadReg(V1725_VME_STATUS, &vmeStat);
+      itdt5751->ReadReg(DT5751_VME_STATUS, &vmeStat);
       usleep(100);
-      itv1725->ReadReg(V1725_ACQUISITION_STATUS, &vmeAcq); // Test the PLL again
+      itdt5751->ReadReg(DT5751_ACQUISITION_STATUS, &vmeAcq); // Test the PLL again
       if ((vmeAcq & 0x80) == 0) {
-        cm_msg(MERROR,"BeginOfRun","V1725 PLL lock still lost Board: %d (vmeAcq=0x%x)"
-               ,itv1725->GetModuleID(), vmeAcq);
+        cm_msg(MERROR,"BeginOfRun","DT5751 PLL lock still lost Board: %d (vmeAcq=0x%x)"
+               ,itdt5751->GetModuleID(), vmeAcq);
         return FE_ERR_HW;
       }
     }
 
-    bool go = itv1725->StartRun();
+    bool go = itdt5751->StartRun();
     if (go == false) return FE_ERR_HW;
 
     //Create ring buffer for board
     status = rb_create(event_buffer_size, max_event_size, &rb_handle);
     if(status == DB_SUCCESS){
-      itv1725->SetRingBufferHandle(rb_handle);
+      itdt5751->SetRingBufferHandle(rb_handle);
     }
     else{
-      cm_msg(MERROR, "feov1725:BOR", "Failed to create rb for board %d", itv1725->GetModuleID());
+      cm_msg(MERROR, "feodt5751:BOR", "Failed to create rb for board %d", itdt5751->GetModuleID());
     }
   }
 
@@ -626,19 +592,9 @@ INT begin_of_run(INT run_number, char *error)
     thread_link[i] = i;
     status = pthread_create(&tid[i], NULL, &link_thread, (void*)&thread_link[i]);
     if(status){
-      cm_msg(MERROR,"feov1725:BOR", "Couldn't create thread for link %d. Return code: %d", i, status);
+      cm_msg(MERROR,"feodt5751:BOR", "Couldn't create thread for link %d. Return code: %d", i, status);
     }
   }
-
-  // Need to discard the first ZMQ bank.
-  is_first_event = true;
-
-  if (enableChronobox) {
-    /// Sleep 1 second and start chronobox
-    sleep(1);
-    chronobox_start_stop(true);
-  }
-
 
   set_equipment_status(equipment[0].name, "Started run", "#00ff00");
   printf(">>> End of begin_of_run\n\n");
@@ -682,28 +638,28 @@ void * link_thread(void * arg)
   int rb_handle;
   int moduleID;
   int rb_level;
-  int firstBoard = link*NB1725PERLINK; //First board on this link
+  int firstBoard = link*NBDT5751PERLINK; //First board on this link
 
   while(1) {  // Indefinite until run stopped (!runInProgress)
     // This loop is running until EOR flag (runInProgress)
 
     // process the addressed board for that link only
-    for (itv1725_thread[link] = ov1725.begin() + firstBoard;
-         itv1725_thread[link] != ov1725.begin() + firstBoard + NB1725PERLINK;
-         ++itv1725_thread[link]){
+    for (itdt5751_thread[link] = odt5751.begin() + firstBoard;
+         itdt5751_thread[link] != odt5751.begin() + firstBoard + NBDT5751PERLINK;
+         ++itdt5751_thread[link]){
 
       // Shortcut
-      rb_handle = itv1725_thread[link]->GetRingBufferHandle();
-      moduleID = itv1725_thread[link]->GetModuleID();
+      rb_handle = itdt5751_thread[link]->GetRingBufferHandle();
+      moduleID = itdt5751_thread[link]->GetModuleID();
 
       // Check if event in hardware to read
-      if (!stopRunInProgress && itv1725_thread[link]->CheckEvent()){
+      if (!stopRunInProgress && itdt5751_thread[link]->CheckEvent()){
 
 
         /* If we've reached 75% of the ring buffer space, don't read
          * the next event.  Wait until the ring buffer level goes down.
-         * It is better to let the v1725 buffer fill up instead of
-         * the ring buffer, as this the v1725 will generate the HW busy to the
+         * It is better to let the dt5751 buffer fill up instead of
+         * the ring buffer, as this the dt5751 will generate the HW busy to the
          * DTM.
          */
         rb_get_buffer_level(rb_handle, &rb_level);
@@ -722,7 +678,7 @@ void * link_thread(void * arg)
         }
 
         // Read data
-        if(itv1725_thread[link]->ReadEvent(wp)) {
+        if(itdt5751_thread[link]->ReadEvent(wp)) {
         } else {
           cm_msg(MERROR,"link_thread", "Readout routine error on thread %d (module %d)", link, moduleID);
           cm_msg(MERROR,"link_thread", "Exiting thread %d with error", link);
@@ -755,20 +711,11 @@ BOOL wait_buffer_empty(int transition, BOOL first)
      printf("\nDeferred transition.  First call of wait_buffer_empty. Stopping run\n");
      // Some funny business here... need to pause the readout on the threads before
      // making the chronobox stop call... some sort of contention for the system resources.
-     if (enableChronobox) {
-       stopRunInProgress = true;
-       usleep(500);
-       chronobox_start_stop(false);
-       stopRunInProgress = false;
-       sleep(1);
-       // We'll stop the V1725s later
-    } else {
-      for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-        if (itv1725->IsConnected()) {  // Skip unconnected board
-          itv1725->StopRun();
-        }
-      }
-    }
+     for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
+       if (itdt5751->IsConnected()) {  // Skip unconnected board
+         itdt5751->StopRun();
+       }
+     }
 
      gettimeofday(&wait_start, NULL);
 
@@ -781,8 +728,8 @@ BOOL wait_buffer_empty(int transition, BOOL first)
    }
 
    bool haveEventsInBuffer = true;
-   for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-     if(itv1725->IsConnected() && (itv1725->GetNumEventsInRB() == 0)) {
+   for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
+     if(itdt5751->IsConnected() && (itdt5751->GetNumEventsInRB() == 0)) {
        haveEventsInBuffer = false;
      }
    }
@@ -843,44 +790,22 @@ INT end_of_run(INT run_number, char *error)
     }
 
     // Stop run
-    for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-      if (itv1725->IsConnected()) {  // Skip unconnected board
-        if (enableChronobox) {
-          // If no chronobox, we've already stopped the boards.
-          result = itv1725->StopRun();
-          
-          if(!result) {
-            cm_msg(MERROR, "EOR", "Could not stop the run for module %d", itv1725->GetModuleID());
-          }
-        }
+    for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
+      if (itdt5751->IsConnected()) {  // Skip unconnected board
+        printf("Number of events in ring buffer for module-%i: %i\n",itdt5751->GetModuleID(),itdt5751->GetNumEventsInRB());
 
-	        printf("Number of events in ring buffer for module-%i: %i\n",itv1725->GetModuleID(),itv1725->GetNumEventsInRB());
-
-        rb_delete(itv1725->GetRingBufferHandle());
-        itv1725->SetRingBufferHandle(-1);
-	      itv1725->ResetNumEventsInRB();
+        rb_delete(itdt5751->GetRingBufferHandle());
+        itdt5751->SetRingBufferHandle(-1);
+	      itdt5751->ResetNumEventsInRB();
       }
     }
 
     // Info about event in HW buffer
-    result = ov1725[0].Poll(&eStored);
+    result = odt5751[0].Poll(&eStored);
     if(eStored != 0x0) {
-      cm_msg(MERROR, "EOR", "Events left in the v1725-%d: %d",ov1725[0].GetModuleID(), eStored);
+      cm_msg(MERROR, "EOR", "Events left in the dt5751-%d: %d",odt5751[0].GetModuleID(), eStored);
     }
 
-  }
-
-  if (enableChronobox) {
-    // Clear out all the events in the ZMQ buffer:
-    uint32_t rcvbuf [100];
-    int total_extra = 0;
-    int stat;
-    stat = zmq_recv (subscriber, rcvbuf, sizeof(rcvbuf), ZMQ_DONTWAIT);
-    while(stat > 0){
-      total_extra++;
-      stat = zmq_recv (subscriber, rcvbuf, sizeof(rcvbuf), ZMQ_DONTWAIT);
-    }
-    if(total_extra >0) cm_msg(MINFO, "EOR", "Events left in the chronobox: %d",total_extra);
   }
 
   printf(">>> End Of end_of_run\n\n");
@@ -921,23 +846,23 @@ INT pause_run(INT run_number, char *error)
     }
 
     // Stop run
-    for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-      if (itv1725->IsConnected()) {  // Skip unconnected board
-        result = itv1725->StopRun();
+    for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
+      if (itdt5751->IsConnected()) {  // Skip unconnected board
+        result = itdt5751->StopRun();
 
         if(!result)
           cm_msg(MERROR, "EOR",
-                 "Could not stop the run for module %d", itv1725->GetModuleID());
+                 "Could not stop the run for module %d", itdt5751->GetModuleID());
 
-        rb_delete(itv1725->GetRingBufferHandle());
-        itv1725->SetRingBufferHandle(-1);
-		itv1725->ResetNumEventsInRB();
+        rb_delete(itdt5751->GetRingBufferHandle());
+        itdt5751->SetRingBufferHandle(-1);
+		itdt5751->ResetNumEventsInRB();
       }
     }
 
-    result = ov1725[0].Poll(&eStored);
+    result = odt5751[0].Poll(&eStored);
     if(eStored != 0x0) {
-      cm_msg(MERROR, "EOR", "Events left in the v1725: %d",eStored);
+      cm_msg(MERROR, "EOR", "Events left in the dt5751: %d",eStored);
     }
 
   }
@@ -969,22 +894,22 @@ INT resume_run(INT run_number, char *error)
 
   runInProgress = true;
 
-  for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-    if (! itv1725->IsConnected()) continue;   // Skip unconnected board
+  for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
+    if (! itdt5751->IsConnected()) continue;   // Skip unconnected board
 
     // Done in frontend_init, or StartRun if settings have changed
-    // itv1725->InitializeForAcq();
+    // itdt5751->InitializeForAcq();
 
-    bool go = itv1725->StartRun();
+    bool go = itdt5751->StartRun();
     if (go == false) return FE_ERR_HW;
 
     //Create ring buffer for board
     status = rb_create(event_buffer_size, max_event_size, &rb_handle);
     if(status == DB_SUCCESS){
-      itv1725->SetRingBufferHandle(rb_handle);
+      itdt5751->SetRingBufferHandle(rb_handle);
     }
     else{
-      cm_msg(MERROR, "feov1725:Resume", "Failed to create rb for board %d", itv1725->GetModuleID());
+      cm_msg(MERROR, "feodt5751:Resume", "Failed to create rb for board %d", itdt5751->GetModuleID());
     }
   }
 
@@ -993,7 +918,7 @@ INT resume_run(INT run_number, char *error)
     thread_link[i] = i;
     status = pthread_create(&tid[i], NULL, &link_thread, (void*)&thread_link[i]);
     if(status){
-      cm_msg(MERROR,"feov1725:Resume", "Couldn't create thread for link %d. Return code: %d", i, status);
+      cm_msg(MERROR,"feodt5751:Resume", "Couldn't create thread for link %d. Return code: %d", i, status);
     }
   }
 
@@ -1028,9 +953,9 @@ INT poll_event(INT source, INT count, BOOL test)
   register int i;
 
   for (i = 0; i < count; i++) {
-    for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-      if(itv1725->IsConnected()) {
-        itv1725->IssueSwTrigIfNeeded();
+    for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
+      if(itdt5751->IsConnected()) {
+        itdt5751->IssueSwTrigIfNeeded();
       }
     }
 
@@ -1039,8 +964,8 @@ INT poll_event(INT source, INT count, BOOL test)
 
     if (enableMerging) {
       //ready for readout only when data is present in all ring buffers
-      for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-        if(itv1725->IsConnected() && (itv1725->GetNumEventsInRB() == 0)) {
+      for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
+        if(itdt5751->IsConnected() && (itdt5751->GetNumEventsInRB() == 0)) {
           evtReady = false;
         }
       }
@@ -1050,12 +975,12 @@ INT poll_event(INT source, INT count, BOOL test)
       evtReady = false;
       int maxNumEvents = -1;
 
-      for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-        if (!itv1725->IsConnected()) {
+      for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
+        if (!itdt5751->IsConnected()) {
           continue;
         }
 
-        int numEvents = itv1725->GetNumEventsInRB();
+        int numEvents = itdt5751->GetNumEventsInRB();
 
         if (numEvents > 0) {
           evtReady = true;
@@ -1064,7 +989,7 @@ INT poll_event(INT source, INT count, BOOL test)
             // Tell the readout routine to read data from the module with the
             // most events in the buffer; this helps to more fairly read data
             // from multiple boards when we're not merging the data.
-            unmergedModuleToRead = itv1725->GetModuleID();
+            unmergedModuleToRead = itdt5751->GetModuleID();
             maxNumEvents = numEvents;
           }
         }
@@ -1129,60 +1054,6 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
   // Keep track of timestamps
   std::vector<uint32_t> timestamps;
 
-  if (enableChronobox) {
-    // Get the ChronoBox bank
-    // If this is the first event, then read ZMQ buffer an extra time; want to discard first event.
-    if(is_first_event){
-      uint32_t rcvbuf [100];
-      int stat0 = zmq_recv (subscriber, rcvbuf, sizeof(rcvbuf), ZMQ_DONTWAIT);
-      if(!stat0){
-        cm_msg(MERROR,"read_trigger_event", "ZMQ read error on first event. %i\n",stat0);
-      }
-      is_first_event = false;
-      printf("Flushed first event from chronobox\n");
-    }
-
-    int stat = -1;
-
-    bk_create(pevent, "ZMQ0", TID_DWORD, (void **)&pdata);
-
-    // Try to receive ZMQ data from chronobox.
-    // Use ZMQ_DONTWAIT to prevent blocking.
-    // But retry several times in case message is delayed.
-    float zmq_timeout_ms = 2000;
-    float zmq_retry_wait_ms = 1;
-    float zmq_time = 0;
-
-    while (zmq_time < zmq_timeout_ms) {
-      stat = zmq_recv (subscriber, pdata, 1000, ZMQ_DONTWAIT);
-
-      if (stat > 0) {
-        break;
-      }
-
-      zmq_time += zmq_retry_wait_ms;
-      usleep(1000 * zmq_retry_wait_ms);
-    }
-
-    if (stat > 0) {
-
-      //printf("ZMQ: %x %x %x %x %x",pdata[0],pdata[1],pdata[2],pdata[3],pdata[4]);
-      // Save the timestamp for ZMQ bank
-      timestamps.push_back((pdata[3]& 0x7fffffff)); // Save the ZMQ timestamp
-      pdata += stat/sizeof(uint32_t);
-      stat = bk_close(pevent, pdata);
-    }else{
-      // There should be ZMQ data for each bank.  If not, stop the run.
-      if(!eor_transition_called){
-        cm_msg(MERROR,"read_trigger_event", "Error: did not receive a ZMQ bank after %f ms.  Stopping run.", zmq_timeout_ms);
-        cm_transition(TR_STOP, 0, NULL, 0, TR_DETACH, 0);
-        eor_transition_called = true;
-        return 0;
-      }
-    }
-  } // End of chronobox
-
-  // Get the V1725
   if (!enableMerging && unmergedModuleToRead < 0) {
     cm_msg(MERROR,"read_trigger_event", "Error: module to read is set to invalid value %d! Stopping run.", unmergedModuleToRead);
     cm_transition(TR_STOP, 0, NULL, 0, TR_DETACH, 0);
@@ -1194,13 +1065,13 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
   int64_t rolloverTime = 0x80000000;
   DWORD numConnectedBoards = 0;
 
-  if (enableMerging && !enableChronobox) {
+  if (enableMerging) {
     // Merge by timestamp
-    for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-      if (! itv1725->IsConnected()) continue;   // Skip unconnected board
+    for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
+      if (! itdt5751->IsConnected()) continue;   // Skip unconnected board
 
       numConnectedBoards++;
-      int64_t thisTimestamp = itv1725->PeekRBTimestamp();
+      int64_t thisTimestamp = itdt5751->PeekRBTimestamp();
 
       //printf("this: %08lx, curr min: %08lx, rollover: %d\n", thisTimestamp, minTimestamp, std::abs(thisTimestamp - minTimestamp) > rolloverTime / 2);
 
@@ -1219,21 +1090,21 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
     }
   }
 
-  for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-    if (! itv1725->IsConnected()) continue;   // Skip unconnected board
+  for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
+    if (! itdt5751->IsConnected()) continue;   // Skip unconnected board
 
-    if (enableMerging && itv1725->GetNumEventsInRB() == 0) {
-        cm_msg(MERROR,"read_trigger_event", "Error: no events in RB for module %d.  Stopping run.", itv1725->GetModuleID());
+    if (enableMerging && itdt5751->GetNumEventsInRB() == 0) {
+        cm_msg(MERROR,"read_trigger_event", "Error: no events in RB for module %d.  Stopping run.", itdt5751->GetModuleID());
         cm_transition(TR_STOP, 0, NULL, 0, TR_DETACH, 0);
         eor_transition_called = true;
         return 0;
     }
 
-    if (!enableMerging && itv1725->GetModuleID() != unmergedModuleToRead) {
+    if (!enableMerging && itdt5751->GetModuleID() != unmergedModuleToRead) {
       continue;
     }
 
-    DWORD thisTimestamp = itv1725->PeekRBTimestamp();
+    DWORD thisTimestamp = itdt5751->PeekRBTimestamp();
     DWORD deltaTimestamp = thisTimestamp - minTimestamp;
 
     if (deltaTimestamp > 0x7FFFFFFF) {
@@ -1241,13 +1112,13 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
       deltaTimestamp -= 0x7FFFFFFF;
     }
 
-    if (enableMerging && !enableChronobox && deltaTimestamp > timestampMatchingThreshold) {
+    if (enableMerging && deltaTimestamp > timestampMatchingThreshold) {
       continue;
     }
 
     // >>> Fill Event bank
     uint32_t timestamp;
-    itv1725->FillEventBank(pevent,timestamp);
+    itdt5751->FillEventBank(pevent,timestamp);
 
     // Save timestamp for ZLE bank.
     timestamps.push_back((timestamp & 0x7fffffff));
@@ -1273,7 +1144,7 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
     printf("only 1 timestamp, [0]:0x%08x secs:%f\n", timestamps[0], timestamps[0]*0.000000008);
   }
 
-  if (enableMerging && !enableChronobox && !writePartiallyMergedEvents && timestamps.size() != numConnectedBoards) {
+  if (enableMerging && !writePartiallyMergedEvents && timestamps.size() != numConnectedBoards) {
     printf("Skipping event at time 0x%08x as only have data from %d/%d boards.\n", minTimestamp, (DWORD)timestamps.size(), numConnectedBoards);
     return 0;
   }
@@ -1290,20 +1161,20 @@ INT read_buffer_level(char *pevent, INT off) {
 
   bk_init32(pevent);
   int PLLLockLossID = -1;
-  for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725) {
-    if (!itv1725->IsConnected()) {
+  for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
+    if (!itdt5751->IsConnected()) {
       continue;
     }
-    itv1725->FillBufferLevelBank(pevent);
+    itdt5751->FillBufferLevelBank(pevent);
 
     // Check the PLL lock
     DWORD vmeStat, vmeAcq;
-    itv1725->ReadReg(V1725_ACQUISITION_STATUS, &vmeAcq);
+    itdt5751->ReadReg(DT5751_ACQUISITION_STATUS, &vmeAcq);
     if ((vmeAcq & 0x80) == 0) {
-      PLLLockLossID= itv1725->GetModuleID();
-      cm_msg(MINFO,"read_buffer_level","V1725 PLL loss lock Board:%d (vmeAcq=0x%x)"
-             , itv1725->GetModuleID(), vmeAcq);
-      itv1725->ReadReg(V1725_VME_STATUS, &vmeStat);
+      PLLLockLossID= itdt5751->GetModuleID();
+      cm_msg(MINFO,"read_buffer_level","DT5751 PLL loss lock Board:%d (vmeAcq=0x%x)"
+             , itdt5751->GetModuleID(), vmeAcq);
+      itdt5751->ReadReg(DT5751_VME_STATUS, &vmeStat);
     }
   }
 
@@ -1328,36 +1199,24 @@ INT read_temperature(char *pevent, INT off) {
 
   // Read the temperature for each ADC...
   DWORD temp;
-  for (itv1725 = ov1725.begin(); itv1725 != ov1725.end(); ++itv1725){
-    if (!itv1725->IsConnected()) {
+  for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751){
+    if (!itdt5751->IsConnected()) {
       continue;
     }
 
     int addr;
     char bankName[5];
-    sprintf(bankName,"TP%02d", itv1725->GetModuleID());
+    sprintf(bankName,"TP%02d", itdt5751->GetModuleID());
     bk_create(pevent, bankName, TID_DWORD, (void **)&pdata);
     for (int i=0;i<16;i++) {
-     addr = V1725_CHANNEL_TEMPERATURE | (i << 8);
-     itv1725->ReadReg(addr, &temp);
+     addr = DT5751_CHANNEL_TEMPERATURE | (i << 8);
+     itdt5751->ReadReg(addr, &temp);
      *pdata++ =  temp;
 
     }
     bk_close(pevent,pdata);
   }
 
-  if(0){
-    bk_create(pevent, "ZMQ0", TID_DWORD, (void **)&pdata);
-    int stat = zmq_recv (subscriber, pdata, 1000, ZMQ_DONTWAIT);
-    // PAA - As long as you don't close the bank, the bank list & event is unchanged.
-    if (stat > 0) {
-      printf ("stat: %d  pdata[0]: %d ... ", stat, pdata[0]);
-      printf("composing ZMQ bank\n");
-      pdata += stat/sizeof(uint32_t);
-      stat = bk_close(pevent, pdata);
-      printf("bk_close size:%d\n", stat);
-    }
-  }
   return bk_size(pevent);
 }
 

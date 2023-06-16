@@ -1,14 +1,14 @@
 /*****************************************************************************/
 /**
-\file v1725CONET2.hxx
+\file dt5751CONET2.hxx
 
 ## Contents
 
-This file contains the class definition for the v1725 module driver.
+This file contains the class definition for the DT5751 module driver.
  *****************************************************************************/
 
-#ifndef V1725_HXX_INCLUDE
-#define V1725_HXX_INCLUDE
+#ifndef DT5751_HXX_INCLUDE
+#define DT5751_HXX_INCLUDE
 
 #include <iostream>
 #include <sstream>
@@ -21,19 +21,19 @@ This file contains the class definition for the v1725 module driver.
 
 #include <CAENComm.h>
 #include <CAENVMElib.h>
-#include "ov1725drv.h"
+#include "odt5751drv.h"
 
 #include "midas.h"
 #include "msystem.h"
 
 // Max event size we support (in bytes).
-// Defined here as needed in v1725CONET2.cxx and feoV1725.cxx.
+// Defined here as needed in dt5751CONET2.cxx and feoDT5751.cxx.
 // Size required in bytes = wf_len_us * num_boards * chans_per_board * us_to_bytes_factor + space for other info
 // E.g. for 1000us when reading 8 channels from 4 boards:
 //   1000 * 4 * 8 * 437.5 + 10000 = 14,010,000
 // If going very big, may also need to change /Experiment/MAX_EVENT_SIZE in ODB.
 // 45MB/event is enough for 3ms with 4 boards * 8 channels
-#define V1725_MAX_EVENT_SIZE 45000000
+#define DT5751_MAX_EVENT_SIZE 45000000
 
 typedef unsigned short UShort_t;    //Unsigned Short integer 2 bytes (unsigned short)
 typedef short          Short_t;     //Signed Short integer 2 bytes (unsigned short)
@@ -52,7 +52,7 @@ namespace TMath {
 };
 
 /**
- * Driver class for the v1725 module using the CAEN CONET2 (optical) interface.
+ * Driver class for the dt5751 module using the CAEN CONET2 (optical) interface.
  * Contains all the methods necessary to:
  *
  * - Connect/disconnect the board through an optical connection
@@ -62,7 +62,7 @@ namespace TMath {
  * - Handle ZLE data
  * - Send a software trigger to the board if desired
  */
-class v1725CONET2
+class dt5751CONET2
 {
 
 public:
@@ -81,7 +81,7 @@ public:
     ZLEPack25,               //!< 3: ZLE data, 2.5 packing
     UnrecognizedDataFormat
   };
-  struct V1725_CONFIG_SETTINGS {
+  struct DT5751_CONFIG_SETTINGS {
     BOOL      enable;
     BOOL      has_zle_firmware;         //!< Some registers only valid for ZLE or non-ZLE FW
     INT       acq_mode;                 //!< 0x8100@[ 1.. 0]
@@ -113,19 +113,19 @@ public:
   static const char history_settings[][NAME_LENGTH];
 
   /* Constructor/Destructor */
-  v1725CONET2(int feindex, int link, int board, int moduleID, HNDLE hDB);
+  dt5751CONET2(int feindex, int link, int board, int moduleID, HNDLE hDB);
   /* Use move instead of copy semantics as we only need one copy of each
    * object (C++11).  See notes in implementation. */
-  v1725CONET2(v1725CONET2&&) noexcept;
-  v1725CONET2& operator=(v1725CONET2&&) noexcept;
-  ~v1725CONET2();
+  dt5751CONET2(dt5751CONET2&&) noexcept;
+  dt5751CONET2& operator=(dt5751CONET2&&) noexcept;
+  ~dt5751CONET2();
 
   /* Public methods */
   ConnectErrorCode Connect();
   ConnectErrorCode Connect(int, int);
   static void * connectThread(void *);
   struct thread_args {
-    v1725CONET2 * v1725;
+    dt5751CONET2 * dt5751;
     CAENComm_ErrorCode * errcode;
     pthread_cond_t * cv;
   };
@@ -249,5 +249,5 @@ private:
   CAENComm_ErrorCode WriteReg_(DWORD, DWORD);
 };
 
-#endif // V1725_HXX_INCLUDE
+#endif // DT5751_HXX_INCLUDE
 
