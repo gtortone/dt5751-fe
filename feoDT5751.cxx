@@ -156,7 +156,6 @@ bool stopRunInProgress = false; //!<
 bool eor_transition_called = false; // already called EOR
 uint32_t timestamp_offset[NBLINKSPERFE*NBDT5751PERLINK]; //!< trigger time stamp offsets
 
-std::string chronoboxIP = "172.16.4.71";
 BOOL enableMerging = true;
 int unmergedModuleToRead = -1;
 BOOL writePartiallyMergedEvents = false;
@@ -290,27 +289,6 @@ void seq_callback(INT h, INT hseq, void *info){
   }
 }
 
-// Start the chronobox run going.  TRUE=start run, FALSE=stop run)
-INT chronobox_start_stop(bool start){
-
-  int status;
-  if(start){
-    char cmd[255];
-    sprintf(cmd, "esper-tool write -d true %s mod_tdm run", chronoboxIP.c_str());
-    status = system(cmd);
-    printf("Started chronobox run; status = %i\n",status);
-  }else{
-    char cmd[255];
-    printf("Stopping chronobox run\n");
-    sprintf(cmd, "esper-tool write -d false %s mod_tdm run", chronoboxIP.c_str());
-    status = system(cmd);
-    printf("Stopped chronobox run; status = %i\n",status);
-  }
-
-  return status;
-}
-
-
 //
 //-------------------------------------------------------------------
 /**
@@ -361,17 +339,14 @@ INT frontend_init(){
   }
 
   {
-    // Create flags for whether to enable Chronobox, and whether to merge data from all boards in same event.
+    // Create flags for merge data from all boards in same event.
     char cb_path[255], cb_ip_path[255], merge_path[255], partial_path[255], flush_path[255], thresh_path[255];
     int size_bool = sizeof(BOOL);
     int size_dword = sizeof(DWORD);
-    sprintf(cb_path, "/Equipment/%s/Settings/Enable chronobox", equipment[0].name);
-    sprintf(cb_ip_path, "/Equipment/%s/Settings/Chronobox IP Address", equipment[0].name);
     sprintf(merge_path, "/Equipment/%s/Settings/Merge data from boards", equipment[0].name);
     sprintf(partial_path, "/Equipment/%s/Settings/Write partially merged events", equipment[0].name);
     sprintf(flush_path, "/Equipment/%s/Settings/Flush buffers at end of run", equipment[0].name);
     sprintf(thresh_path, "/Equipment/%s/Settings/TS match thresh (clock ticks)", equipment[0].name);
-    db_get_value_string(hDB, 0, cb_ip_path, 0, &chronoboxIP, TRUE, 128);
     db_get_value(hDB, 0, merge_path, &enableMerging, &size_bool, TID_BOOL, TRUE);
     db_get_value(hDB, 0, partial_path, &writePartiallyMergedEvents, &size_bool, TID_BOOL, TRUE);
     db_get_value(hDB, 0, flush_path, &flushBuffersAtEndOfRun, &size_bool, TID_BOOL, TRUE);
@@ -533,27 +508,18 @@ INT begin_of_run(INT run_number, char *error)
   }
 
   {
-    // Create/read flags for whether to enable Chronobox, and whether to merge data from all boards in same event.
+    // Create/read flags for merge data from all boards in same event.
     char cb_path[255], cb_ip_path[255], merge_path[255], partial_path[255], flush_path[255], thresh_path[255];
-    sprintf(cb_path, "/Equipment/%s/Settings/Enable chronobox", equipment[0].name);
-    sprintf(cb_ip_path, "/Equipment/%s/Settings/Chronobox IP Address", equipment[0].name);
     sprintf(merge_path, "/Equipment/%s/Settings/Merge data from boards", equipment[0].name);
     sprintf(partial_path, "/Equipment/%s/Settings/Write partially merged events", equipment[0].name);
     sprintf(flush_path, "/Equipment/%s/Settings/Flush buffers at end of run", equipment[0].name);
     sprintf(thresh_path, "/Equipment/%s/Settings/TS match thresh (clock ticks)", equipment[0].name);
     INT size = sizeof(BOOL);
-    db_get_value_string(hDB, 0, cb_ip_path, 0, &chronoboxIP, TRUE, 128);
     db_get_value(hDB, 0, merge_path, &enableMerging, &size, TID_BOOL, TRUE);
     db_get_value(hDB, 0, partial_path, &writePartiallyMergedEvents, &size, TID_BOOL, TRUE);
     db_get_value(hDB, 0, flush_path, &flushBuffersAtEndOfRun, &size, TID_BOOL, TRUE);
     size = sizeof(DWORD);
     db_get_value(hDB, 0, thresh_path, &timestampMatchingThreshold, &size, TID_DWORD, TRUE);
-  }
-
-  if (!enableMerging) {
-    cm_msg(MERROR, __FUNCTION__, "Invalid setup - you must merge data from all boards if running with the chronobox.");
-    sprintf(error, "Invalid setup - you must merge data from all boards if running with the chronobox.");
-    return FE_ERR_ODB;
   }
 
   for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
@@ -563,8 +529,8 @@ INT begin_of_run(INT run_number, char *error)
     if ((vmeAcq & 0x80) == 0) {
       cm_msg(MERROR,"BeginOfRun","DT5751 PLL loss lock Board (sometime in the past):%d (vmeAcq=0x%x)"
              ,itdt5751->GetModuleID(), vmeAcq);
-      // PLL loss lock reset by the VME_STATUS read!
-      itdt5751->ReadReg(DT5751_VME_STATUS, &vmeStat);
+      // PLL loss lock reset by the READOUT_STATUS read!
+      itdt5751->ReadReg(DT5751_READOUT_STATUS, &vmeStat);
       usleep(100);
       itdt5751->ReadReg(DT5751_ACQUISITION_STATUS, &vmeAcq); // Test the PLL again
       if ((vmeAcq & 0x80) == 0) {
@@ -652,9 +618,14 @@ void * link_thread(void * arg)
       rb_handle = itdt5751_thread[link]->GetRingBufferHandle();
       moduleID = itdt5751_thread[link]->GetModuleID();
 
-      // Check if event in hardware to read
-      if (!stopRunInProgress && itdt5751_thread[link]->CheckEvent()){
+# if 0
+      // debug
+      if(itdt5751_thread[link]->IsEnabled())
+        odt5751_Status(itdt5751_thread[link]->GetDeviceHandle());
+#endif
 
+      // Check if event in hardware to read
+      if (!stopRunInProgress && itdt5751_thread[link]->CheckEvent() && itdt5751_thread[link]->IsEnabled()){
 
         /* If we've reached 75% of the ring buffer space, don't read
          * the next event.  Wait until the ring buffer level goes down.
@@ -709,8 +680,6 @@ BOOL wait_buffer_empty(int transition, BOOL first)
 
    if(first){
      printf("\nDeferred transition.  First call of wait_buffer_empty. Stopping run\n");
-     // Some funny business here... need to pause the readout on the threads before
-     // making the chronobox stop call... some sort of contention for the system resources.
      for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
        if (itdt5751->IsConnected()) {  // Skip unconnected board
          itdt5751->StopRun();
@@ -1138,10 +1107,10 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
       uint32_t diff = (diff1 < diff2) ? diff1 : diff2;
       double fdiff = diff*0.000000008;
 
-      printf("idx:%i sze:%zu [0]:0x%08x [%i]:0x%08x diff:%i secs:%f diff_secs:%f \n", i, timestamps.size(), timestamps[0], i,  timestamps[i], diff, timestamps[i]*0.000000008,fdiff);
+      //printf("idx:%i sze:%zu [0]:0x%08x [%i]:0x%08x diff:%i secs:%f diff_secs:%f \n", i, timestamps.size(), timestamps[0], i,  timestamps[i], diff, timestamps[i]*0.000000008,fdiff);
     }
   } else {
-    printf("only 1 timestamp, [0]:0x%08x secs:%f\n", timestamps[0], timestamps[0]*0.000000008);
+    //printf("only 1 timestamp, [0]:0x%08x secs:%f\n", timestamps[0], timestamps[0]*0.000000008);
   }
 
   if (enableMerging && !writePartiallyMergedEvents && timestamps.size() != numConnectedBoards) {
@@ -1174,7 +1143,7 @@ INT read_buffer_level(char *pevent, INT off) {
       PLLLockLossID= itdt5751->GetModuleID();
       cm_msg(MINFO,"read_buffer_level","DT5751 PLL loss lock Board:%d (vmeAcq=0x%x)"
              , itdt5751->GetModuleID(), vmeAcq);
-      itdt5751->ReadReg(DT5751_VME_STATUS, &vmeStat);
+      itdt5751->ReadReg(DT5751_READOUT_STATUS, &vmeStat);
     }
   }
 
@@ -1183,7 +1152,7 @@ INT read_buffer_level(char *pevent, INT off) {
     char Path[255];
     sprintf(Path,"/DS Alarm/PLL Loss FE0%d",get_frontend_index());
     db_set_value(hDB, 0, Path, &(PLLLockLossID), sizeof(INT), 1, TID_INT);
-    // PLL loss lock reset by the VME_STATUS read!
+    // PLL loss lock reset by the READOUT_STATUS read!
   }
   printf(" | ");
   return bk_size(pevent);

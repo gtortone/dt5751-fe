@@ -149,8 +149,6 @@ public:
   int SetHistoryRecord(HNDLE h, void(*cb_func)(INT,INT,void*));
   int InitializeForAcq();
 
-  void FindPulses(bool firstBlock, int closePulseLookAhead, int closePulseNearEndOfBlock, bool extendPulseEnd, bool enableSubPeaks, bool enablePulseSplitting);
-
   /* Getters/Setters */
   int GetModuleID() { return moduleID_; } //!< returns unique module ID
   int GetLink() { return link_; }         //!< returns optical link number

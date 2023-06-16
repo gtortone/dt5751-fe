@@ -184,9 +184,9 @@ CAENComm_ErrorCode odt5751_info(int handle, int *nchannels, uint32_t *data)
 
   // times the number of active channels
   sCAEN = CAENComm_Read32(handle, DT5751_CHANNEL_EN_MASK, &reg);  
-  chanmask = 0xff & reg; 
+  chanmask = 0xf & reg; 
   *nchannels = 0;
-  for (i=0;i<8;i++) {
+  for (i=0;i<4;i++) {
     if (chanmask & (1<<i))
       *nchannels += 1;
   }
@@ -212,14 +212,22 @@ CAENComm_ErrorCode odt5751_Status(int handle)
   printf("Acquisition control  : 0x%8.8x\n", reg);
   sCAEN = CAENComm_Read32(handle, DT5751_ACQUISITION_STATUS, &reg);  
   printf("Acquisition status         : 0x%8.8x\n", reg);
+  sCAEN = CAENComm_Read32(handle, DT5751_CHANNEL_EN_MASK, &reg);  
+  printf("Channel mask               : 0x%5.5x\n", reg);
   sCAEN = CAENComm_Read32(handle, DT5751_BOARD_CONFIG, &reg);  
-  printf("Channel Configuration      : 0x%5.5x\n", reg);
+  printf("Board Configuration        : 0x%5.5x\n", reg);
   sCAEN = CAENComm_Read32(handle, DT5751_TRIG_SRCE_EN_MASK, &reg);  
   printf("Trigger Source Enable Mask : 0x%8.8x\n", reg);
-  sCAEN = CAENComm_Read32(handle, DT5751_VME_STATUS, &reg);  
+  sCAEN = CAENComm_Read32(handle, DT5751_READOUT_STATUS, &reg);  
   printf("VME Status                 : 0x%x\n", reg);
   sCAEN = CAENComm_Read32(handle, DT5751_EVENT_STORED, &reg);  
   printf("Event Stored               : 0x%8.8x\n", reg);
+  for(int i=0; i<4; i++) {
+    sCAEN = CAENComm_Read32(handle, DT5751_CHANNEL_STATUS + (i * 0x100), &reg);
+    printf("Channel %d status (0x%X)        : 0x%8.8x\n", i, DT5751_CHANNEL_STATUS + (i * 0x100), reg);
+    sCAEN = CAENComm_Read32(handle, DT5751_CHANNEL_CONFIG + (i * 0x100), &reg);
+    printf("Channel %d config (0x%X)        : 0x%8.8x\n", i, DT5751_CHANNEL_CONFIG + (i * 0x100), reg);
+  }
   printf("================================================\n");
   return sCAEN;
 }
@@ -531,37 +539,6 @@ int main (int argc, char* argv[]) {
     //    printf("Modules all readout\n");
   }
 
-#endif
-
-#if 0
-  Address = DT5751_EVENT_READOUT_BUFFER;
-  CAENComm_MultiRead32(handle, &Address, status/4, &(data[0]), &sCAEN);
-  printf("sCAEN:%d MultiRead32 length:0x%x\n", sCAEN, status/4);
-#endif
-
-#if 0
-  // SCAEN returns -13 when no more data, nw on the -13 returns the remain
-  Address = DT5751_EVENT_READOUT_BUFFER;
-  for (i=0;i<32;i++) {
-    sCAEN = CAENComm_BLTRead(handle, Address, &(data[0]), 512, &nw);
-    printf("sCAEN:%d BLTRead length:0x%x\n", sCAEN, nw);
-    if (nw == 0) break;
-  }
-#endif
-  
-#if 0
-  Address = DT5751_EVENT_READOUT_BUFFER;
-  for (i=0;i<32;i++) {
-    sCAEN = CAENComm_MBLTRead(handle, Address, &(data[0]), 128, &nw);
-    printf("sCAEN:%d MBLTRead length:0x%x\n", sCAEN, nw);
-    if (nw == 0) break;
-  }
-#endif
-  
-#if 0
-  for (i=0;i<nw;i++) {
-    printf(" Data[%d] = 0x%8.8x\n", i, data[i]);
-  }
 #endif
 
   // Exit port

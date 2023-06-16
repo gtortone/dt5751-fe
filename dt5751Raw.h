@@ -50,8 +50,8 @@
 #define DT5751_BUFFER_OCCUPANCY_GAIN           0x81B4      /* R/W       ; D32 */
 #define DT5751_EXTENDED_VETO_DELAY             0x8170      /* R/W       ; D32 */
 
-#define DT5751_VME_CONTROL                     0xEF00      /* R/W       ; D32 */ 
-#define DT5751_VME_STATUS                      0xEF04      /* read  only; D32 */ 
+#define DT5751_READOUT_CONTROL                 0xEF00      /* R/W       ; D32 */ 
+#define DT5751_READOUT_STATUS                  0xEF04      /* read  only; D32 */ 
 #define DT5751_BOARD_ID                        0xEF08      /* R/W       ; D32 */ 
 #define DT5751_MULTICAST_BASE_ADDCTL           0xEF0C      /* R/W       ; D32 */ 
 #define DT5751_RELOC_ADDRESS                   0xEF10      /* R/W       ; D32 */ 
@@ -74,6 +74,7 @@
 #define DT5751_CHANNEL_STATUS                  0x1088      /* For channel 0 */
 #define DT5751_FPGA_FWREV                      0x108C      /* For channel 0 */
 #define DT5751_CHANNEL_DAC                     0x1098      /* For channel 0 */
+#define DT5751_CHANNEL_CONFIG		       0x109C      /* For channel 0 */
 #define DT5751_CHANNEL_TEMPERATURE             0x10A8      /* For channel 0 */
 
 // bitmasks

@@ -15,9 +15,6 @@ This file contains the class implementation for the DT5751 module driver.
 #include <fstream>
 
 #define UNUSED(x) ((void)(x)) //!< Suppress compiler warnings
-#define NUM_SQ_WORDS 5
-#define POSTPONE_CHARGE_FILTERING 0
-#define MAX_QT_WORDS 2000
 
 //! Configuration string for this board. (ODB: /Equipment/[eq_name]/Settings/[board_name]/)
 const char * dt5751CONET2::config_str_board[] = {\
@@ -542,12 +539,12 @@ CAENComm_ErrorCode dt5751CONET2::WriteReg_(DWORD address, DWORD val)
     char **strings;
 
     nptrs = backtrace(buffer, SIZE);
-    printf("backtrace() returned %d addresses\n", nptrs);
+    //printf("backtrace() returned %d addresses\n", nptrs);
 
     strings = backtrace_symbols(buffer, nptrs);
 
-    for (j = 0; j < nptrs; j++)
-        printf("%s\n", strings[j]);
+    //for (j = 0; j < nptrs; j++)
+    //    printf("%s\n", strings[j]);
 
     free(strings);
   }
@@ -598,8 +595,10 @@ bool dt5751CONET2::Poll(DWORD *val)
 bool dt5751CONET2::CheckEvent()
 {
   DWORD vmeStat, eStored;
-  this->ReadReg(DT5751_VME_STATUS, &vmeStat);
-  return (vmeStat & 0x1);
+  //this->ReadReg(DT5751_READOUT_STATUS, &vmeStat);
+  //return (vmeStat & 0x1);
+  this->ReadReg(DT5751_ACQUISITION_STATUS, &vmeStat);
+  return ( (vmeStat >> 3) & 0x1);
 }
 
 //
@@ -699,7 +698,6 @@ bool dt5751CONET2::FillEventBank(char * pevent, uint32_t &timestamp)
     return false;
   }
 
-
   if ((*src & 0xF0000000) != 0xA0000000){
     cm_msg(MERROR,"FillEventBank","Incorrect hearder for board:%d (0x%x)", this->GetModuleID(), *src);
     return false;
@@ -720,7 +718,6 @@ bool dt5751CONET2::FillEventBank(char * pevent, uint32_t &timestamp)
   }
  // printf("Bank size (before %s): %u, event size: %u\n", bankName, bk_size(pevent), size_words);
   bk_create(pevent, bankName, TID_DWORD, (void **)&dest);
-
 
   uint32_t limit_size = (DT5751_MAX_EVENT_SIZE-bk_size(pevent))/4; // what space is left in the event (in DWORDS)
   if (size_words > limit_size) {
@@ -771,7 +768,6 @@ bool dt5751CONET2::FillEventBank(char * pevent, uint32_t &timestamp)
   return true;
 
 }
-
 
 
 //
@@ -833,7 +829,6 @@ bool dt5751CONET2::FillBufferLevelBank(char * pevent)
 
 
   bk_close(pevent, pdata);
-
 
   return (sCAEN == CAENComm_Success);
 
@@ -1060,8 +1055,8 @@ int dt5751CONET2::InitializeForAcq()
   uint32_t version = 0;
   uint32_t prev_chan = 0;
   // Hardcode correct firmware verisons
-	const uint32_t amc_fw_ver = 0x44260008;  // 0x14048c02; for ZLE
-	const uint32_t roc_fw_ver = 0x4b060417;  // 0x1331040c; for ZLE
+	const uint32_t amc_fw_ver = 0x0c020007;
+	const uint32_t roc_fw_ver = 0x17200410;
   for(int iCh=0;iCh<4;iCh++) {
     addr = 0x108c | (iCh << 8);
     sCAEN = ReadReg_(addr, &version);
@@ -1072,11 +1067,9 @@ int dt5751CONET2::InitializeForAcq()
   }
 	//  cm_msg(MINFO,"feoDT5751","Format: YMDD:XX.YY");
 
-#ifndef NO_DT5751
   if(version != amc_fw_ver)
     cm_msg(MERROR,"InitializeForAcq","Incorrect AMC Firmware Version: 0x%08x, 0x%08x expected", version, amc_fw_ver);
   else
-#endif
     ss_fw_datatype << "AMC FW: 0x" << std::hex << version << ", ";
 
   // read ROC firmware revision
@@ -1088,9 +1081,7 @@ int dt5751CONET2::InitializeForAcq()
     ss_fw_datatype << "ROC FW: 0x" << std::hex << version << ", ";
     break;
   default:
-#ifndef NO_DT5751
     cm_msg(MERROR,"InitializeForAcq","Incorrect ROC Firmware Version: 0x%08x, 0x%08x expected", version, roc_fw_ver);
-#endif
     break;
   }
 
@@ -1155,19 +1146,13 @@ int dt5751CONET2::InitializeForAcq()
 	WriteReg_(DT5751_FP_TRIGGER_OUT_EN_MASK,  config.trigger_output);
 	WriteReg_(DT5751_MONITOR_MODE,            0x3); // Buffer Occupancy mode;
 	WriteReg_(DT5751_BLT_EVENT_NB,            0x1); // TL? max number of events per BLT is 1?
-	WriteReg_(DT5751_VME_CONTROL,             DT5751_ALIGN64);
-
 
 	printf("..............................Now other settings...\n");
 	//set specfic channel values
 
 	usleep(200000);
 
-#ifdef NO_DT5751
-	for (int iChan=0; iChan<8; iChan++) {
-#else
 	for (int iChan=0; iChan<4; iChan++) {
-#endif
 
     if (config.has_zle_firmware) {
   		WriteReg_(DT5751ZLE_CHANNEL_THRESHOLD + (iChan<<8), config.selftrigger_threshold[iChan]);
@@ -1204,24 +1189,28 @@ int dt5751CONET2::InitializeForAcq()
 	// Wait for 200ms after channing DAC offsets, before starting calibration. 
 	usleep(200000);
 
-#ifndef NO_DT5751
 	// Start the ADC calibration
-  WriteReg_(DT5751_ADC_CALIBRATION , 1);
+	DWORD temp;
+	ReadReg_(DT5751_ADC_CALIBRATION, &temp);
+	temp = temp & (~ (1<<1));
+  	WriteReg_(DT5751_ADC_CALIBRATION , temp);
+	temp = temp | (1<<1);
+	WriteReg_(DT5751_ADC_CALIBRATION , temp);
+
 	// Now we check to see when the calibration has finished.
 	// by checking register 0x1n88.
-	DWORD temp;
 	for (int i=0;i<4;i++) {
 		addr = DT5751_CHANNEL_STATUS | (i << 8);
 		ReadReg_(addr,&temp);
 		//		printf("Channel (%i) %x Status: %x\n",i,addr,temp);
-		if((temp & 0x4) == 0x4){
+		if((temp & 0x40) != 0x40){
 			printf("waiting for ADC calibration to finish...\n");
 			int j;
 			for(j =0; j < 20; i++){
 				sleep(1);
 				//				printf("temp %x\n",temp);
 				ReadReg_(addr,&temp);
-				if((temp & 0x4) == 0x0){
+				if((temp & 0x40) == 0x40){
 					break;
 				}
 			}
@@ -1239,7 +1228,8 @@ int dt5751CONET2::InitializeForAcq()
 
 	printf("Module[...] : ADC calibration finished already\n");
 
-#endif	
+	temp = temp & (~ (1<<1));
+  	WriteReg_(DT5751_ADC_CALIBRATION , temp);
 	
 	// Check finally for Acquisition status
 	sCAEN = ReadReg_(0x8178, &reg);

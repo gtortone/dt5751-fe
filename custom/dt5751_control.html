@@ -6,7 +6,7 @@
    <script src="controls.js"></script>
    <script src="midas.js"></script>
    <script src="mhttpd.js"></script>
-   <title>V1725 Setup</title>
+   <title>DT5751 Setup</title>
 
    <style>
       .mtable td { padding: 10px; }
@@ -15,7 +15,7 @@
    <script>
 
     function set_board_param(board_id, odbkey, value) {
-      let path = "/Equipment/V1725_Data00/Settings/Board" + board_id + "/" + odbkey;
+      let path = "/Equipment/DT5751_Data00/Settings/Board" + board_id + "/" + odbkey;
 
       mjsonrpc_db_set_value(path, value).then(function(rpc) {
          result=rpc.result;              
@@ -31,45 +31,20 @@
      pret_factor = 4;
      zle_wndw_factor = 2;
      
-     // V1725s
+     // DT5751
      if (board_type == 0) {
-       sampling_rate = 250e6;
-       sram_samples_per_chan = 640e3;
-       cs_factor = is_zle(board_id) ? 4 : 10;
-       pt_factor = 4; // Should be 2 according to manual, but 4 seems correct in reality
+       sampling_rate = 1e9;
+       sram_samples_per_chan = 1.8e6;
+       cs_factor = is_zle(board_id) ? 4 : 7;
+       pt_factor = 16; 
      }
      if (board_type == 1) {
-       sampling_rate = 250e6;
-       sram_samples_per_chan = 5.12e6;
-       cs_factor = is_zle(board_id) ? 4 : 10;
-       pt_factor = 4; // Should be 2 according to manual, but 4 seems correct in reality
+       sampling_rate = 1e9;
+       sram_samples_per_chan = 14.4e6;
+       cs_factor = is_zle(board_id) ? 4 : 7;
+       pt_factor = 16; 
      }
 
-     // V1720s
-     if (board_type == 2) {
-       sampling_rate = 250e6;
-       sram_samples_per_chan = 1e6;
-       cs_factor = 2;
-       pt_factor = 4;
-     }
-     if (board_type == 3) {
-       sampling_rate = 250e6;
-       sram_samples_per_chan = 8e6;
-       cs_factor = 2;
-       pt_factor = 4;
-     }
-     if (board_type == 4) {
-       sampling_rate = 250e6;
-       sram_samples_per_chan = 1e6 * 1.25;
-       cs_factor = 2 * 1.25;
-       pt_factor = 4;
-     }
-     if (board_type == 5) {
-       sampling_rate = 250e6;
-       sram_samples_per_chan = 8e6 * 1.25;
-       cs_factor = 2 * 1.25;
-       pt_factor = 4;
-     }
      return [sampling_rate, sram_samples_per_chan, cs_factor, pt_factor, pret_factor, zle_wndw_factor];
    }
 
@@ -138,7 +113,6 @@
    }
    
    function buffer_code_details(buffer_code, board_id) {
-	   // buffer_code is 0x0 - 0xA. See V1725 docs for register 0x800C.
 	   var num_buffers = 1 << buffer_code;
 	   var num_samples = get_board_sram_samples_per_chan(board_id) / num_buffers;
 	   return [num_samples, num_buffers]
@@ -181,14 +155,10 @@
 
    function trigger_source_updated(board_id) {
     let val = parseInt(document.getElementById("ts_" + board_id).innerText);
-    document.getElementById("ts_" + board_id + "_ch01").checked = (((val >> 0) & 0x1) == 1);
-    document.getElementById("ts_" + board_id + "_ch23").checked = (((val >> 1) & 0x1) == 1);
-    document.getElementById("ts_" + board_id + "_ch45").checked = (((val >> 2) & 0x1) == 1);
-    document.getElementById("ts_" + board_id + "_ch67").checked = (((val >> 3) & 0x1) == 1);
-    document.getElementById("ts_" + board_id + "_ch89").checked = (((val >> 4) & 0x1) == 1);
-    document.getElementById("ts_" + board_id + "_ch1011").checked = (((val >> 5) & 0x1) == 1);
-    document.getElementById("ts_" + board_id + "_ch1213").checked = (((val >> 6) & 0x1) == 1);
-    document.getElementById("ts_" + board_id + "_ch1415").checked = (((val >> 7) & 0x1) == 1);
+    document.getElementById("ts_" + board_id + "_ch0").checked = (((val >> 0) & 0x1) == 1);
+    document.getElementById("ts_" + board_id + "_ch1").checked = (((val >> 1) & 0x1) == 1);
+    document.getElementById("ts_" + board_id + "_ch2").checked = (((val >> 2) & 0x1) == 1);
+    document.getElementById("ts_" + board_id + "_ch3").checked = (((val >> 3) & 0x1) == 1);
     document.getElementById("ts_" + board_id + "_lvds").checked = (((val >> 29) & 0x1) == 1);
     document.getElementById("ts_" + board_id + "_trgin").checked = (((val >> 30) & 0x1) == 1);
     document.getElementById("ts_" + board_id + "_sw").checked = (((val >> 31) & 0x1) == 1);
@@ -198,14 +168,10 @@
 
    function update_trigger_source(board_id) {
      let new_val = 0;
-     if (document.getElementById("ts_" + board_id + "_ch01").checked) {new_val |= (1 << 0);}
-     if (document.getElementById("ts_" + board_id + "_ch23").checked) {new_val |= (1 << 1);}
-     if (document.getElementById("ts_" + board_id + "_ch45").checked) {new_val |= (1 << 2);}
-     if (document.getElementById("ts_" + board_id + "_ch67").checked) {new_val |= (1 << 3);}
-     if (document.getElementById("ts_" + board_id + "_ch89").checked) {new_val |= (1 << 4);}
-     if (document.getElementById("ts_" + board_id + "_ch1011").checked) {new_val |= (1 << 5);}
-     if (document.getElementById("ts_" + board_id + "_ch1213").checked) {new_val |= (1 << 6);}
-     if (document.getElementById("ts_" + board_id + "_ch1415").checked) {new_val |= (1 << 7);}
+     if (document.getElementById("ts_" + board_id + "_ch0").checked) {new_val |= (1 << 0);}
+     if (document.getElementById("ts_" + board_id + "_ch1").checked) {new_val |= (1 << 1);}
+     if (document.getElementById("ts_" + board_id + "_ch2").checked) {new_val |= (1 << 2);}
+     if (document.getElementById("ts_" + board_id + "_ch3").checked) {new_val |= (1 << 3);}
      if (document.getElementById("ts_" + board_id + "_lvds").checked) {new_val |= (1 << 29);}
      if (document.getElementById("ts_" + board_id + "_trgin").checked) {new_val |= (1 << 30);}
      if (document.getElementById("ts_" + board_id + "_sw").checked) {new_val |= (1 << 31);}
@@ -234,14 +200,10 @@
 
   function trigger_output_updated(board_id) {
     let val = parseInt(document.getElementById("to_" + board_id).innerText);
-    document.getElementById("to_" + board_id + "_ch01").checked = (((val >> 0) & 0x1) == 1);
-    document.getElementById("to_" + board_id + "_ch23").checked = (((val >> 1) & 0x1) == 1);
-    document.getElementById("to_" + board_id + "_ch45").checked = (((val >> 2) & 0x1) == 1);
-    document.getElementById("to_" + board_id + "_ch67").checked = (((val >> 3) & 0x1) == 1);
-    document.getElementById("to_" + board_id + "_ch89").checked = (((val >> 4) & 0x1) == 1);
-    document.getElementById("to_" + board_id + "_ch1011").checked = (((val >> 5) & 0x1) == 1);
-    document.getElementById("to_" + board_id + "_ch1213").checked = (((val >> 6) & 0x1) == 1);
-    document.getElementById("to_" + board_id + "_ch1415").checked = (((val >> 7) & 0x1) == 1);
+    document.getElementById("to_" + board_id + "_ch0").checked = (((val >> 0) & 0x1) == 1);
+    document.getElementById("to_" + board_id + "_ch1").checked = (((val >> 1) & 0x1) == 1);
+    document.getElementById("to_" + board_id + "_ch2").checked = (((val >> 2) & 0x1) == 1);
+    document.getElementById("to_" + board_id + "_ch3").checked = (((val >> 3) & 0x1) == 1);
     document.getElementById("to_" + board_id + "_lvds").checked = (((val >> 29) & 0x1) == 1);
     document.getElementById("to_" + board_id + "_trgin").checked = (((val >> 30) & 0x1) == 1);
     document.getElementById("to_" + board_id + "_sw").checked = (((val >> 31) & 0x1) == 1);
@@ -251,14 +213,10 @@
 
     function update_trigger_output(board_id) {
       let new_val = 0;
-      if (document.getElementById("to_" + board_id + "_ch01").checked) {new_val |= (1 << 0);}
-      if (document.getElementById("to_" + board_id + "_ch23").checked) {new_val |= (1 << 1);}
-      if (document.getElementById("to_" + board_id + "_ch45").checked) {new_val |= (1 << 2);}
-      if (document.getElementById("to_" + board_id + "_ch67").checked) {new_val |= (1 << 3);}
-      if (document.getElementById("to_" + board_id + "_ch89").checked) {new_val |= (1 << 4);}
-      if (document.getElementById("to_" + board_id + "_ch1011").checked) {new_val |= (1 << 5);}
-      if (document.getElementById("to_" + board_id + "_ch1213").checked) {new_val |= (1 << 6);}
-      if (document.getElementById("to_" + board_id + "_ch1415").checked) {new_val |= (1 << 7);}
+      if (document.getElementById("to_" + board_id + "_ch0").checked) {new_val |= (1 << 0);}
+      if (document.getElementById("to_" + board_id + "_ch1").checked) {new_val |= (1 << 1);}
+      if (document.getElementById("to_" + board_id + "_ch2").checked) {new_val |= (1 << 2);}
+      if (document.getElementById("to_" + board_id + "_ch3").checked) {new_val |= (1 << 3);}
       if (document.getElementById("to_" + board_id + "_lvds").checked) {new_val |= (1 << 29);}
       if (document.getElementById("to_" + board_id + "_trgin").checked) {new_val |= (1 << 30);}
       if (document.getElementById("to_" + board_id + "_sw").checked) {new_val |= (1 << 31);}
@@ -326,14 +284,14 @@
     function readout_mask_updated(board_id) {
       let val = parseInt(document.getElementById("readout_" + board_id).innerText);
       
-      for (let i = 0; i < 16; i++) {
+      for (let i = 0; i < 4; i++) {
         document.getElementById("readout_" + board_id + "_" + i).checked = ((val >> i) & 0x1 == 1);
       }
     }
 
     function update_readout_mask(board_id) {
       let new_val = 0;
-      for (let i = 0; i < 16; i++) {
+      for (let i = 0; i < 4; i++) {
         if (document.getElementById("readout_" + board_id + "_" + i).checked) {
           new_val |= (1<<i);
         }
@@ -418,28 +376,16 @@
      let family = (val & 0xFF);
      let memory = ((val >> 8) & 0xFF);
 
-     if (family == 0x3) {
-       // V1720
+     if (family == 0x5) {
+       // 751 
        let cfg = parseInt(document.getElementById("board_config_" + board_id).innerText);
-       let pack25 = (cfg & (1<<11)) == 1;
 
        if (memory == 0x2) {
-          //1.25MS
-          document.getElementById("board_type_" + board_id).value = pack25 ? 4 : 2;
-          handled = true;
-       } else if (memory == 0x10) {
-         //10MS total memory
-          document.getElementById("board_type_" + board_id).value = pack25 ? 5 : 3;
-          handled = true;
-       }
-     } else if (family == 0xe) {
-       // V1725
-       if (memory == 0x1) {
-          //640kS/chan
+          //1.8MS
           document.getElementById("board_type_" + board_id).value = 0;
           handled = true;
-       } else if (memory == 0x8) {
-         //5.12MS/chan
+       } else if (memory == 0x10) {
+         //14.4 MS 
           document.getElementById("board_type_" + board_id).value = 1;
           handled = true;
        }
@@ -449,16 +395,11 @@
    }
    
    function register_listeners() {
-     var boxes = document.getElementsByClassName("chrono_mask");
+
+     boxes = document.getElementsByClassName("dt5751_mask");
      
      for (var i = 0; i < boxes.length; i++) {
-       boxes[i].onclick = function(){calculate_chrono_mask();};
-     }
-     
-     boxes = document.getElementsByClassName("v1725_mask");
-     
-     for (var i = 0; i < boxes.length; i++) {
-       boxes[i].onclick = function(){calculate_v1725_mask();};
+       boxes[i].onclick = function(){calculate_dt5751_mask();};
      }
      
      boxes = document.getElementsByClassName("blur_on_enter");
@@ -467,8 +408,7 @@
     	 boxes[i].onkeyup = function(e){if(e.keyCode==13){e.target.blur();}}
      }
      
-	   calculate_v1725_mask();
-	   calculate_chrono_mask();
+	   calculate_dt5751_mask();
    }
    
    function set_wf_length(board_id) {
@@ -566,8 +506,8 @@
      }
    }
    
-   function calculate_v1725_mask() {
-     var boxes = document.getElementsByClassName("v1725_mask");
+   function calculate_dt5751_mask() {
+     var boxes = document.getElementsByClassName("dt5751_mask");
      var mask = 0;
      
      for (var i = 0; i < boxes.length; i++) {
@@ -576,47 +516,19 @@
        }
      }
    
-     document.getElementById("v1725_mask_result").innerHTML = "0x" + mask.toString(16);
+     document.getElementById("dt5751_mask_result").innerHTML = "0x" + mask.toString(16);
    }
    
-   function select_all_v1725(checked) {
-     var boxes = document.getElementsByClassName("v1725_mask");
+   function select_all_dt5751(checked) {
+     var boxes = document.getElementsByClassName("dt5751_mask");
      
      for (var i = 0; i < boxes.length; i++) {
         boxes[i].checked = checked;
       }
       
-      calculate_v1725_mask();
+      calculate_dt5751_mask();
    }
    
-   function calculate_chrono_mask() {
-     var boxes = document.getElementsByClassName("chrono_mask");
-     var mask = 0;
-     
-     for (var i = 0; i < boxes.length; i++) {
-       if (boxes[i].checked) {
-    	   // Sigh, JS uses signed ints for bitshifts...
-    	   if (boxes[i].value == 31) {
-    		   mask += 0x80000000;
-    	   } else {
-    		   mask += (1 << boxes[i].value);
-    	   }
-       }
-     }
-   
-     document.getElementById("chrono_mask_result").innerHTML = "0x" + mask.toString(16);
-   }
-   
-   function select_all_chrono(checked) {
-     var boxes = document.getElementsByClassName("chrono_mask");
-     
-     for (var i = 0; i < boxes.length; i++) {
-        boxes[i].checked = checked;
-      }
-      
-      calculate_chrono_mask();
-   }
-
    function enable_changed(board_id) {
      let enabled = document.getElementById("enable_" + board_id).checked;
      let elems = document.querySelectorAll("[data-board='" + board_id + "']");
@@ -650,7 +562,7 @@
 
 </head>
 
-<body class="mcss" onload="mhttpd_init('V1725 Setup');register_listeners();">
+<body class="mcss" onload="mhttpd_init('DT5751 Setup');register_listeners();">
 
 <!-- header and side navigation will be filled in mhttpd_init -->
 <div id="mheader"></div>
@@ -660,30 +572,21 @@
 
   <table class="mtable">
     <tr>
-      <th colspan="6" class="mtableheader">V1725 Global Setup</th>
+      <th colspan="6" class="mtableheader">DT5751 Global Setup</th>
     </tr>
     <tr>
       <th>Setting</th>
       <th>Value</th> 
     </tr>
     <tr>
-      <td>Enable chronobox</td>
-      <td><input type="checkbox" class="modbcheckbox" data-odb-path="/Equipment/V1725_Data00/Settings/Enable chronobox" data-odb-editable="1"></td>
-    </tr>
-    <tr>
       <td>Merge data from multiple boards into a single event</td>
-      <td><input type="checkbox" class="modbcheckbox" data-odb-path="/Equipment/V1725_Data00/Settings/Merge data from boards" data-odb-editable="1"></td>
+      <td><input type="checkbox" class="modbcheckbox" data-odb-path="/Equipment/DT5751_Data00/Settings/Merge data from boards" data-odb-editable="1"></td>
     </tr>
     <tr>
       <td>
         Write partially merged events<br>
-        <div style="font-size:small; max-width:300px">
-          If the chronobox is disabled but we're still merging events, we'll do it by event timestamp.<br>
-          If a board is BUSY, should we still write the data from the other boards, or only write events 
-          when we have data from all boards?
-        </div>
       </td>
-      <td><input type="checkbox" class="modbcheckbox" data-odb-path="/Equipment/V1725_Data00/Settings/Write partially merged events" data-odb-editable="1"></td>
+      <td><input type="checkbox" class="modbcheckbox" data-odb-path="/Equipment/DT5751_Data00/Settings/Write partially merged events" data-odb-editable="1"></td>
     </tr>
     <tr>
       <td>
@@ -694,19 +597,19 @@
           of events stored, so the transition could take up to 20s to complete if this is enabled.
         </div>
       </td>
-      <td><input type="checkbox" class="modbcheckbox" data-odb-path="/Equipment/V1725_Data00/Settings/Flush buffers at end of run" data-odb-editable="1"></td>
+      <td><input type="checkbox" class="modbcheckbox" data-odb-path="/Equipment/DT5751_Data00/Settings/Flush buffers at end of run" data-odb-editable="1"></td>
     </tr>
     <tr>
       <td>
         Timestamp matching threshold (clock ticks)
       </td>
-      <td><div class="modbvalue" data-odb-path="/Equipment/V1725_Data00/Settings/TS match thresh (clock ticks)" data-odb-editable="1"></div></td>
+      <td><div class="modbvalue" data-odb-path="/Equipment/DT5751_Data00/Settings/TS match thresh (clock ticks)" data-odb-editable="1"></div></td>
     </tr>
   </table>
 
   <table class="mtable">
     <tr>
-      <th colspan="6" class="mtableheader">V1725 Board Setup</th>
+      <th colspan="6" class="mtableheader">DT5751 Board Setup</th>
     </tr>
     <tr>
       <th>Parameter</th>
@@ -717,64 +620,48 @@
     </tr>
     <tr>
       <td>Enable</td>
-      <td><input type="checkbox" class="modbcheckbox" id="enable_0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Enable" onchange="enable_changed(0)" onload="onchange()"></td>
-      <td><input type="checkbox" class="modbcheckbox" id="enable_1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Enable" onchange="enable_changed(1)" onload="onchange()"></td>
-      <td><input type="checkbox" class="modbcheckbox" id="enable_2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Enable" onchange="enable_changed(2)" onload="onchange()"></td>
-      <td><input type="checkbox" class="modbcheckbox" id="enable_3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Enable" onchange="enable_changed(3)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" id="enable_0" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/Enable" onchange="enable_changed(0)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" id="enable_1" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/Enable" onchange="enable_changed(1)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" id="enable_2" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/Enable" onchange="enable_changed(2)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" id="enable_3" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/Enable" onchange="enable_changed(3)" onload="onchange()"></td>
     </tr>
     <tr>
       <td>Board type</td>
       <td>
         <select data-board="0" style="max-width:200px" id="board_type_0" onchange="update_wf_lengths_readback(0);update_post_trigger_readback(0)">
-          <option value="0" selected>V1725, 640kS/chan memory</option>
-          <option value="1">V1725, 5.12MS/chan memory</option>
-          <option value="2">V1720, 1MS/chan memory</option>
-          <option value="3">V1720, 8MS/chan memory</option>
-          <option value="4">V1720, 1MS/chan memory, Pack2.5</option>
-          <option value="5">V1720, 8MS/chan memory, Pack2.5</option>
+          <option value="0" selected>DT5751, 1.8MS/chan memory</option>
+          <option value="1">DT5751, 14.4MS/chan memory</option>
         </select>
-        <div class="modbvalue" style="display:none" id="board_type_rdb_0" onchange="board_type_rdb_changed(0)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Readback/Board0/Board type" ></div> 
+        <div class="modbvalue" style="display:none" id="board_type_rdb_0" onchange="board_type_rdb_changed(0)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Readback/Board0/Board type" ></div> 
       </td>
       <td>
         <select data-board="1" style="max-width:200px" id="board_type_1" onchange="update_wf_lengths_readback(1);update_post_trigger_readback(1)">
-          <option value="0" selected>V1725, 640kS/chan memory</option>
-          <option value="1">V1725, 5.12MS/chan memory</option>
-          <option value="2">V1720, 1MS/chan memory</option>
-          <option value="3">V1720, 8MS/chan memory</option>
-          <option value="4">V1720, 1MS/chan memory, Pack2.5</option>
-          <option value="5">V1720, 8MS/chan memory, Pack2.5</option>
+          <option value="0" selected>DT5751, 1.8MS/chan memory</option>
+          <option value="1">DT5751, 14.4MS/chan memory</option>
         </select>
-        <div class="modbvalue" style="display:none" id="board_type_rdb_1" onchange="board_type_rdb_changed(1)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Readback/Board1/Board type" ></div> 
+        <div class="modbvalue" style="display:none" id="board_type_rdb_1" onchange="board_type_rdb_changed(1)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Readback/Board1/Board type" ></div> 
       </td>
       <td>
         <select data-board="2" style="max-width:200px" id="board_type_2" onchange="update_wf_lengths_readback(2);update_post_trigger_readback(2)">
-          <option value="0" selected>V1725, 640kS/chan memory</option>
-          <option value="1">V1725, 5.12MS/chan memory</option>
-          <option value="2">V1720, 1MS/chan memory</option>
-          <option value="3">V1720, 8MS/chan memory</option>
-          <option value="4">V1720, 1MS/chan memory, Pack2.5</option>
-          <option value="5">V1720, 8MS/chan memory, Pack2.5</option>
+          <option value="0" selected>DT5751, 1.8MS/chan memory</option>
+          <option value="1">DT5751, 14.4MS/chan memory</option>
         </select>
-        <div class="modbvalue" style="display:none" id="board_type_rdb_2" onchange="board_type_rdb_changed(2)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Readback/Board2/Board type" ></div> 
+        <div class="modbvalue" style="display:none" id="board_type_rdb_2" onchange="board_type_rdb_changed(2)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Readback/Board2/Board type" ></div> 
       </td>
       <td>
         <select data-board="3" style="max-width:200px" id="board_type_3" onchange="update_wf_lengths_readback(3);update_post_trigger_readback(3)">
-          <option value="0" selected>V1725, 640kS/chan memory</option>
-          <option value="1">V1725, 5.12MS/chan memory</option>
-          <option value="2">V1720, 1MS/chan memory</option>
-          <option value="3">V1720, 8MS/chan memory</option>
-          <option value="4">V1720, 1MS/chan memory, Pack2.5</option>
-          <option value="5">V1720, 8MS/chan memory, Pack2.5</option>
+          <option value="0" selected>DT5751, 1.8MS/chan memory</option>
+          <option value="1">DT5751, 14.4MS/chan memory</option>
         </select>
-        <div class="modbvalue" style="display:none" id="board_type_rdb_3" onchange="board_type_rdb_changed(3)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Readback/Board3/Board type" ></div> 
+        <div class="modbvalue" style="display:none" id="board_type_rdb_3" onchange="board_type_rdb_changed(3)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Readback/Board3/Board type" ></div> 
       </td>
     </tr>
     <tr>
       <td>Has ZLE firmware</td>
-      <td><input type="checkbox" class="modbcheckbox" id="zle_fw_0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Has ZLE firmware" onchange="enable_changed(0)" onload="onchange()"></td>
-      <td><input type="checkbox" class="modbcheckbox" id="zle_fw_1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Has ZLE firmware" onchange="enable_changed(1)" onload="onchange()"></td>
-      <td><input type="checkbox" class="modbcheckbox" id="zle_fw_2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Has ZLE firmware" onchange="enable_changed(2)" onload="onchange()"></td>
-      <td><input type="checkbox" class="modbcheckbox" id="zle_fw_3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Has ZLE firmware" onchange="enable_changed(3)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" id="zle_fw_0" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/Has ZLE firmware" onchange="enable_changed(0)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" id="zle_fw_1" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/Has ZLE firmware" onchange="enable_changed(1)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" id="zle_fw_2" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/Has ZLE firmware" onchange="enable_changed(2)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" id="zle_fw_3" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/Has ZLE firmware" onchange="enable_changed(3)" onload="onchange()"></td>
     </tr>
 
     
@@ -852,24 +739,24 @@
     </tr>
     <tr>
       <td>Custom size<br><small>AKA 'Record length' for ZLE firmware</small></td>
-      <td><div class="modbvalue customsize" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Custom size" onchange="update_wf_lengths_readback(0)" onload="onchange()" ></div></td>
-      <td><div class="modbvalue customsize" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Custom size" onchange="update_wf_lengths_readback(1)" onload="onchange()" ></div></td>
-      <td><div class="modbvalue customsize" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Custom size" onchange="update_wf_lengths_readback(2)" onload="onchange()" ></div></td>
-      <td><div class="modbvalue customsize" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Custom size" onchange="update_wf_lengths_readback(3)" onload="onchange()" ></div></td>
+      <td><div class="modbvalue customsize" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/Custom size" onchange="update_wf_lengths_readback(0)" onload="onchange()" ></div></td>
+      <td><div class="modbvalue customsize" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/Custom size" onchange="update_wf_lengths_readback(1)" onload="onchange()" ></div></td>
+      <td><div class="modbvalue customsize" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/Custom size" onchange="update_wf_lengths_readback(2)" onload="onchange()" ></div></td>
+      <td><div class="modbvalue customsize" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/Custom size" onchange="update_wf_lengths_readback(3)" onload="onchange()" ></div></td>
     </tr>
     <tr>
       <td>Almost Full<br><small>Only for RAW firmware</small></td>
-      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/almost_full" ></div></td>
-      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/almost_full" ></div></td>
-      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/almost_full" ></div></td>
-      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/almost_full" ></div></td>
+      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="0" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/almost_full" ></div></td>
+      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/almost_full" ></div></td>
+      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="2" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/almost_full" ></div></td>
+      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="3" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/almost_full" ></div></td>
     </tr>
     <tr>
       <td>Buffer Organization<br><small>Only for RAW firmware</small></td>
-      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Buffer Organization" ></div></td>
-      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Buffer Organization" ></div></td>
-      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Buffer Organization" ></div></td>
-      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Buffer Organization" ></div></td>
+      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="0" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/Buffer Organization" ></div></td>
+      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/Buffer Organization" ></div></td>
+      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="2" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/Buffer Organization" ></div></td>
+      <td><div class="modbvalue" data-odb-editable="1" data-raw="1" data-board="3" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/Buffer Organization" ></div></td>
     </tr>
     <tr>
       <td>
@@ -883,10 +770,10 @@
     </tr>
     <tr>
       <td>Post Trigger<br><small>Only for RAW firmware</small></td>
-      <td><div class="modbvalue posttrigger" data-raw="1" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Post Trigger" onchange="update_post_trigger_readback(0)" onload="onchange()"></div></td>
-      <td><div class="modbvalue posttrigger" data-raw="1" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Post Trigger" onchange="update_post_trigger_readback(1)" onload="onchange()"></div></td>
-      <td><div class="modbvalue posttrigger" data-raw="1" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Post Trigger" onchange="update_post_trigger_readback(2)" onload="onchange()"></div></td>
-      <td><div class="modbvalue posttrigger" data-raw="1" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Post Trigger" onchange="update_post_trigger_readback(3)" onload="onchange()"></div></td>
+      <td><div class="modbvalue posttrigger" data-raw="1" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/Post Trigger" onchange="update_post_trigger_readback(0)" onload="onchange()"></div></td>
+      <td><div class="modbvalue posttrigger" data-raw="1" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/Post Trigger" onchange="update_post_trigger_readback(1)" onload="onchange()"></div></td>
+      <td><div class="modbvalue posttrigger" data-raw="1" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/Post Trigger" onchange="update_post_trigger_readback(2)" onload="onchange()"></div></td>
+      <td><div class="modbvalue posttrigger" data-raw="1" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/Post Trigger" onchange="update_post_trigger_readback(3)" onload="onchange()"></div></td>
     </tr>
     <tr>
       <td>
@@ -900,38 +787,38 @@
     </tr>
     <tr>
       <td>Pre Trigger<br><small>Only for ZLE firmware</small></td>
-      <td><div class="modbvalue pretrigger" data-zle="1" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Pre Trigger" onchange="update_pre_trigger_readback(0)" onload="onchange()"></div></td>
-      <td><div class="modbvalue pretrigger" data-zle="1" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Pre Trigger" onchange="update_pre_trigger_readback(1)" onload="onchange()"></div></td>
-      <td><div class="modbvalue pretrigger" data-zle="1" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Pre Trigger" onchange="update_pre_trigger_readback(2)" onload="onchange()"></div></td>
-      <td><div class="modbvalue pretrigger" data-zle="1" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Pre Trigger" onchange="update_pre_trigger_readback(3)" onload="onchange()"></div></td>
+      <td><div class="modbvalue pretrigger" data-zle="1" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/Pre Trigger" onchange="update_pre_trigger_readback(0)" onload="onchange()"></div></td>
+      <td><div class="modbvalue pretrigger" data-zle="1" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/Pre Trigger" onchange="update_pre_trigger_readback(1)" onload="onchange()"></div></td>
+      <td><div class="modbvalue pretrigger" data-zle="1" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/Pre Trigger" onchange="update_pre_trigger_readback(2)" onload="onchange()"></div></td>
+      <td><div class="modbvalue pretrigger" data-zle="1" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/Pre Trigger" onchange="update_pre_trigger_readback(3)" onload="onchange()"></div></td>
     </tr>
     <tr>
       <td>Enable ZLE compression<br><small>Only for ZLE firmware</small></td>
-      <td><input type="checkbox" class="modbcheckbox" data-board="0" data-zle="1" id="enable_zle_0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Enable ZLE" onchange="enable_changed(0)" onload="onchange()"></td>
-      <td><input type="checkbox" class="modbcheckbox" data-board="1" data-zle="1" id="enable_zle_1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Enable ZLE" onchange="enable_changed(1)" onload="onchange()"></td>
-      <td><input type="checkbox" class="modbcheckbox" data-board="2" data-zle="1" id="enable_zle_2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Enable ZLE" onchange="enable_changed(2)" onload="onchange()"></td>
-      <td><input type="checkbox" class="modbcheckbox" data-board="3" data-zle="1" id="enable_zle_3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Enable ZLE" onchange="enable_changed(3)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" data-board="0" data-zle="1" id="enable_zle_0" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/Enable ZLE" onchange="enable_changed(0)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" data-board="1" data-zle="1" id="enable_zle_1" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/Enable ZLE" onchange="enable_changed(1)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" data-board="2" data-zle="1" id="enable_zle_2" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/Enable ZLE" onchange="enable_changed(2)" onload="onchange()"></td>
+      <td><input type="checkbox" class="modbcheckbox" data-board="3" data-zle="1" id="enable_zle_3" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/Enable ZLE" onchange="enable_changed(3)" onload="onchange()"></td>
     </tr>
     <tr>
       <td>ZLE threshold (ADC from baseline, signed)<br><small>Only for ZLE firmware</small></td>
-      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/ZLESignedThresh"></div></td>
-      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/ZLESignedThresh"></div></td>
-      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/ZLESignedThresh"></div></td>
-      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/ZLESignedThresh"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/ZLESignedThresh"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/ZLESignedThresh"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/ZLESignedThresh"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/ZLESignedThresh"></div></td>
     </tr>
     <tr>
       <td>ZLE pre-window (N*2 samples are recorded!)<br><small>Only for ZLE firmware</small></td>
-      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/ZLENBinsBefore"></div></td>
-      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/ZLENBinsBefore"></div></td>
-      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/ZLENBinsBefore"></div></td>
-      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/ZLENBinsBefore"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/ZLENBinsBefore"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/ZLENBinsBefore"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/ZLENBinsBefore"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/ZLENBinsBefore"></div></td>
     </tr>
     <tr>
       <td>ZLE post-window (N*2 samples are recorded!)<br><small>Only for ZLE firmware</small></td>
-      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/ZLENBinsAfter"></div></td>
-      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/ZLENBinsAfter"></div></td>
-      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/ZLENBinsAfter"></div></td>
-      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/ZLENBinsAfter"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="0" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/ZLENBinsAfter"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/ZLENBinsAfter"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="2" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/ZLENBinsAfter"></div></td>
+      <td><div class="modbvalue" data-zle="1" data-zlecomp="1" data-odb-editable="1" data-board="3" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/ZLENBinsAfter"></div></td>
     </tr>
     <tr>
       <td>ZLE baseline settings<br><small>Only for ZLE firmware</small></td>
@@ -974,18 +861,6 @@
         <label for="readout_0_1"> <input type="checkbox" data-board="0" id="readout_0_1"  onchange="update_readout_mask(0)">1</label><br>
         <label for="readout_0_2"> <input type="checkbox" data-board="0" id="readout_0_2"  onchange="update_readout_mask(0)">2</label><br>
         <label for="readout_0_3"> <input type="checkbox" data-board="0" id="readout_0_3"  onchange="update_readout_mask(0)">3</label><br>
-        <label for="readout_0_4"> <input type="checkbox" data-board="0" id="readout_0_4"  onchange="update_readout_mask(0)">4</label><br>
-        <label for="readout_0_5"> <input type="checkbox" data-board="0" id="readout_0_5"  onchange="update_readout_mask(0)">5</label><br>
-        <label for="readout_0_6"> <input type="checkbox" data-board="0" id="readout_0_6"  onchange="update_readout_mask(0)">6</label><br>
-        <label for="readout_0_7"> <input type="checkbox" data-board="0" id="readout_0_7"  onchange="update_readout_mask(0)">7</label><br>
-        <label for="readout_0_8"> <input type="checkbox" data-board="0" id="readout_0_8"  onchange="update_readout_mask(0)">8</label><br>
-        <label for="readout_0_9"> <input type="checkbox" data-board="0" id="readout_0_9"  onchange="update_readout_mask(0)">9</label><br>
-        <label for="readout_0_10"><input type="checkbox" data-board="0" id="readout_0_10" onchange="update_readout_mask(0)">10</label><br>
-        <label for="readout_0_11"><input type="checkbox" data-board="0" id="readout_0_11" onchange="update_readout_mask(0)">11</label><br>
-        <label for="readout_0_12"><input type="checkbox" data-board="0" id="readout_0_12" onchange="update_readout_mask(0)">12</label><br>
-        <label for="readout_0_13"><input type="checkbox" data-board="0" id="readout_0_13" onchange="update_readout_mask(0)">13</label><br>
-        <label for="readout_0_14"><input type="checkbox" data-board="0" id="readout_0_14" onchange="update_readout_mask(0)">14</label><br>
-        <label for="readout_0_15"><input type="checkbox" data-board="0" id="readout_0_15" onchange="update_readout_mask(0)">15</label>
         </div>
       </td>
       <td>
@@ -994,18 +869,6 @@
         <label for="readout_1_1"> <input type="checkbox" data-board="1" id="readout_1_1"  onchange="update_readout_mask(1)">1</label><br>
         <label for="readout_1_2"> <input type="checkbox" data-board="1" id="readout_1_2"  onchange="update_readout_mask(1)">2</label><br>
         <label for="readout_1_3"> <input type="checkbox" data-board="1" id="readout_1_3"  onchange="update_readout_mask(1)">3</label><br>
-        <label for="readout_1_4"> <input type="checkbox" data-board="1" id="readout_1_4"  onchange="update_readout_mask(1)">4</label><br>
-        <label for="readout_1_5"> <input type="checkbox" data-board="1" id="readout_1_5"  onchange="update_readout_mask(1)">5</label><br>
-        <label for="readout_1_6"> <input type="checkbox" data-board="1" id="readout_1_6"  onchange="update_readout_mask(1)">6</label><br>
-        <label for="readout_1_7"> <input type="checkbox" data-board="1" id="readout_1_7"  onchange="update_readout_mask(1)">7</label><br>
-        <label for="readout_1_8"> <input type="checkbox" data-board="1" id="readout_1_8"  onchange="update_readout_mask(1)">8</label><br>
-        <label for="readout_1_9"> <input type="checkbox" data-board="1" id="readout_1_9"  onchange="update_readout_mask(1)">9</label><br>
-        <label for="readout_1_10"><input type="checkbox" data-board="1" id="readout_1_10" onchange="update_readout_mask(1)">10</label><br>
-        <label for="readout_1_11"><input type="checkbox" data-board="1" id="readout_1_11" onchange="update_readout_mask(1)">11</label><br>
-        <label for="readout_1_12"><input type="checkbox" data-board="1" id="readout_1_12" onchange="update_readout_mask(1)">12</label><br>
-        <label for="readout_1_13"><input type="checkbox" data-board="1" id="readout_1_13" onchange="update_readout_mask(1)">13</label><br>
-        <label for="readout_1_14"><input type="checkbox" data-board="1" id="readout_1_14" onchange="update_readout_mask(1)">14</label><br>
-        <label for="readout_1_15"><input type="checkbox" data-board="1" id="readout_1_15" onchange="update_readout_mask(1)">15</label>
         </div>
       </td>
       <td>
@@ -1014,18 +877,6 @@
         <label for="readout_2_1"> <input type="checkbox" data-board="2" id="readout_2_1"  onchange="update_readout_mask(2)">1</label><br>
         <label for="readout_2_2"> <input type="checkbox" data-board="2" id="readout_2_2"  onchange="update_readout_mask(2)">2</label><br>
         <label for="readout_2_3"> <input type="checkbox" data-board="2" id="readout_2_3"  onchange="update_readout_mask(2)">3</label><br>
-        <label for="readout_2_4"> <input type="checkbox" data-board="2" id="readout_2_4"  onchange="update_readout_mask(2)">4</label><br>
-        <label for="readout_2_5"> <input type="checkbox" data-board="2" id="readout_2_5"  onchange="update_readout_mask(2)">5</label><br>
-        <label for="readout_2_6"> <input type="checkbox" data-board="2" id="readout_2_6"  onchange="update_readout_mask(2)">6</label><br>
-        <label for="readout_2_7"> <input type="checkbox" data-board="2" id="readout_2_7"  onchange="update_readout_mask(2)">7</label><br>
-        <label for="readout_2_8"> <input type="checkbox" data-board="2" id="readout_2_8"  onchange="update_readout_mask(2)">8</label><br>
-        <label for="readout_2_9"> <input type="checkbox" data-board="2" id="readout_2_9"  onchange="update_readout_mask(2)">9</label><br>
-        <label for="readout_2_10"><input type="checkbox" data-board="2" id="readout_2_10" onchange="update_readout_mask(2)">10</label><br>
-        <label for="readout_2_11"><input type="checkbox" data-board="2" id="readout_2_11" onchange="update_readout_mask(2)">11</label><br>
-        <label for="readout_2_12"><input type="checkbox" data-board="2" id="readout_2_12" onchange="update_readout_mask(2)">12</label><br>
-        <label for="readout_2_13"><input type="checkbox" data-board="2" id="readout_2_13" onchange="update_readout_mask(2)">13</label><br>
-        <label for="readout_2_14"><input type="checkbox" data-board="2" id="readout_2_14" onchange="update_readout_mask(2)">14</label><br>
-        <label for="readout_2_15"><input type="checkbox" data-board="2" id="readout_2_15" onchange="update_readout_mask(2)">15</label>
         </div>
       </td>
       <td>
@@ -1034,101 +885,6 @@
         <label for="readout_3_1"> <input type="checkbox" data-board="3" id="readout_3_1"  onchange="update_readout_mask(3)">1</label><br>
         <label for="readout_3_2"> <input type="checkbox" data-board="3" id="readout_3_2"  onchange="update_readout_mask(3)">2</label><br>
         <label for="readout_3_3"> <input type="checkbox" data-board="3" id="readout_3_3"  onchange="update_readout_mask(3)">3</label><br>
-        <label for="readout_3_4"> <input type="checkbox" data-board="3" id="readout_3_4"  onchange="update_readout_mask(3)">4</label><br>
-        <label for="readout_3_5"> <input type="checkbox" data-board="3" id="readout_3_5"  onchange="update_readout_mask(3)">5</label><br>
-        <label for="readout_3_6"> <input type="checkbox" data-board="3" id="readout_3_6"  onchange="update_readout_mask(3)">6</label><br>
-        <label for="readout_3_7"> <input type="checkbox" data-board="3" id="readout_3_7"  onchange="update_readout_mask(3)">7</label><br>
-        <label for="readout_3_8"> <input type="checkbox" data-board="3" id="readout_3_8"  onchange="update_readout_mask(3)">8</label><br>
-        <label for="readout_3_9"> <input type="checkbox" data-board="3" id="readout_3_9"  onchange="update_readout_mask(3)">9</label><br>
-        <label for="readout_3_10"><input type="checkbox" data-board="3" id="readout_3_10" onchange="update_readout_mask(3)">10</label><br>
-        <label for="readout_3_11"><input type="checkbox" data-board="3" id="readout_3_11" onchange="update_readout_mask(3)">11</label><br>
-        <label for="readout_3_12"><input type="checkbox" data-board="3" id="readout_3_12" onchange="update_readout_mask(3)">12</label><br>
-        <label for="readout_3_13"><input type="checkbox" data-board="3" id="readout_3_13" onchange="update_readout_mask(3)">13</label><br>
-        <label for="readout_3_14"><input type="checkbox" data-board="3" id="readout_3_14" onchange="update_readout_mask(3)">14</label><br>
-        <label for="readout_3_15"><input type="checkbox" data-board="3" id="readout_3_15" onchange="update_readout_mask(3)">15</label>
-        </div>
-      </td>
-    </tr>
-    <tr>
-      <td>Use 2V dynamic range<br><small>Unchecked = 0.5V dynamic range</small></td>
-      <td>
-        <div data-board="0">
-          <label for="dynamic_0_0">[0]   <input id="dynamic_0_0"  type="checkbox" class="modbcheckbox" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Dynamic Range 2V (y) 0.5V (n)[0]"></label><br>
-          <label for="dynamic_0_1">[1]   <input id="dynamic_0_1"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Dynamic Range 2V (y) 0.5V (n)[1]"></label><br>
-          <label for="dynamic_0_2">[2]   <input id="dynamic_0_2"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Dynamic Range 2V (y) 0.5V (n)[2]"></label><br>
-          <label for="dynamic_0_3">[3]   <input id="dynamic_0_3"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Dynamic Range 2V (y) 0.5V (n)[3]"></label><br>
-          <label for="dynamic_0_4">[4]   <input id="dynamic_0_4"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Dynamic Range 2V (y) 0.5V (n)[4]"></label><br>
-          <label for="dynamic_0_5">[5]   <input id="dynamic_0_5"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Dynamic Range 2V (y) 0.5V (n)[5]"></label><br>
-          <label for="dynamic_0_6">[6]   <input id="dynamic_0_6"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Dynamic Range 2V (y) 0.5V (n)[6]"></label><br>
-          <label for="dynamic_0_7">[7]   <input id="dynamic_0_7"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Dynamic Range 2V (y) 0.5V (n)[7]"></label><br>
-          <label for="dynamic_0_8">[8]   <input id="dynamic_0_8"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Dynamic Range 2V (y) 0.5V (n)[8]"></label><br>
-          <label for="dynamic_0_9">[9]   <input id="dynamic_0_9"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Dynamic Range 2V (y) 0.5V (n)[9]"></label><br>
-          <label for="dynamic_0_10">[10] <input id="dynamic_0_10" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Dynamic Range 2V (y) 0.5V (n)[10]"></label><br>
-          <label for="dynamic_0_11">[11] <input id="dynamic_0_11" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Dynamic Range 2V (y) 0.5V (n)[11]"></label><br>
-          <label for="dynamic_0_12">[12] <input id="dynamic_0_12" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Dynamic Range 2V (y) 0.5V (n)[12]"></label><br>
-          <label for="dynamic_0_13">[13] <input id="dynamic_0_13" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Dynamic Range 2V (y) 0.5V (n)[13]"></label><br>
-          <label for="dynamic_0_14">[14] <input id="dynamic_0_14" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Dynamic Range 2V (y) 0.5V (n)[14]"></label><br>
-          <label for="dynamic_0_15">[15] <input id="dynamic_0_15" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Dynamic Range 2V (y) 0.5V (n)[15]"></label>
-        </div>
-      </td>
-      <td>
-        <div data-board="1">
-          <label for="dynamic_1_0">[0]   <input id="dynamic_1_0"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Dynamic Range 2V (y) 0.5V (n)[0]"></label><br>
-          <label for="dynamic_1_1">[1]   <input id="dynamic_1_1"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Dynamic Range 2V (y) 0.5V (n)[1]"></label><br>
-          <label for="dynamic_1_2">[2]   <input id="dynamic_1_2"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Dynamic Range 2V (y) 0.5V (n)[2]"></label><br>
-          <label for="dynamic_1_3">[3]   <input id="dynamic_1_3"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Dynamic Range 2V (y) 0.5V (n)[3]"></label><br>
-          <label for="dynamic_1_4">[4]   <input id="dynamic_1_4"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Dynamic Range 2V (y) 0.5V (n)[4]"></label><br>
-          <label for="dynamic_1_5">[5]   <input id="dynamic_1_5"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Dynamic Range 2V (y) 0.5V (n)[5]"></label><br>
-          <label for="dynamic_1_6">[6]   <input id="dynamic_1_6"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Dynamic Range 2V (y) 0.5V (n)[6]"></label><br>
-          <label for="dynamic_1_7">[7]   <input id="dynamic_1_7"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Dynamic Range 2V (y) 0.5V (n)[7]"></label><br>
-          <label for="dynamic_1_8">[8]   <input id="dynamic_1_8"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Dynamic Range 2V (y) 0.5V (n)[8]"></label><br>
-          <label for="dynamic_1_9">[9]   <input id="dynamic_1_9"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Dynamic Range 2V (y) 0.5V (n)[9]"></label><br>
-          <label for="dynamic_1_10">[10] <input id="dynamic_1_10" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Dynamic Range 2V (y) 0.5V (n)[10]"></label><br>
-          <label for="dynamic_1_11">[11] <input id="dynamic_1_11" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Dynamic Range 2V (y) 0.5V (n)[11]"></label><br>
-          <label for="dynamic_1_12">[12] <input id="dynamic_1_12" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Dynamic Range 2V (y) 0.5V (n)[12]"></label><br>
-          <label for="dynamic_1_13">[13] <input id="dynamic_1_13" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Dynamic Range 2V (y) 0.5V (n)[13]"></label><br>
-          <label for="dynamic_1_14">[14] <input id="dynamic_1_14" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Dynamic Range 2V (y) 0.5V (n)[14]"></label><br>
-          <label for="dynamic_1_15">[15] <input id="dynamic_1_15" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Dynamic Range 2V (y) 0.5V (n)[15]"></label>
-        </div>
-      </td>
-      <td>
-        <div data-board="2">
-          <label for="dynamic_2_0">[0]   <input id="dynamic_2_0"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Dynamic Range 2V (y) 0.5V (n)[0]"></label><br>
-          <label for="dynamic_2_1">[1]   <input id="dynamic_2_1"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Dynamic Range 2V (y) 0.5V (n)[1]"></label><br>
-          <label for="dynamic_2_2">[2]   <input id="dynamic_2_2"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Dynamic Range 2V (y) 0.5V (n)[2]"></label><br>
-          <label for="dynamic_2_3">[3]   <input id="dynamic_2_3"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Dynamic Range 2V (y) 0.5V (n)[3]"></label><br>
-          <label for="dynamic_2_4">[4]   <input id="dynamic_2_4"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Dynamic Range 2V (y) 0.5V (n)[4]"></label><br>
-          <label for="dynamic_2_5">[5]   <input id="dynamic_2_5"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Dynamic Range 2V (y) 0.5V (n)[5]"></label><br>
-          <label for="dynamic_2_6">[6]   <input id="dynamic_2_6"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Dynamic Range 2V (y) 0.5V (n)[6]"></label><br>
-          <label for="dynamic_2_7">[7]   <input id="dynamic_2_7"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Dynamic Range 2V (y) 0.5V (n)[7]"></label><br>
-          <label for="dynamic_2_8">[8]   <input id="dynamic_2_8"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Dynamic Range 2V (y) 0.5V (n)[8]"></label><br>
-          <label for="dynamic_2_9">[9]   <input id="dynamic_2_9"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Dynamic Range 2V (y) 0.5V (n)[9]"></label><br>
-          <label for="dynamic_2_10">[10] <input id="dynamic_2_10" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Dynamic Range 2V (y) 0.5V (n)[10]"></label><br>
-          <label for="dynamic_2_11">[11] <input id="dynamic_2_11" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Dynamic Range 2V (y) 0.5V (n)[11]"></label><br>
-          <label for="dynamic_2_12">[12] <input id="dynamic_2_12" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Dynamic Range 2V (y) 0.5V (n)[12]"></label><br>
-          <label for="dynamic_2_13">[13] <input id="dynamic_2_13" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Dynamic Range 2V (y) 0.5V (n)[13]"></label><br>
-          <label for="dynamic_2_14">[14] <input id="dynamic_2_14" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Dynamic Range 2V (y) 0.5V (n)[14]"></label><br>
-          <label for="dynamic_2_15">[15] <input id="dynamic_2_15" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Dynamic Range 2V (y) 0.5V (n)[15]"></label>
-        </div>
-      </td>
-      <td>
-        <div data-board="3">
-          <label for="dynamic_3_0">[0]   <input id="dynamic_3_0"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Dynamic Range 2V (y) 0.5V (n)[0]"></label><br>
-          <label for="dynamic_3_1">[1]   <input id="dynamic_3_1"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Dynamic Range 2V (y) 0.5V (n)[1]"></label><br>
-          <label for="dynamic_3_2">[2]   <input id="dynamic_3_2"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Dynamic Range 2V (y) 0.5V (n)[2]"></label><br>
-          <label for="dynamic_3_3">[3]   <input id="dynamic_3_3"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Dynamic Range 2V (y) 0.5V (n)[3]"></label><br>
-          <label for="dynamic_3_4">[4]   <input id="dynamic_3_4"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Dynamic Range 2V (y) 0.5V (n)[4]"></label><br>
-          <label for="dynamic_3_5">[5]   <input id="dynamic_3_5"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Dynamic Range 2V (y) 0.5V (n)[5]"></label><br>
-          <label for="dynamic_3_6">[6]   <input id="dynamic_3_6"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Dynamic Range 2V (y) 0.5V (n)[6]"></label><br>
-          <label for="dynamic_3_7">[7]   <input id="dynamic_3_7"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Dynamic Range 2V (y) 0.5V (n)[7]"></label><br>
-          <label for="dynamic_3_8">[8]   <input id="dynamic_3_8"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Dynamic Range 2V (y) 0.5V (n)[8]"></label><br>
-          <label for="dynamic_3_9">[9]   <input id="dynamic_3_9"  type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Dynamic Range 2V (y) 0.5V (n)[9]"></label><br>
-          <label for="dynamic_3_10">[10] <input id="dynamic_3_10" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Dynamic Range 2V (y) 0.5V (n)[10]"></label><br>
-          <label for="dynamic_3_11">[11] <input id="dynamic_3_11" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Dynamic Range 2V (y) 0.5V (n)[11]"></label><br>
-          <label for="dynamic_3_12">[12] <input id="dynamic_3_12" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Dynamic Range 2V (y) 0.5V (n)[12]"></label><br>
-          <label for="dynamic_3_13">[13] <input id="dynamic_3_13" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Dynamic Range 2V (y) 0.5V (n)[13]"></label><br>
-          <label for="dynamic_3_14">[14] <input id="dynamic_3_14" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Dynamic Range 2V (y) 0.5V (n)[14]"></label><br>
-          <label for="dynamic_3_15">[15] <input id="dynamic_3_15" type="checkbox" class="modbcheckbox"  data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Dynamic Range 2V (y) 0.5V (n)[15]"></label>
         </div>
       </td>
     </tr>
@@ -1140,27 +896,20 @@
       <td><input type="checkbox" data-board="3" data-raw="1" id="board_config_3_testpattern" onchange="update_board_config(3)"></td>
     </tr>
     
-
     <tr>
       <th class="mtableheader" colspan="5" style="font-size:unset;">Trigger settings</th>
     </tr>
 
-    
-
     <tr>
       <td>
-        Trigger sources<br><small>Note that self-trigger works on an OR of 2 channels.<br>Also set the self-trigger coincidence parameters below.</small>
+        Trigger sources<br><small>(OR of channels)</small>
       </td>
       <td>
         <div data-board="0">
-          <label for="ts_0_ch01">  <input type="checkbox" id="ts_0_ch01"   onchange="update_trigger_source(0)">Channels 0/1</label><br>
-          <label for="ts_0_ch23">  <input type="checkbox" id="ts_0_ch23"   onchange="update_trigger_source(0)">Channels 2/3</label><br>
-          <label for="ts_0_ch45">  <input type="checkbox" id="ts_0_ch45"   onchange="update_trigger_source(0)">Channels 4/5</label><br>
-          <label for="ts_0_ch67">  <input type="checkbox" id="ts_0_ch67"   onchange="update_trigger_source(0)">Channels 6/7</label><br>
-          <label for="ts_0_ch89">  <input type="checkbox" id="ts_0_ch89"   onchange="update_trigger_source(0)">Channels 8/9</label><br>
-          <label for="ts_0_ch1011"><input type="checkbox" id="ts_0_ch1011" onchange="update_trigger_source(0)">Channels 10/11</label><br>
-          <label for="ts_0_ch1213"><input type="checkbox" id="ts_0_ch1213" onchange="update_trigger_source(0)">Channels 12/13</label><br>
-          <label for="ts_0_ch1415"><input type="checkbox" id="ts_0_ch1415" onchange="update_trigger_source(0)">Channels 14/15</label><br>
+          <label for="ts_0_ch0">  <input type="checkbox" id="ts_0_ch0"   onchange="update_trigger_source(0)">Channel 0</label><br>
+          <label for="ts_0_ch1">  <input type="checkbox" id="ts_0_ch1"   onchange="update_trigger_source(0)">Channel 1</label><br>
+          <label for="ts_0_ch2">  <input type="checkbox" id="ts_0_ch2"   onchange="update_trigger_source(0)">Channel 2</label><br>
+          <label for="ts_0_ch3">  <input type="checkbox" id="ts_0_ch3"   onchange="update_trigger_source(0)">Channel 3</label><br>
           <br>
           <label for="ts_0_lvds">  <input type="checkbox" id="ts_0_lvds"   onchange="update_trigger_source(0)">LVDS</label><br>
           <label for="ts_0_trgin"> <input type="checkbox" id="ts_0_trgin"  onchange="update_trigger_source(0)">TRG-IN</label><br>
@@ -1169,14 +918,10 @@
       </td>
       <td>
         <div data-board="1">
-          <label for="ts_1_ch01">  <input type="checkbox" id="ts_1_ch01"   onchange="update_trigger_source(1)">Channels 0/1</label><br>
-          <label for="ts_1_ch23">  <input type="checkbox" id="ts_1_ch23"   onchange="update_trigger_source(1)">Channels 2/3</label><br>
-          <label for="ts_1_ch45">  <input type="checkbox" id="ts_1_ch45"   onchange="update_trigger_source(1)">Channels 4/5</label><br>
-          <label for="ts_1_ch67">  <input type="checkbox" id="ts_1_ch67"   onchange="update_trigger_source(1)">Channels 6/7</label><br>
-          <label for="ts_1_ch89">  <input type="checkbox" id="ts_1_ch89"   onchange="update_trigger_source(1)">Channels 8/9</label><br>
-          <label for="ts_1_ch1011"><input type="checkbox" id="ts_1_ch1011" onchange="update_trigger_source(1)">Channels 10/11</label><br>
-          <label for="ts_1_ch1213"><input type="checkbox" id="ts_1_ch1213" onchange="update_trigger_source(1)">Channels 12/13</label><br>
-          <label for="ts_1_ch1415"><input type="checkbox" id="ts_1_ch1415" onchange="update_trigger_source(1)">Channels 14/15</label><br>
+          <label for="ts_1_ch0">  <input type="checkbox" id="ts_1_ch0"   onchange="update_trigger_source(0)">Channel 0</label><br>
+          <label for="ts_1_ch1">  <input type="checkbox" id="ts_1_ch1"   onchange="update_trigger_source(0)">Channel 1</label><br>
+          <label for="ts_1_ch2">  <input type="checkbox" id="ts_1_ch2"   onchange="update_trigger_source(0)">Channel 2</label><br>
+          <label for="ts_1_ch3">  <input type="checkbox" id="ts_1_ch3"   onchange="update_trigger_source(0)">Channel 3</label><br>
           <br>
           <label for="ts_1_lvds">  <input type="checkbox" id="ts_1_lvds"   onchange="update_trigger_source(1)">LVDS</label><br>
           <label for="ts_1_trgin"> <input type="checkbox" id="ts_1_trgin"  onchange="update_trigger_source(1)">TRG-IN</label><br>
@@ -1185,14 +930,10 @@
       </td>
       <td>
         <div data-board="2">
-          <label for="ts_2_ch01">  <input type="checkbox" id="ts_2_ch01"   onchange="update_trigger_source(2)">Channels 0/1</label><br>
-          <label for="ts_2_ch23">  <input type="checkbox" id="ts_2_ch23"   onchange="update_trigger_source(2)">Channels 2/3</label><br>
-          <label for="ts_2_ch45">  <input type="checkbox" id="ts_2_ch45"   onchange="update_trigger_source(2)">Channels 4/5</label><br>
-          <label for="ts_2_ch67">  <input type="checkbox" id="ts_2_ch67"   onchange="update_trigger_source(2)">Channels 6/7</label><br>
-          <label for="ts_2_ch89">  <input type="checkbox" id="ts_2_ch89"   onchange="update_trigger_source(2)">Channels 8/9</label><br>
-          <label for="ts_2_ch1011"><input type="checkbox" id="ts_2_ch1011" onchange="update_trigger_source(2)">Channels 10/11</label><br>
-          <label for="ts_2_ch1213"><input type="checkbox" id="ts_2_ch1213" onchange="update_trigger_source(2)">Channels 12/13</label><br>
-          <label for="ts_2_ch1415"><input type="checkbox" id="ts_2_ch1415" onchange="update_trigger_source(2)">Channels 14/15</label><br>
+          <label for="ts_2_ch0">  <input type="checkbox" id="ts_2_ch0"   onchange="update_trigger_source(0)">Channel 0</label><br>
+          <label for="ts_2_ch1">  <input type="checkbox" id="ts_2_ch1"   onchange="update_trigger_source(0)">Channel 1</label><br>
+          <label for="ts_2_ch2">  <input type="checkbox" id="ts_2_ch2"   onchange="update_trigger_source(0)">Channel 2</label><br>
+          <label for="ts_2_ch3">  <input type="checkbox" id="ts_2_ch3"   onchange="update_trigger_source(0)">Channel 3</label><br>
           <br>
           <label for="ts_2_lvds">  <input type="checkbox" id="ts_2_lvds"   onchange="update_trigger_source(2)">LVDS</label><br>
           <label for="ts_2_trgin"> <input type="checkbox" id="ts_2_trgin"  onchange="update_trigger_source(2)">TRG-IN</label><br>
@@ -1201,14 +942,10 @@
       </td>
       <td>
         <div data-board="3">
-          <label for="ts_3_ch01">  <input type="checkbox" id="ts_3_ch01"   onchange="update_trigger_source(3)">Channels 0/1</label><br>
-          <label for="ts_3_ch23">  <input type="checkbox" id="ts_3_ch23"   onchange="update_trigger_source(3)">Channels 2/3</label><br>
-          <label for="ts_3_ch45">  <input type="checkbox" id="ts_3_ch45"   onchange="update_trigger_source(3)">Channels 4/5</label><br>
-          <label for="ts_3_ch67">  <input type="checkbox" id="ts_3_ch67"   onchange="update_trigger_source(3)">Channels 6/7</label><br>
-          <label for="ts_3_ch89">  <input type="checkbox" id="ts_3_ch89"   onchange="update_trigger_source(3)">Channels 8/9</label><br>
-          <label for="ts_3_ch1011"><input type="checkbox" id="ts_3_ch1011" onchange="update_trigger_source(3)">Channels 10/11</label><br>
-          <label for="ts_3_ch1213"><input type="checkbox" id="ts_3_ch1213" onchange="update_trigger_source(3)">Channels 12/13</label><br>
-          <label for="ts_3_ch1415"><input type="checkbox" id="ts_3_ch1415" onchange="update_trigger_source(3)">Channels 14/15</label><br>
+          <label for="ts_3_ch0">  <input type="checkbox" id="ts_3_ch0"   onchange="update_trigger_source(0)">Channel 0</label><br>
+          <label for="ts_3_ch1">  <input type="checkbox" id="ts_3_ch1"   onchange="update_trigger_source(0)">Channel 1</label><br>
+          <label for="ts_3_ch2">  <input type="checkbox" id="ts_3_ch2"   onchange="update_trigger_source(0)">Channel 2</label><br>
+          <label for="ts_3_ch3">  <input type="checkbox" id="ts_3_ch3"   onchange="update_trigger_source(0)">Channel 3</label><br>
           <br>
           <label for="ts_3_lvds">  <input type="checkbox" id="ts_3_lvds"   onchange="update_trigger_source(3)">LVDS</label><br>
           <label for="ts_3_trgin"> <input type="checkbox" id="ts_3_trgin"  onchange="update_trigger_source(3)">TRG-IN</label><br>
@@ -1223,10 +960,10 @@
         <br><small>Software triggers are independent for each board! Do not use if <i>Merge data from multiple boards into a single event</i> is enabled!</small>
         <br><small>Ensure that the <i>Software</i> trigger source is enabled.</small>
       </td>
-      <td><span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Software trigger rate (Hz)" ></span></td>
-      <td><span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Software trigger rate (Hz)" ></span></td>
-      <td><span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Software trigger rate (Hz)" ></span></td>
-      <td><span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Software trigger rate (Hz)" ></span></td>
+      <td><span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/Software trigger rate (Hz)" ></span></td>
+      <td><span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/Software trigger rate (Hz)" ></span></td>
+      <td><span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/Software trigger rate (Hz)" ></span></td>
+      <td><span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/Software trigger rate (Hz)" ></span></td>
     </tr>
 
     <tr>
@@ -1235,82 +972,34 @@
       </td>
       <td >
         <div data-board="0"> 
-        [0]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Threshold[0]" ></span><br>
-        [1]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Threshold[1]" ></span><br>
-        [2]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Threshold[2]" ></span><br>
-        [3]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Threshold[3]" ></span><br>
-        [4]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Threshold[4]" ></span><br>
-        [5]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Threshold[5]" ></span><br>
-        [6]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Threshold[6]" ></span><br>
-        [7]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Threshold[7]" ></span><br>
-        [8]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Threshold[8]" ></span><br>
-        [9]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Threshold[9]" ></span><br>
-        [10] <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Threshold[10]" ></span><br>
-        [11] <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Threshold[11]" ></span><br>
-        [12] <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Threshold[12]" ></span><br>
-        [13] <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Threshold[13]" ></span><br>
-        [14] <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Threshold[14]" ></span><br>
-        [15] <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Threshold[15]" ></span>
+        [0]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/SelfTrigger_Threshold[0]" ></span><br>
+        [1]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/SelfTrigger_Threshold[1]" ></span><br>
+        [2]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/SelfTrigger_Threshold[2]" ></span><br>
+        [3]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/SelfTrigger_Threshold[3]" ></span><br>
         </div>  
       </td>
       <td >  
         <div data-board="1">
-        [0]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Threshold[0]" ></span><br>
-        [1]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Threshold[1]" ></span><br>
-        [2]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Threshold[2]" ></span><br>
-        [3]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Threshold[3]" ></span><br>
-        [4]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Threshold[4]" ></span><br>
-        [5]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Threshold[5]" ></span><br>
-        [6]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Threshold[6]" ></span><br>
-        [7]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Threshold[7]" ></span><br>
-        [8]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Threshold[8]" ></span><br>
-        [9]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Threshold[9]" ></span><br>
-        [10] <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Threshold[10]" ></span><br>
-        [11] <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Threshold[11]" ></span><br>
-        [12] <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Threshold[12]" ></span><br>
-        [13] <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Threshold[13]" ></span><br>
-        [14] <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Threshold[14]" ></span><br>
-        [15] <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Threshold[15]" ></span>
+        [0]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/SelfTrigger_Threshold[0]" ></span><br>
+        [1]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/SelfTrigger_Threshold[1]" ></span><br>
+        [2]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/SelfTrigger_Threshold[2]" ></span><br>
+        [3]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/SelfTrigger_Threshold[3]" ></span><br>
         </div> 
       </td>
       <td >   
         <div data-board="2">   
-        [0]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Threshold[0]" ></span><br>
-        [1]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Threshold[1]" ></span><br>
-        [2]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Threshold[2]" ></span><br>
-        [3]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Threshold[3]" ></span><br>
-        [4]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Threshold[4]" ></span><br>
-        [5]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Threshold[5]" ></span><br>
-        [6]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Threshold[6]" ></span><br>
-        [7]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Threshold[7]" ></span><br>
-        [8]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Threshold[8]" ></span><br>
-        [9]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Threshold[9]" ></span><br>
-        [10] <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Threshold[10]" ></span><br>
-        [11] <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Threshold[11]" ></span><br>
-        [12] <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Threshold[12]" ></span><br>
-        [13] <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Threshold[13]" ></span><br>
-        [14] <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Threshold[14]" ></span><br>
-        [15] <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Threshold[15]" ></span>
+        [0]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/SelfTrigger_Threshold[0]" ></span><br>
+        [1]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/SelfTrigger_Threshold[1]" ></span><br>
+        [2]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/SelfTrigger_Threshold[2]" ></span><br>
+        [3]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/SelfTrigger_Threshold[3]" ></span><br>
         </div> 
       </td>
       <td >      
         <div data-board="3">
-        [0]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Threshold[0]" ></span><br>
-        [1]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Threshold[1]" ></span><br>
-        [2]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Threshold[2]" ></span><br>
-        [3]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Threshold[3]" ></span><br>
-        [4]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Threshold[4]" ></span><br>
-        [5]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Threshold[5]" ></span><br>
-        [6]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Threshold[6]" ></span><br>
-        [7]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Threshold[7]" ></span><br>
-        [8]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Threshold[8]" ></span><br>
-        [9]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Threshold[9]" ></span><br>
-        [10] <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Threshold[10]" ></span><br>
-        [11] <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Threshold[11]" ></span><br>
-        [12] <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Threshold[12]" ></span><br>
-        [13] <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Threshold[13]" ></span><br>
-        [14] <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Threshold[14]" ></span><br>
-        [15] <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Threshold[15]" ></span>
+        [0]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/SelfTrigger_Threshold[0]" ></span><br>
+        [1]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/SelfTrigger_Threshold[1]" ></span><br>
+        [2]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/SelfTrigger_Threshold[2]" ></span><br>
+        [3]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/SelfTrigger_Threshold[3]" ></span><br>
         </div> 
       </td>
     </tr>
@@ -1335,65 +1024,10 @@
       <td><input data-board="2" id="ts_2_majority" style="width:40px" onchange="update_trigger_source(2)"></td>
       <td><input data-board="3" id="ts_3_majority" style="width:40px" onchange="update_trigger_source(3)"></td>
     </tr>
-    <tr>
-      <td>
-        Self-trigger channel couple logic<br><small>Self-triggers are done on paris/couples of channels. Which of the pair should contribute?</small>
-      </td>
-      <td>
-        <div data-board="0"> 
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Logic[0]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 0/1<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Logic[1]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 2/3<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Logic[2]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 4/5<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Logic[3]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 6/7<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Logic[4]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 8/9<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Logic[5]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 10/11<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Logic[6]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 12/13<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/SelfTrigger_Logic[7]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 14/15
-      </div>
-      </td>
-      <td>
-        <div data-board="1"> 
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Logic[0]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 0/1<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Logic[1]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 2/3<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Logic[2]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 4/5<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Logic[3]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 6/7<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Logic[4]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 8/9<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Logic[5]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 10/11<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Logic[6]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 12/13<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/SelfTrigger_Logic[7]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 14/15
-        </div>
-      </td>
-      <td>
-        <div data-board="2"> 
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Logic[0]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 0/1<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Logic[1]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 2/3<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Logic[2]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 4/5<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Logic[3]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 6/7<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Logic[4]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 8/9<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Logic[5]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 10/11<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Logic[6]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 12/13<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/SelfTrigger_Logic[7]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 14/15
-        </div>
-      </td>
-      <td>
-        <div data-board="3"> 
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Logic[0]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 0/1<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Logic[1]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 2/3<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Logic[2]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 4/5<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Logic[3]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 6/7<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Logic[4]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 8/9<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Logic[5]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 10/11<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Logic[6]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 12/13<br>
-          <select class="modbselect" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/SelfTrigger_Logic[7]" ><option value="0x00000000">AND</option><option value="0x00000001">Only even</option><option value="0x00000002">Only odd</option><option value="0x00000003">OR</option></select> Channels 14/15
-        </div>
-      </td>
-    </tr>
-
 
     <tr>
       <th class="mtableheader" colspan="5" style="font-size:unset;">Front panel settings</th>
     </tr>
-
 
     <tr>
       <td>Use TTL levels<br><small>Unchecked = use NIM levels</small></td>
@@ -1488,14 +1122,10 @@
               <td style="padding: 0;"><input style="width:40px" id="to_0_majority" onchange="update_trigger_output(0)"></td>
             </tr>
           </table>
-        <label for="to_0_ch01">  <input type="checkbox" id="to_0_ch01"   onchange="update_trigger_output(0)">Channels 0/1</label><br>
-        <label for="to_0_ch23">  <input type="checkbox" id="to_0_ch23"   onchange="update_trigger_output(0)">Channels 2/3</label><br>
-        <label for="to_0_ch45">  <input type="checkbox" id="to_0_ch45"   onchange="update_trigger_output(0)">Channels 4/5</label><br>
-        <label for="to_0_ch67">  <input type="checkbox" id="to_0_ch67"   onchange="update_trigger_output(0)">Channels 6/7</label><br>
-        <label for="to_0_ch89">  <input type="checkbox" id="to_0_ch89"   onchange="update_trigger_output(0)">Channels 8/9</label><br>
-        <label for="to_0_ch1011"><input type="checkbox" id="to_0_ch1011" onchange="update_trigger_output(0)">Channels 10/11</label><br>
-        <label for="to_0_ch1213"><input type="checkbox" id="to_0_ch1213" onchange="update_trigger_output(0)">Channels 12/13</label><br>
-        <label for="to_0_ch1415"><input type="checkbox" id="to_0_ch1415" onchange="update_trigger_output(0)">Channels 14/15</label><br>
+        <label for="to_0_ch0">  <input type="checkbox" id="to_0_ch0"   onchange="update_trigger_output(0)">Channel 0</label><br>
+        <label for="to_0_ch1">  <input type="checkbox" id="to_0_ch1"   onchange="update_trigger_output(0)">Channel 1</label><br>
+        <label for="to_0_ch2">  <input type="checkbox" id="to_0_ch2"   onchange="update_trigger_output(0)">Channel 2</label><br>
+        <label for="to_0_ch3">  <input type="checkbox" id="to_0_ch3"   onchange="update_trigger_output(0)">Channel 3</label><br>
         <br>
         <label for="to_0_lvds">  <input type="checkbox" id="to_0_lvds"   onchange="update_trigger_output(0)">LVDS</label><br>
         <label for="to_0_trgin"> <input type="checkbox" id="to_0_trgin"  onchange="update_trigger_output(0)">TRG-IN</label><br>
@@ -1520,14 +1150,10 @@
               <td style="padding: 0;"><input style="width:40px" id="to_1_majority" onchange="update_trigger_output(1)"></td>
             </tr>
           </table>
-        <label for="to_1_ch01">  <input type="checkbox" id="to_1_ch01"   onchange="update_trigger_output(1)">Channels 0/1</label><br>
-        <label for="to_1_ch23">  <input type="checkbox" id="to_1_ch23"   onchange="update_trigger_output(1)">Channels 2/3</label><br>
-        <label for="to_1_ch45">  <input type="checkbox" id="to_1_ch45"   onchange="update_trigger_output(1)">Channels 4/5</label><br>
-        <label for="to_1_ch67">  <input type="checkbox" id="to_1_ch67"   onchange="update_trigger_output(1)">Channels 6/7</label><br>
-        <label for="to_1_ch89">  <input type="checkbox" id="to_1_ch89"   onchange="update_trigger_output(1)">Channels 8/9</label><br>
-        <label for="to_1_ch1011"><input type="checkbox" id="to_1_ch1011" onchange="update_trigger_output(1)">Channels 10/11</label><br>
-        <label for="to_1_ch1213"><input type="checkbox" id="to_1_ch1213" onchange="update_trigger_output(1)">Channels 12/13</label><br>
-        <label for="to_1_ch1415"><input type="checkbox" id="to_1_ch1415" onchange="update_trigger_output(1)">Channels 14/15</label><br>
+        <label for="to_1_ch0">  <input type="checkbox" id="to_1_ch0"   onchange="update_trigger_output(0)">Channel 0</label><br>
+        <label for="to_1_ch1">  <input type="checkbox" id="to_1_ch1"   onchange="update_trigger_output(0)">Channel 1</label><br>
+        <label for="to_1_ch2">  <input type="checkbox" id="to_1_ch2"   onchange="update_trigger_output(0)">Channel 2</label><br>
+        <label for="to_1_ch3">  <input type="checkbox" id="to_1_ch3"   onchange="update_trigger_output(0)">Channel 3</label><br>
         <br>
         <label for="to_1_lvds">  <input type="checkbox" id="to_1_lvds"   onchange="update_trigger_output(1)">LVDS</label><br>
         <label for="to_1_trgin"> <input type="checkbox" id="to_1_trgin"  onchange="update_trigger_output(1)">TRG-IN</label><br>
@@ -1552,14 +1178,10 @@
               <td style="padding: 0;"><input style="width:40px" id="to_2_majority" onchange="update_trigger_output(2)"></td>
             </tr>
           </table>
-        <label for="to_2_ch01">  <input type="checkbox" id="to_2_ch01"   onchange="update_trigger_output(2)">Channels 0/1</label><br>
-        <label for="to_2_ch23">  <input type="checkbox" id="to_2_ch23"   onchange="update_trigger_output(2)">Channels 2/3</label><br>
-        <label for="to_2_ch45">  <input type="checkbox" id="to_2_ch45"   onchange="update_trigger_output(2)">Channels 4/5</label><br>
-        <label for="to_2_ch67">  <input type="checkbox" id="to_2_ch67"   onchange="update_trigger_output(2)">Channels 6/7</label><br>
-        <label for="to_2_ch89">  <input type="checkbox" id="to_2_ch89"   onchange="update_trigger_output(2)">Channels 8/9</label><br>
-        <label for="to_2_ch1011"><input type="checkbox" id="to_2_ch1011" onchange="update_trigger_output(2)">Channels 10/11</label><br>
-        <label for="to_2_ch1213"><input type="checkbox" id="to_2_ch1213" onchange="update_trigger_output(2)">Channels 12/13</label><br>
-        <label for="to_2_ch1415"><input type="checkbox" id="to_2_ch1415" onchange="update_trigger_output(2)">Channels 14/15</label><br>
+        <label for="to_2_ch0">  <input type="checkbox" id="to_2_ch0"   onchange="update_trigger_output(0)">Channel 0</label><br>
+        <label for="to_2_ch1">  <input type="checkbox" id="to_2_ch1"   onchange="update_trigger_output(0)">Channel 1</label><br>
+        <label for="to_2_ch2">  <input type="checkbox" id="to_2_ch2"   onchange="update_trigger_output(0)">Channel 2</label><br>
+        <label for="to_2_ch3">  <input type="checkbox" id="to_2_ch3"   onchange="update_trigger_output(0)">Channel 3</label><br>
         <br>
         <label for="to_2_lvds">  <input type="checkbox" id="to_2_lvds"   onchange="update_trigger_output(2)">LVDS</label><br>
         <label for="to_2_trgin"> <input type="checkbox" id="to_2_trgin"  onchange="update_trigger_output(2)">TRG-IN</label><br>
@@ -1584,14 +1206,10 @@
               <td style="padding: 0;"><input style="width:40px" id="to_3_majority" onchange="update_trigger_output(3)"></td>
             </tr>
           </table>
-        <label for="to_3_ch01">  <input type="checkbox" id="to_3_ch01"   onchange="update_trigger_output(3)">Channels 0/1</label><br>
-        <label for="to_3_ch23">  <input type="checkbox" id="to_3_ch23"   onchange="update_trigger_output(3)">Channels 2/3</label><br>
-        <label for="to_3_ch45">  <input type="checkbox" id="to_3_ch45"   onchange="update_trigger_output(3)">Channels 4/5</label><br>
-        <label for="to_3_ch67">  <input type="checkbox" id="to_3_ch67"   onchange="update_trigger_output(3)">Channels 6/7</label><br>
-        <label for="to_3_ch89">  <input type="checkbox" id="to_3_ch89"   onchange="update_trigger_output(3)">Channels 8/9</label><br>
-        <label for="to_3_ch1011"><input type="checkbox" id="to_3_ch1011" onchange="update_trigger_output(3)">Channels 10/11</label><br>
-        <label for="to_3_ch1213"><input type="checkbox" id="to_3_ch1213" onchange="update_trigger_output(3)">Channels 12/13</label><br>
-        <label for="to_3_ch1415"><input type="checkbox" id="to_3_ch1415" onchange="update_trigger_output(3)">Channels 14/15</label><br>
+        <label for="to_3_ch0">  <input type="checkbox" id="to_3_ch0"   onchange="update_trigger_output(0)">Channel 0</label><br>
+        <label for="to_3_ch1">  <input type="checkbox" id="to_3_ch1"   onchange="update_trigger_output(0)">Channel 1</label><br>
+        <label for="to_3_ch2">  <input type="checkbox" id="to_3_ch2"   onchange="update_trigger_output(0)">Channel 2</label><br>
+        <label for="to_3_ch3">  <input type="checkbox" id="to_3_ch3"   onchange="update_trigger_output(0)">Channel 3</label><br>
         <br>
         <label for="to_3_lvds">  <input type="checkbox" id="to_3_lvds"   onchange="update_trigger_output(3)">LVDS</label><br>
         <label for="to_3_trgin"> <input type="checkbox" id="to_3_trgin"  onchange="update_trigger_output(3)">TRG-IN</label><br>
@@ -1787,148 +1405,97 @@
       </td>
       <td >     
         <div data-board="0">   
-        [0]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/DAC[0]" ></span><br>
-        [1]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/DAC[1]" ></span><br>
-        [2]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/DAC[2]" ></span><br>
-        [3]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/DAC[3]" ></span><br>
-        [4]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/DAC[4]" ></span><br>
-        [5]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/DAC[5]" ></span><br>
-        [6]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/DAC[6]" ></span><br>
-        [7]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/DAC[7]" ></span><br>
-        [8]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/DAC[8]" ></span><br>
-        [9]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/DAC[9]" ></span><br>
-        [10] <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/DAC[10]" ></span><br>
-        [11] <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/DAC[11]" ></span><br>
-        [12] <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/DAC[12]" ></span><br>
-        [13] <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/DAC[13]" ></span><br>
-        [14] <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/DAC[14]" ></span><br>
-        [15] <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/DAC[15]" ></span>
+        [0]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/DAC[0]" ></span><br>
+        [1]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/DAC[1]" ></span><br>
+        [2]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/DAC[2]" ></span><br>
+        [3]  <span class="modbvalue" data-board="0" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/DAC[3]" ></span><br>
         </div> 
       </td>
       <td >    
         <div data-board="1">    
-        [0]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/DAC[0]" ></span><br>
-        [1]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/DAC[1]" ></span><br>
-        [2]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/DAC[2]" ></span><br>
-        [3]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/DAC[3]" ></span><br>
-        [4]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/DAC[4]" ></span><br>
-        [5]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/DAC[5]" ></span><br>
-        [6]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/DAC[6]" ></span><br>
-        [7]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/DAC[7]" ></span><br>
-        [8]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/DAC[8]" ></span><br>
-        [9]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/DAC[9]" ></span><br>
-        [10] <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/DAC[10]" ></span><br>
-        [11] <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/DAC[11]" ></span><br>
-        [12] <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/DAC[12]" ></span><br>
-        [13] <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/DAC[13]" ></span><br>
-        [14] <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/DAC[14]" ></span><br>
-        [15] <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/DAC[15]" ></span>
+        [0]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/DAC[0]" ></span><br>
+        [1]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/DAC[1]" ></span><br>
+        [2]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/DAC[2]" ></span><br>
+        [3]  <span class="modbvalue" data-board="1" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/DAC[3]" ></span><br>
         </div>
       </td>
       <td >
         <div data-board="2">        
-        [0]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/DAC[0]" ></span><br>
-        [1]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/DAC[1]" ></span><br>
-        [2]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/DAC[2]" ></span><br>
-        [3]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/DAC[3]" ></span><br>
-        [4]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/DAC[4]" ></span><br>
-        [5]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/DAC[5]" ></span><br>
-        [6]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/DAC[6]" ></span><br>
-        [7]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/DAC[7]" ></span><br>
-        [8]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/DAC[8]" ></span><br>
-        [9]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/DAC[9]" ></span><br>
-        [10] <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/DAC[10]" ></span><br>
-        [11] <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/DAC[11]" ></span><br>
-        [12] <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/DAC[12]" ></span><br>
-        [13] <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/DAC[13]" ></span><br>
-        [14] <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/DAC[14]" ></span><br>
-        [15] <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/DAC[15]" ></span>
+        [0]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/DAC[0]" ></span><br>
+        [1]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/DAC[1]" ></span><br>
+        [2]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/DAC[2]" ></span><br>
+        [3]  <span class="modbvalue" data-board="2" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/DAC[3]" ></span><br>
         </div>
       </td>
       <td >
         <div data-board="3">        
-        [0]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/DAC[0]" ></span><br>
-        [1]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/DAC[1]" ></span><br>
-        [2]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/DAC[2]" ></span><br>
-        [3]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/DAC[3]" ></span><br>
-        [4]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/DAC[4]" ></span><br>
-        [5]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/DAC[5]" ></span><br>
-        [6]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/DAC[6]" ></span><br>
-        [7]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/DAC[7]" ></span><br>
-        [8]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/DAC[8]" ></span><br>
-        [9]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/DAC[9]" ></span><br>
-        [10] <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/DAC[10]" ></span><br>
-        [11] <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/DAC[11]" ></span><br>
-        [12] <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/DAC[12]" ></span><br>
-        [13] <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/DAC[13]" ></span><br>
-        [14] <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/DAC[14]" ></span><br>
-        [15] <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/DAC[15]" ></span>
+        [0]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/DAC[0]" ></span><br>
+        [1]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/DAC[1]" ></span><br>
+        [2]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/DAC[2]" ></span><br>
+        [3]  <span class="modbvalue" data-board="3" data-odb-editable="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/DAC[3]" ></span><br>
         </div>
       </td>
     </tr>
-
-
 
     <tr>
       <th class="mtableheader" colspan="5" style="font-size:unset;">Computed register values</th>
     </tr>
 
-
     <tr>
       <td>Board configuration<br><small>Computed from test pattern, trigger overlap and trigger polarity<br>Only for RAW firmware</small></td>
-      <td><div class="modbvalue" data-format="x" data-raw="1" data-board="0" id="board_config_0" onchange="board_config_changed(0)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Board configuration" ></div></td>
-      <td><div class="modbvalue" data-format="x" data-raw="1" data-board="1" id="board_config_1" onchange="board_config_changed(1)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Board configuration" ></div></td>
-      <td><div class="modbvalue" data-format="x" data-raw="1" data-board="2" id="board_config_2" onchange="board_config_changed(2)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Board configuration" ></div></td>
-      <td><div class="modbvalue" data-format="x" data-raw="1" data-board="3" id="board_config_3" onchange="board_config_changed(3)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Board configuration" ></div></td>
+      <td><div class="modbvalue" data-format="x" data-raw="1" data-board="0" id="board_config_0" onchange="board_config_changed(0)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/Board configuration" ></div></td>
+      <td><div class="modbvalue" data-format="x" data-raw="1" data-board="1" id="board_config_1" onchange="board_config_changed(1)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/Board configuration" ></div></td>
+      <td><div class="modbvalue" data-format="x" data-raw="1" data-board="2" id="board_config_2" onchange="board_config_changed(2)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/Board configuration" ></div></td>
+      <td><div class="modbvalue" data-format="x" data-raw="1" data-board="3" id="board_config_3" onchange="board_config_changed(3)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/Board configuration" ></div></td>
     </tr>
     <tr>
       <td>Readout channel mask</td>
-      <td><div class="modbvalue" id="readout_0" data-format="x" data-board="0" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Channel Mask" onchange="readout_mask_updated(0)" onload="onchange()"></div></td>
-      <td><div class="modbvalue" id="readout_1" data-format="x" data-board="1" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Channel Mask" onchange="readout_mask_updated(1)" onload="onchange()"></div></td>
-      <td><div class="modbvalue" id="readout_2" data-format="x" data-board="2" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Channel Mask" onchange="readout_mask_updated(2)" onload="onchange()"></div></td>
-      <td><div class="modbvalue" id="readout_3" data-format="x" data-board="3" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Channel Mask" onchange="readout_mask_updated(3)" onload="onchange()"></div></td>
+      <td><div class="modbvalue" id="readout_0" data-format="x" data-board="0" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/Channel Mask" onchange="readout_mask_updated(0)" onload="onchange()"></div></td>
+      <td><div class="modbvalue" id="readout_1" data-format="x" data-board="1" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/Channel Mask" onchange="readout_mask_updated(1)" onload="onchange()"></div></td>
+      <td><div class="modbvalue" id="readout_2" data-format="x" data-board="2" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/Channel Mask" onchange="readout_mask_updated(2)" onload="onchange()"></div></td>
+      <td><div class="modbvalue" id="readout_3" data-format="x" data-board="3" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/Channel Mask" onchange="readout_mask_updated(3)" onload="onchange()"></div></td>
     </tr>
     <tr>
       <td>Global trigger mask<br><small>Computed from trigger sources, coincidence window and majority</small></td>
-      <td><span class="modbvalue" id="ts_0" data-board="0" data-format="x" onchange="trigger_source_updated(0)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Trigger Source"></span></td>
-      <td><span class="modbvalue" id="ts_1" data-board="1" data-format="x" onchange="trigger_source_updated(1)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Trigger Source"></span></td>
-      <td><span class="modbvalue" id="ts_2" data-board="2" data-format="x" onchange="trigger_source_updated(2)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Trigger Source"></span></td>
-      <td><span class="modbvalue" id="ts_3" data-board="3" data-format="x" onchange="trigger_source_updated(3)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Trigger Source"></span></td>
+      <td><span class="modbvalue" id="ts_0" data-board="0" data-format="x" onchange="trigger_source_updated(0)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/Trigger Source"></span></td>
+      <td><span class="modbvalue" id="ts_1" data-board="1" data-format="x" onchange="trigger_source_updated(1)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/Trigger Source"></span></td>
+      <td><span class="modbvalue" id="ts_2" data-board="2" data-format="x" onchange="trigger_source_updated(2)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/Trigger Source"></span></td>
+      <td><span class="modbvalue" id="ts_3" data-board="3" data-format="x" onchange="trigger_source_updated(3)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/Trigger Source"></span></td>
     </tr>
     <tr>
       <td>Front panel I/O mask<br><small>Computed from Front panel I/O settings, LVDS directions, and some hard-coded values</small></td>
-      <td><span class="modbvalue" id="io_0" data-board="0" data-format="x" onchange="io_updated(0)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Front panel IO"></span></td>
-      <td><span class="modbvalue" id="io_1" data-board="1" data-format="x" onchange="io_updated(1)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Front panel IO"></span></td>
-      <td><span class="modbvalue" id="io_2" data-board="2" data-format="x" onchange="io_updated(2)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Front panel IO"></span></td>
-      <td><span class="modbvalue" id="io_3" data-board="3" data-format="x" onchange="io_updated(3)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Front panel IO"></span></td>      
+      <td><span class="modbvalue" id="io_0" data-board="0" data-format="x" onchange="io_updated(0)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/Front panel IO"></span></td>
+      <td><span class="modbvalue" id="io_1" data-board="1" data-format="x" onchange="io_updated(1)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/Front panel IO"></span></td>
+      <td><span class="modbvalue" id="io_2" data-board="2" data-format="x" onchange="io_updated(2)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/Front panel IO"></span></td>
+      <td><span class="modbvalue" id="io_3" data-board="3" data-format="x" onchange="io_updated(3)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/Front panel IO"></span></td>      
     </tr>
     <tr>
       <td>TRG-OUT mask<br><small>Computed from TRG-OUT settings</small></td>
-      <td><span class="modbvalue" id="to_0" data-board="0" data-format="x" onchange="trigger_output_updated(0)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Trigger Output"></span></td>
-      <td><span class="modbvalue" id="to_1" data-board="1" data-format="x" onchange="trigger_output_updated(1)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Trigger Output"></span></td>
-      <td><span class="modbvalue" id="to_2" data-board="2" data-format="x" onchange="trigger_output_updated(2)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Trigger Output"></span></td>
-      <td><span class="modbvalue" id="to_3" data-board="3" data-format="x" onchange="trigger_output_updated(3)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Trigger Output"></span></td>
+      <td><span class="modbvalue" id="to_0" data-board="0" data-format="x" onchange="trigger_output_updated(0)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/Trigger Output"></span></td>
+      <td><span class="modbvalue" id="to_1" data-board="1" data-format="x" onchange="trigger_output_updated(1)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/Trigger Output"></span></td>
+      <td><span class="modbvalue" id="to_2" data-board="2" data-format="x" onchange="trigger_output_updated(2)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/Trigger Output"></span></td>
+      <td><span class="modbvalue" id="to_3" data-board="3" data-format="x" onchange="trigger_output_updated(3)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/Trigger Output"></span></td>
     </tr>
     <tr>
       <td>LVDS I/O mask<br><small>Computed from LVDS modes and 5th checkbox</small></td>
-      <td><span class="modbvalue" id="lvds_0" data-board="0" data-format="x" onchange="lvds_updated(0)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Front panel LVDS IO"></span></td>
-      <td><span class="modbvalue" id="lvds_1" data-board="1" data-format="x" onchange="lvds_updated(1)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Front panel LVDS IO"></span></td>
-      <td><span class="modbvalue" id="lvds_2" data-board="2" data-format="x" onchange="lvds_updated(2)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Front panel LVDS IO"></span></td>
-      <td><span class="modbvalue" id="lvds_3" data-board="3" data-format="x" onchange="lvds_updated(3)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Front panel LVDS IO"></span></td>
+      <td><span class="modbvalue" id="lvds_0" data-board="0" data-format="x" onchange="lvds_updated(0)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/Front panel LVDS IO"></span></td>
+      <td><span class="modbvalue" id="lvds_1" data-board="1" data-format="x" onchange="lvds_updated(1)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/Front panel LVDS IO"></span></td>
+      <td><span class="modbvalue" id="lvds_2" data-board="2" data-format="x" onchange="lvds_updated(2)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/Front panel LVDS IO"></span></td>
+      <td><span class="modbvalue" id="lvds_3" data-board="3" data-format="x" onchange="lvds_updated(3)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/Front panel LVDS IO"></span></td>
     </tr>
     <tr>
       <td>Acquistion control mask<br><small>Computed from start mode, trigger count mode, LVDS enable flags</small></td>
-      <td><span class="modbvalue" id="acq_0" data-board="0" data-format="x" onchange="acq_updated(0)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/Acq mode"></span></td>
-      <td><span class="modbvalue" id="acq_1" data-board="1" data-format="x" onchange="acq_updated(1)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/Acq mode"></span></td>
-      <td><span class="modbvalue" id="acq_2" data-board="2" data-format="x" onchange="acq_updated(2)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/Acq mode"></span></td>
-      <td><span class="modbvalue" id="acq_3" data-board="3" data-format="x" onchange="acq_updated(3)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/Acq mode"></span></td>
+      <td><span class="modbvalue" id="acq_0" data-board="0" data-format="x" onchange="acq_updated(0)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/Acq mode"></span></td>
+      <td><span class="modbvalue" id="acq_1" data-board="1" data-format="x" onchange="acq_updated(1)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/Acq mode"></span></td>
+      <td><span class="modbvalue" id="acq_2" data-board="2" data-format="x" onchange="acq_updated(2)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/Acq mode"></span></td>
+      <td><span class="modbvalue" id="acq_3" data-board="3" data-format="x" onchange="acq_updated(3)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/Acq mode"></span></td>
     </tr>
     <tr>
       <td>ZLE baseline<br><small>Computed from ZLE baseline settings<br>Only for ZLE firmware</small></td>
-      <td><span class="modbvalue" id="zle_bl_0" data-board="0" data-zle="1" data-format="x" onchange="zle_baseline_updated(0)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board0/ZLEBaseline"></span></td>
-      <td><span class="modbvalue" id="zle_bl_1" data-board="1" data-zle="1" data-format="x" onchange="zle_baseline_updated(1)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board1/ZLEBaseline"></span></td>
-      <td><span class="modbvalue" id="zle_bl_2" data-board="2" data-zle="1" data-format="x" onchange="zle_baseline_updated(2)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board2/ZLEBaseline"></span></td>
-      <td><span class="modbvalue" id="zle_bl_3" data-board="3" data-zle="1" data-format="x" onchange="zle_baseline_updated(3)" onload="onchange()" data-odb-path="/Equipment/V1725_Data00/Settings/Board3/ZLEBaseline"></span></td>
+      <td><span class="modbvalue" id="zle_bl_0" data-board="0" data-zle="1" data-format="x" onchange="zle_baseline_updated(0)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board0/ZLEBaseline"></span></td>
+      <td><span class="modbvalue" id="zle_bl_1" data-board="1" data-zle="1" data-format="x" onchange="zle_baseline_updated(1)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board1/ZLEBaseline"></span></td>
+      <td><span class="modbvalue" id="zle_bl_2" data-board="2" data-zle="1" data-format="x" onchange="zle_baseline_updated(2)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board2/ZLEBaseline"></span></td>
+      <td><span class="modbvalue" id="zle_bl_3" data-board="3" data-zle="1" data-format="x" onchange="zle_baseline_updated(3)" onload="onchange()" data-odb-path="/Equipment/DT5751_Data00/Settings/Board3/ZLEBaseline"></span></td>
     </tr>
 
   </table>
@@ -1940,83 +1507,17 @@
       <th colspan="6" class="mtableheader">Channel Mask Calculator</th>
     </tr>
     <tr>
-      <th>V1725 Mask Calculator</th>
-      <th>Chronobox Mask Calculator</th>
+      <th>DTDT51 Mask Calculator</th>
     </tr>
     <tr>
       <td>
-        <input type="button" value="Select all" onclick="select_all_v1725(true);">
-        <input type="button" value="Select none" onclick="select_all_v1725(false);"><br/>
-        <input type="checkbox" id="v1725_mask_0" value="0" class="v1725_mask"><label for="v1725_mask_0">Ch 0</label><br/>
-        <input type="checkbox" id="v1725_mask_1" value="1" class="v1725_mask"><label for="v1725_mask_1">Ch 1</label><br/>
-        <input type="checkbox" id="v1725_mask_2" value="2" class="v1725_mask"><label for="v1725_mask_2">Ch 2</label><br/>
-        <input type="checkbox" id="v1725_mask_3" value="3" class="v1725_mask"><label for="v1725_mask_3">Ch 3</label><br/>
-        <input type="checkbox" id="v1725_mask_4" value="4" class="v1725_mask"><label for="v1725_mask_4">Ch 4</label><br/>
-        <input type="checkbox" id="v1725_mask_5" value="5" class="v1725_mask"><label for="v1725_mask_5">Ch 5</label><br/>
-        <input type="checkbox" id="v1725_mask_6" value="6" class="v1725_mask"><label for="v1725_mask_6">Ch 6</label><br/>
-        <input type="checkbox" id="v1725_mask_7" value="7" class="v1725_mask"><label for="v1725_mask_7">Ch 7</label><br/>
-        <input type="checkbox" id="v1725_mask_8" value="8" class="v1725_mask"><label for="v1725_mask_8">Ch 8</label><br/>
-        <input type="checkbox" id="v1725_mask_9" value="9" class="v1725_mask"><label for="v1725_mask_9">Ch 9</label><br/>
-        <input type="checkbox" id="v1725_mask_10" value="10" class="v1725_mask"><label for="v1725_mask_10">Ch 10</label><br/>
-        <input type="checkbox" id="v1725_mask_11" value="11" class="v1725_mask"><label for="v1725_mask_11">Ch 11</label><br/>
-        <input type="checkbox" id="v1725_mask_12" value="12" class="v1725_mask"><label for="v1725_mask_12">Ch 12</label><br/>
-        <input type="checkbox" id="v1725_mask_13" value="13" class="v1725_mask"><label for="v1725_mask_13">Ch 13</label><br/>
-        <input type="checkbox" id="v1725_mask_14" value="14" class="v1725_mask"><label for="v1725_mask_14">Ch 14</label><br/>
-        <input type="checkbox" id="v1725_mask_15" value="15" class="v1725_mask"><label for="v1725_mask_15">Ch 15</label><br/>
-        Mask = <span id="v1725_mask_result">0x0</span>
-      </td>
-      <td>
-        <input type="button" value="Select all" onclick="select_all_chrono(true);">
-        <input type="button" value="Select none" onclick="select_all_chrono(false);"><br/>
-        <table>
-          <tr>
-            <td>
-              Board 0<br/>
-              <input type="checkbox" id="chrono_mask_0_0" value="0" class="chrono_mask"><label for="chrono_mask_0_0">Ch 0+1</label><br/>
-              <input type="checkbox" id="chrono_mask_0_1" value="1" class="chrono_mask"><label for="chrono_mask_0_1">Ch 2+3</label><br/>
-              <input type="checkbox" id="chrono_mask_0_2" value="2" class="chrono_mask"><label for="chrono_mask_0_2">Ch 4+5</label><br/>
-              <input type="checkbox" id="chrono_mask_0_3" value="3" class="chrono_mask"><label for="chrono_mask_0_3">Ch 6+7</label><br/>
-              <input type="checkbox" id="chrono_mask_0_4" value="4" class="chrono_mask"><label for="chrono_mask_0_4">Ch 8+9</label><br/>
-              <input type="checkbox" id="chrono_mask_0_5" value="5" class="chrono_mask"><label for="chrono_mask_0_5">Ch 10+11</label><br/>
-              <input type="checkbox" id="chrono_mask_0_6" value="6" class="chrono_mask"><label for="chrono_mask_0_6">Ch 12+13</label><br/>
-              <input type="checkbox" id="chrono_mask_0_7" value="7" class="chrono_mask"><label for="chrono_mask_0_7">Ch 14+15</label>              
-            </td>
-            <td>
-              Board 1<br/>
-              <input type="checkbox" id="chrono_mask_1_0" value="8" class="chrono_mask"><label for="chrono_mask_1_0">Ch 0+1</label><br/>
-              <input type="checkbox" id="chrono_mask_1_1" value="9" class="chrono_mask"><label for="chrono_mask_1_1">Ch 2+3</label><br/>
-              <input type="checkbox" id="chrono_mask_1_2" value="10" class="chrono_mask"><label for="chrono_mask_1_2">Ch 4+5</label><br/>
-              <input type="checkbox" id="chrono_mask_1_3" value="11" class="chrono_mask"><label for="chrono_mask_1_3">Ch 6+7</label><br/>
-              <input type="checkbox" id="chrono_mask_1_4" value="12" class="chrono_mask"><label for="chrono_mask_1_4">Ch 8+9</label><br/>
-              <input type="checkbox" id="chrono_mask_1_5" value="13" class="chrono_mask"><label for="chrono_mask_1_5">Ch 10+11</label><br/>
-              <input type="checkbox" id="chrono_mask_1_6" value="14" class="chrono_mask"><label for="chrono_mask_1_6">Ch 12+13</label><br/>
-              <input type="checkbox" id="chrono_mask_1_7" value="15" class="chrono_mask"><label for="chrono_mask_1_7">Ch 14+15</label>              
-            </td>
-            <td>
-              Board 2<br/>
-              <input type="checkbox" id="chrono_mask_2_0" value="16" class="chrono_mask"><label for="chrono_mask_2_0">Ch 0+1</label><br/>
-              <input type="checkbox" id="chrono_mask_2_1" value="17" class="chrono_mask"><label for="chrono_mask_2_1">Ch 2+3</label><br/>
-              <input type="checkbox" id="chrono_mask_2_2" value="18" class="chrono_mask"><label for="chrono_mask_2_2">Ch 4+5</label><br/>
-              <input type="checkbox" id="chrono_mask_2_3" value="19" class="chrono_mask"><label for="chrono_mask_2_3">Ch 6+7</label><br/>
-              <input type="checkbox" id="chrono_mask_2_4" value="20" class="chrono_mask"><label for="chrono_mask_2_4">Ch 8+9</label><br/>
-              <input type="checkbox" id="chrono_mask_2_5" value="21" class="chrono_mask"><label for="chrono_mask_2_5">Ch 10+11</label><br/>
-              <input type="checkbox" id="chrono_mask_2_6" value="22" class="chrono_mask"><label for="chrono_mask_2_6">Ch 12+13</label><br/>
-              <input type="checkbox" id="chrono_mask_2_7" value="23" class="chrono_mask"><label for="chrono_mask_2_7">Ch 14+15</label>              
-            </td>
-            <td>
-              Board 3<br/>
-              <input type="checkbox" id="chrono_mask_3_0" value="24" class="chrono_mask"><label for="chrono_mask_3_0">Ch 0+1</label><br/>
-              <input type="checkbox" id="chrono_mask_3_1" value="25" class="chrono_mask"><label for="chrono_mask_3_1">Ch 2+3</label><br/>
-              <input type="checkbox" id="chrono_mask_3_2" value="26" class="chrono_mask"><label for="chrono_mask_3_2">Ch 4+5</label><br/>
-              <input type="checkbox" id="chrono_mask_3_3" value="27" class="chrono_mask"><label for="chrono_mask_3_3">Ch 6+7</label><br/>
-              <input type="checkbox" id="chrono_mask_3_4" value="28" class="chrono_mask"><label for="chrono_mask_3_4">Ch 8+9</label><br/>
-              <input type="checkbox" id="chrono_mask_3_5" value="29" class="chrono_mask"><label for="chrono_mask_3_5">Ch 10+11</label><br/>
-              <input type="checkbox" id="chrono_mask_3_6" value="30" class="chrono_mask"><label for="chrono_mask_3_6">Ch 12+13</label><br/>
-              <input type="checkbox" id="chrono_mask_3_7" value="31" class="chrono_mask"><label for="chrono_mask_3_7">Ch 14+15</label>              
-            </td>
-          </tr>
-        </table><br/>
-        Mask = <span id="chrono_mask_result">0x0</span>
+        <input type="button" value="Select all" onclick="select_all_dt5751(true);">
+        <input type="button" value="Select none" onclick="select_all_dt5751(false);"><br/>
+        <input type="checkbox" id="dt5751_mask_0" value="0" class="dt5751_mask"><label for="dt5751_mask_0">Ch 0</label><br/>
+        <input type="checkbox" id="dt5751_mask_1" value="1" class="dt5751_mask"><label for="dt5751_mask_1">Ch 1</label><br/>
+        <input type="checkbox" id="dt5751_mask_2" value="2" class="dt5751_mask"><label for="dt5751_mask_2">Ch 2</label><br/>
+        <input type="checkbox" id="dt5751_mask_3" value="3" class="dt5751_mask"><label for="dt5751_mask_3">Ch 3</label><br/>
+        Mask = <span id="dt5751_mask_result">0x0</span>
       </td>
     </tr>
   </table>
@@ -2026,7 +1527,7 @@ Notes:
 
   <ul>
     <li> The number of saved samples is = "Custom Size" * 10 </li>
-    <li> Buffer Organization defines how many buffers (events) in memory; Tab 8.1 of V1725 manual </li>
+    <li> Buffer Organization defines how many buffers (events) in memory; Tab 8.1 of DT5751 manual </li>
     <li> Almost full should be half of the number of buffers </li>
     <li> Waveform length, Buffer organization and almost full need to be changed coherently. </li>
   </ul>
@@ -2034,14 +1535,13 @@ Notes:
   Links to full set of ODB parameters:
 
   <ul>
-    <li>  <a href="/Equipment/V1725_Data00/Settings/Board0"> Board 0 </a></li>
-    <li>  <a href="/Equipment/V1725_Data00/Settings/Board1"> Board 1 </a></li>
-    <li>  <a href="/Equipment/V1725_Data00/Settings/Board2"> Board 2 </a></li>
-    <li>  <a href="/Equipment/V1725_Data00/Settings/Board3"> Board 3 </a></li>
+    <li>  <a href="/Equipment/DT5751_Data00/Settings/Board0"> Board 0 </a></li>
+    <li>  <a href="/Equipment/DT5751_Data00/Settings/Board1"> Board 1 </a></li>
+    <li>  <a href="/Equipment/DT5751_Data00/Settings/Board2"> Board 2 </a></li>
+    <li>  <a href="/Equipment/DT5751_Data00/Settings/Board3"> Board 3 </a></li>
   </ul>
 
 </div>
-
 
 </body>
 </html>
