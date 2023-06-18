@@ -107,7 +107,7 @@ controls 2*2 = 4 DT5751 boards.  Compile and run:
 #define NBLINKSPERFE      1   //!< Number of optical links controlled by each frontend
 #define NBDT5751PERLINK     1   //!< Number of daisy-chained dt5751s per optical link
 #define NBDT5751TOTAL      1  //!< Number of dt5751 boards in total
-#define NBCORES           8   //!< Number of cpu cores, for process/thread locking
+#define NBCORES           4   //!< Number of cpu cores, for process/thread locking
 #endif
 
 
@@ -119,7 +119,6 @@ controls 2*2 = 4 DT5751 boards.  Compile and run:
 #define  FE_NAME   "feodt5751MTI"       //!< Frontend name
 
 #define UNUSED(x) ((void)(x)) //!< Suppress compiler warnings
-const bool SYNCEVENTS_DEBUG = true;
 
 // __________________________________________________________________
 // --- MIDAS global variables
@@ -442,13 +441,14 @@ INT frontend_init(){
 
   cpu_set_t mask;
   CPU_ZERO(&mask);
-  CPU_SET(5, &mask);  //Main thread to core 5
+  CPU_SET(3, &mask);  //Main thread to core 3
   if( sched_setaffinity(0, sizeof(mask), &mask) < 0 ){
     printf("ERROR setting cpu affinity for main thread: %s\n", strerror(errno));
   }
 
   // Setup a deferred transition to wait till the DT5751 buffer is empty.
   cm_register_deferred_transition(TR_STOP, wait_buffer_empty);
+  cm_register_deferred_transition(TR_PAUSE, wait_buffer_empty);
 
   return SUCCESS;
 }
@@ -676,8 +676,7 @@ timeval wait_start;
 
 // Check how many events we have in the ring buffer
 BOOL wait_buffer_empty(int transition, BOOL first)
- {
-
+{
    if(first){
      printf("\nDeferred transition.  First call of wait_buffer_empty. Stopping run\n");
      for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
@@ -918,7 +917,6 @@ INT frontend_loop()
 // Event polling; only ready for readout only when data is present in all ring buffers
 INT poll_event(INT source, INT count, BOOL test)
 {
-
   register int i;
 
   for (i = 0; i < count; i++) {
@@ -934,7 +932,7 @@ INT poll_event(INT source, INT count, BOOL test)
     if (enableMerging) {
       //ready for readout only when data is present in all ring buffers
       for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
-        if(itdt5751->IsConnected() && (itdt5751->GetNumEventsInRB() == 0)) {
+        if(itdt5751->IsEnabled() && itdt5751->IsConnected() && (itdt5751->GetNumEventsInRB() == 0)) {
           evtReady = false;
         }
       }
@@ -945,7 +943,7 @@ INT poll_event(INT source, INT count, BOOL test)
       int maxNumEvents = -1;
 
       for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
-        if (!itdt5751->IsConnected()) {
+        if (!itdt5751->IsConnected() || !itdt5751->IsEnabled()) {
           continue;
         }
 
@@ -967,8 +965,10 @@ INT poll_event(INT source, INT count, BOOL test)
 
     //If event not ready or we're in test phase, keep looping
     if (evtReady && !test)
-      //      return 0;
       return 1;
+
+    // cm_yield added to allow fast handling of run transitions (START -> STOP)
+    cm_yield(0);
 
     usleep(20);
   }
@@ -1012,6 +1012,7 @@ INT interrupt_configure(INT cmd, INT source, POINTER_T adr)
  * Get data from all ring buffers and compose the MIDAS banks.
  */
 INT read_event_from_ring_bufs(char *pevent, INT off) {
+
   DWORD *pdata;
 
   if (!runInProgress) return 0;
@@ -1169,7 +1170,7 @@ INT read_temperature(char *pevent, INT off) {
   // Read the temperature for each ADC...
   DWORD temp;
   for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751){
-    if (!itdt5751->IsConnected()) {
+    if (!itdt5751->IsConnected() || !itdt5751->IsEnabled()) {
       continue;
     }
 
