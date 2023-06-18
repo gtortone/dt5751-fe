@@ -35,7 +35,7 @@ set (NBDT5751PERLINK 1)
 set (NBDT5751TOTAL 4) 
 
 # Number of cores
-set (NBCORES 12)
+set (NBCORES 4)
 
 # Using the SYSTEM buffer
 set (USE_SYSTEM_BUFFER 1)
