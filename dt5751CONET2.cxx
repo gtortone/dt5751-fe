@@ -1191,8 +1191,18 @@ int dt5751CONET2::InitializeForAcq()
 
 	// Start the ADC calibration
 	DWORD temp;
+	int desmode = ReadReg_(DT5751_BOARD_CONFIG, &temp) & (1<<12);
+
+	if(desmode) {
+	   // disable even channels
+	   ReadReg_(DT5751_CHANNEL_EN_MASK, &temp);
+	   temp = temp & ~(1<<0);
+	   temp = temp & ~(1<<2);
+	   WriteReg_(DT5751_CHANNEL_EN_MASK, temp);
+ 	} 
+
 	ReadReg_(DT5751_ADC_CALIBRATION, &temp);
-	temp = temp & (~ (1<<1));
+	temp = temp & ~(1<<1);
   	WriteReg_(DT5751_ADC_CALIBRATION , temp);
 	temp = temp | (1<<1);
 	WriteReg_(DT5751_ADC_CALIBRATION , temp);
@@ -1200,6 +1210,11 @@ int dt5751CONET2::InitializeForAcq()
 	// Now we check to see when the calibration has finished.
 	// by checking register 0x1n88.
 	for (int i=0;i<4;i++) {
+
+		// if DES skip even channels
+                if(desmode && i%2==0)
+		   continue;
+
 		addr = DT5751_CHANNEL_STATUS | (i << 8);
 		ReadReg_(addr,&temp);
 		//		printf("Channel (%i) %x Status: %x\n",i,addr,temp);
