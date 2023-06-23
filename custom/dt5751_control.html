@@ -590,12 +590,21 @@
       <th>Value</th> 
     </tr>
     <tr>
+      <td>Enable chronobox</td>
+      <td><input type="checkbox" class="modbcheckbox" data-odb-path="/Equipment/DT5751_Data00/Settings/Enable chronobox" data-odb-editable="1"></td>
+    </tr>
+    <tr>
       <td>Merge data from multiple boards into a single event</td>
       <td><input type="checkbox" class="modbcheckbox" data-odb-path="/Equipment/DT5751_Data00/Settings/Merge data from boards" data-odb-editable="1"></td>
     </tr>
     <tr>
       <td>
         Write partially merged events<br>
+        <div style="font-size:small; max-width:300px">
+          If the chronobox is disabled but we're still merging events, we'll do it by event timestamp.<br>
+          If a board is BUSY, should we still write the data from the other boards, or only write events
+          when we have data from all boards?
+        </div>
       </td>
       <td><input type="checkbox" class="modbcheckbox" data-odb-path="/Equipment/DT5751_Data00/Settings/Write partially merged events" data-odb-editable="1"></td>
     </tr>

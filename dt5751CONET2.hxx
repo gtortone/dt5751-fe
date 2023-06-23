@@ -72,7 +72,8 @@ public:
     ConnectSuccess,
     ConnectErrorCaenComm,
     ConnectErrorTimeout,
-    ConnectErrorAlreadyConnected
+    ConnectErrorAlreadyConnected,
+    ConnectErrorBoardMismatch
   };
   enum DataType {
     RawPack2,                //!< 0: Full data, 2 packing

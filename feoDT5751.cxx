@@ -98,6 +98,8 @@ controls 2*2 = 4 DT5751 boards.  Compile and run:
 #include "mfe.h"
 #include "dt5751CONET2.hxx"
 
+#include <zmq.h>
+
 // __________________________________________________________________
 // --- General feodt5751 parameters
 
@@ -155,6 +157,8 @@ bool stopRunInProgress = false; //!<
 bool eor_transition_called = false; // already called EOR
 uint32_t timestamp_offset[NBLINKSPERFE*NBDT5751PERLINK]; //!< trigger time stamp offsets
 
+std::string chronoboxIP = "172.16.4.71";
+BOOL enableChronobox = true;
 BOOL enableMerging = true;
 int unmergedModuleToRead = -1;
 BOOL writePartiallyMergedEvents = false;
@@ -190,7 +194,7 @@ EQUIPMENT equipment[] =
     {
         "DT5751_Data%02d",           /* equipment name */
         {
-            EQ_EVID, EQ_TRGMSK,     /* event ID, trigger mask */
+            4, EQ_TRGMSK,     /* event ID, trigger mask */
 #if USE_SYSTEM_BUFFER
             "SYSTEM",               /* write events to system buffer */
 #else
@@ -218,7 +222,7 @@ EQUIPMENT equipment[] =
     {
         "DT5751_BufLvl%02d",             /* equipment name */
         {
-            100, 0x1000,            /* event ID, corrected with feIndex, trigger mask */
+            400, 0x1000,            /* event ID, corrected with feIndex, trigger mask */
             "SYSTEM",               /* event buffer */
             EQ_PERIODIC,            /* equipment type */
             0,                      /* event source */
@@ -237,7 +241,7 @@ EQUIPMENT equipment[] =
     {
       "DT5751_Temp%02d",             /* equipment name */
       {
-	100, 0x1000,            /* event ID, corrected with feIndex, trigger mask */
+	400, 0x1000,            /* event ID, corrected with feIndex, trigger mask */
 	"SYSTEM",               /* event buffer */
 	EQ_PERIODIC,            /* equipment type */
 	0,                      /* event source */
@@ -263,6 +267,7 @@ std::vector<dt5751CONET2>::iterator itdt5751_thread[NBLINKSPERFE];  //!< Link th
 pthread_t tid[NBLINKSPERFE];                            //!< Thread ID
 int thread_retval[NBLINKSPERFE] = {0};                  //!< Thread return value
 int thread_link[NBLINKSPERFE];                          //!< Link number associated with each thread
+bool is_first_event = true;
 
 /********************************************************************/
 /********************************************************************/
@@ -286,6 +291,26 @@ void seq_callback(INT h, INT hseq, void *info){
       cm_msg(MINFO, "seq_callback", "Settings %s touched. Changes will take effect at start of next run.", key.name);
     }
   }
+}
+
+// Start the chronobox run going.  TRUE=start run, FALSE=stop run)
+INT chronobox_start_stop(bool start){
+
+  int status;
+  if(start){
+    char cmd[255];
+    sprintf(cmd, "esper-tool write -d true %s mod_tdm run", chronoboxIP.c_str());
+    status = system(cmd);
+    printf("Started chronobox run; status = %i\n",status);
+  }else{
+    char cmd[255];
+    printf("Stopping chronobox run\n");
+    sprintf(cmd, "esper-tool write -d false %s mod_tdm run", chronoboxIP.c_str());
+    status = system(cmd);
+    printf("Stopped chronobox run; status = %i\n",status);
+  }
+
+  return status;
 }
 
 //
@@ -342,10 +367,14 @@ INT frontend_init(){
     char cb_path[255], cb_ip_path[255], merge_path[255], partial_path[255], flush_path[255], thresh_path[255];
     int size_bool = sizeof(BOOL);
     int size_dword = sizeof(DWORD);
+    sprintf(cb_path, "/Equipment/%s/Settings/Enable chronobox", equipment[0].name);
+    sprintf(cb_ip_path, "/Equipment/%s/Settings/Chronobox IP Address", equipment[0].name);
     sprintf(merge_path, "/Equipment/%s/Settings/Merge data from boards", equipment[0].name);
     sprintf(partial_path, "/Equipment/%s/Settings/Write partially merged events", equipment[0].name);
     sprintf(flush_path, "/Equipment/%s/Settings/Flush buffers at end of run", equipment[0].name);
     sprintf(thresh_path, "/Equipment/%s/Settings/TS match thresh (clock ticks)", equipment[0].name);
+    db_get_value(hDB, 0, cb_path, &enableChronobox, &size_bool, TID_BOOL, TRUE);
+    db_get_value_string(hDB, 0, cb_ip_path, 0, &chronoboxIP, TRUE, 128);
     db_get_value(hDB, 0, merge_path, &enableMerging, &size_bool, TID_BOOL, TRUE);
     db_get_value(hDB, 0, partial_path, &writePartiallyMergedEvents, &size_bool, TID_BOOL, TRUE);
     db_get_value(hDB, 0, flush_path, &flushBuffersAtEndOfRun, &size_bool, TID_BOOL, TRUE);
@@ -390,6 +419,8 @@ INT frontend_init(){
         break;
       case dt5751CONET2::ConnectErrorCaenComm:
       case dt5751CONET2::ConnectErrorTimeout:
+      case dt5751CONET2::ConnectErrorBoardMismatch:
+        printf(">>> Connect error\n");
         errBoards.push_back(std::pair<int,int>(iLink,iBoard));
         break;
       case dt5751CONET2::ConnectErrorAlreadyConnected:
@@ -447,8 +478,25 @@ INT frontend_init(){
   }
 
   // Setup a deferred transition to wait till the DT5751 buffer is empty.
-  cm_register_deferred_transition(TR_STOP, wait_buffer_empty);
-  cm_register_deferred_transition(TR_PAUSE, wait_buffer_empty);
+  //cm_register_deferred_transition(TR_STOP, wait_buffer_empty);
+
+  //-begin - ZMQ----------------------------------------------------------
+
+  //  Socket to talk to clients
+  void *context = zmq_ctx_new ();
+  subscriber = zmq_socket (context, ZMQ_SUB);
+  char zmq_port[255];
+  sprintf(zmq_port, "tcp://%s:5555", chronoboxIP.c_str());
+  int rc = zmq_connect (subscriber, zmq_port);
+  // Without message
+  zmq_setsockopt (subscriber, ZMQ_SUBSCRIBE, "", 0);
+  printf (" This subscriber is connecting to the ChronoBox Publisher context: %p *subscriber: %p rc:%d \n"
+          , context, subscriber, rc);
+  
+  // Need to discard the first ZMQ bank.
+  is_first_event = true;
+  
+  //-end - ZMQ---------------------------------------------------------- 
 
   return SUCCESS;
 }
@@ -510,20 +558,35 @@ INT begin_of_run(INT run_number, char *error)
   {
     // Create/read flags for merge data from all boards in same event.
     char cb_path[255], cb_ip_path[255], merge_path[255], partial_path[255], flush_path[255], thresh_path[255];
+    sprintf(cb_path, "/Equipment/%s/Settings/Enable chronobox", equipment[0].name);
+    sprintf(cb_ip_path, "/Equipment/%s/Settings/Chronobox IP Address", equipment[0].name);
     sprintf(merge_path, "/Equipment/%s/Settings/Merge data from boards", equipment[0].name);
     sprintf(partial_path, "/Equipment/%s/Settings/Write partially merged events", equipment[0].name);
     sprintf(flush_path, "/Equipment/%s/Settings/Flush buffers at end of run", equipment[0].name);
     sprintf(thresh_path, "/Equipment/%s/Settings/TS match thresh (clock ticks)", equipment[0].name);
     INT size = sizeof(BOOL);
+    db_get_value(hDB, 0, cb_path, &enableChronobox, &size, TID_BOOL, TRUE);
+    db_get_value_string(hDB, 0, cb_ip_path, 0, &chronoboxIP, TRUE, 128);
     db_get_value(hDB, 0, merge_path, &enableMerging, &size, TID_BOOL, TRUE);
     db_get_value(hDB, 0, partial_path, &writePartiallyMergedEvents, &size, TID_BOOL, TRUE);
     db_get_value(hDB, 0, flush_path, &flushBuffersAtEndOfRun, &size, TID_BOOL, TRUE);
     size = sizeof(DWORD);
     db_get_value(hDB, 0, thresh_path, &timestampMatchingThreshold, &size, TID_DWORD, TRUE);
   }
+  
+  if (enableChronobox && !enableMerging) {
+    cm_msg(MERROR, __FUNCTION__, "Invalid setup - you must merge data from all boards if running with the chronobox.");
+    sprintf(error, "Invalid setup - you must merge data from all boards if running with the chronobox.");
+    return FE_ERR_ODB;
+  }
+
+   if (enableChronobox) {
+     /// Make sure the chronobox is stopped
+     chronobox_start_stop(false);
+   }
 
   for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
-    if (! itdt5751->IsConnected()) continue;   // Skip unconnected board
+    if (!itdt5751->IsConnected()) continue;   // Skip unconnected board
     DWORD vmeAcq, vmeStat;
     itdt5751->ReadReg(DT5751_ACQUISITION_STATUS, &vmeAcq);//Test the PLL lock once (it may have happened earlier)
     if ((vmeAcq & 0x80) == 0) {
@@ -560,6 +623,15 @@ INT begin_of_run(INT run_number, char *error)
     if(status){
       cm_msg(MERROR,"feodt5751:BOR", "Couldn't create thread for link %d. Return code: %d", i, status);
     }
+  }
+
+  // Need to discard the first ZMQ bank.
+  is_first_event = true;
+
+  if (enableChronobox) {
+    /// Sleep 1 second and start chronobox
+    sleep(1);
+    chronobox_start_stop(true);
   }
 
   set_equipment_status(equipment[0].name, "Started run", "#00ff00");
@@ -678,19 +750,36 @@ timeval wait_start;
 BOOL wait_buffer_empty(int transition, BOOL first)
 {
    if(first){
-     printf("\nDeferred transition.  First call of wait_buffer_empty. Stopping run\n");
-     for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
-       if (itdt5751->IsConnected()) {  // Skip unconnected board
-         itdt5751->StopRun();
+      printf("\nDeferred transition.  First call of wait_buffer_empty. Stopping run\n");
+      // Some funny business here... need to pause the readout on the threads before
+      // making the chronobox stop call... some sort of contention for the system resources.
+      if (enableChronobox) {
+        stopRunInProgress = true;
+        usleep(500);
+        chronobox_start_stop(false);
+        stopRunInProgress = false;
+        sleep(1);
+        // We'll stop the DT5751s later
+     } else {
+       printf("wait_buffer_empty: begin of boards stop\n");
+       for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
+         if (itdt5751->IsConnected()) {  // Skip unconnected board
+           itdt5751->StopRun();
+         }
        }
+       printf("wait_buffer_empty: end of boards stop\n");
+       // gennaro
+       stopRunInProgress = true;
      }
 
      gettimeofday(&wait_start, NULL);
 
      if (flushBuffersAtEndOfRun) {
-       cm_msg(MINFO, __FUNCTION__, "Deferring transition to flush more data from boards");
+       cm_msg(MINFO, __FUNCTION__, "Deferring transition to flush more data from boards"); 
+       printf("wait_buffer_empty: return FALSE\n");	
        return FALSE;
      } else {
+       printf("wait_buffer_empty: return TRUE\n");	
        return TRUE;
      }
    }
@@ -760,6 +849,15 @@ INT end_of_run(INT run_number, char *error)
     // Stop run
     for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
       if (itdt5751->IsConnected()) {  // Skip unconnected board
+        if (1) { //(enableChronobox) {
+           // If no chronobox, we've already stopped the boards.
+           result = itdt5751->StopRun();
+
+           if(!result) {
+             cm_msg(MERROR, "EOR", "Could not stop the run for module %d", itdt5751->GetModuleID());
+           }
+        }
+
         printf("Number of events in ring buffer for module-%i: %i\n",itdt5751->GetModuleID(),itdt5751->GetNumEventsInRB());
 
         rb_delete(itdt5751->GetRingBufferHandle());
@@ -768,10 +866,25 @@ INT end_of_run(INT run_number, char *error)
       }
     }
 
+#if 0
     // Info about event in HW buffer
     result = odt5751[0].Poll(&eStored);
     if(eStored != 0x0) {
       cm_msg(MERROR, "EOR", "Events left in the dt5751-%d: %d",odt5751[0].GetModuleID(), eStored);
+    }
+#endif
+
+    if (enableChronobox) {
+      // Clear out all the events in the ZMQ buffer:
+      uint32_t rcvbuf [100];
+      int total_extra = 0;
+      int stat;
+      stat = zmq_recv (subscriber, rcvbuf, sizeof(rcvbuf), ZMQ_DONTWAIT);
+      while(stat > 0){
+        total_extra++;
+        stat = zmq_recv (subscriber, rcvbuf, sizeof(rcvbuf), ZMQ_DONTWAIT);
+      }
+      if(total_extra >0) cm_msg(MINFO, "EOR", "Events left in the chronobox: %d",total_extra);
     }
 
   }
@@ -932,7 +1045,7 @@ INT poll_event(INT source, INT count, BOOL test)
     if (enableMerging) {
       //ready for readout only when data is present in all ring buffers
       for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
-        if(itdt5751->IsEnabled() && itdt5751->IsConnected() && (itdt5751->GetNumEventsInRB() == 0)) {
+        if(itdt5751->IsConnected() && (itdt5751->GetNumEventsInRB() == 0)) {
           evtReady = false;
         }
       }
@@ -943,7 +1056,7 @@ INT poll_event(INT source, INT count, BOOL test)
       int maxNumEvents = -1;
 
       for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751) {
-        if (!itdt5751->IsConnected() || !itdt5751->IsEnabled()) {
+        if (!itdt5751->IsConnected()) {
           continue;
         }
 
@@ -1024,9 +1137,64 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
   // Keep track of timestamps
   std::vector<uint32_t> timestamps;
 
+  if (enableChronobox) {
+    // Get the ChronoBox bank
+    // If this is the first event, then read ZMQ buffer an extra time; want to discard first event.
+    if(is_first_event){
+      uint32_t rcvbuf [100];
+      int stat0 = zmq_recv (subscriber, rcvbuf, sizeof(rcvbuf), ZMQ_DONTWAIT);
+      if(!stat0){
+        cm_msg(MERROR,"read_trigger_event", "ZMQ read error on first event. %i\n",stat0);
+      }
+      is_first_event = false;
+      printf("Flushed first event from chronobox\n");
+    }
+
+    int stat = -1;
+
+    bk_create(pevent, "ZMQ0", TID_DWORD, (void **)&pdata);
+
+    // Try to receive ZMQ data from chronobox.
+    // Use ZMQ_DONTWAIT to prevent blocking.
+    // But retry several times in case message is delayed.
+    float zmq_timeout_ms = 100;
+    float zmq_retry_wait_ms = 1;
+    float zmq_time = 0;
+
+    while (zmq_time < zmq_timeout_ms) {
+      stat = zmq_recv (subscriber, pdata, 1000, ZMQ_DONTWAIT);
+
+      if (stat > 0) {
+        break;
+      }
+
+      zmq_time += zmq_retry_wait_ms;
+      usleep(1000 * zmq_retry_wait_ms);
+    }
+
+    if (stat > 0) {
+
+      //printf("ZMQ: %x %x %x %x %x",pdata[0],pdata[1],pdata[2],pdata[3],pdata[4]);
+      // Save the timestamp for ZMQ bank
+      timestamps.push_back((pdata[3]& 0x7fffffff)); // Save the ZMQ timestamp
+      pdata += stat/sizeof(uint32_t);
+      stat = bk_close(pevent, pdata);
+    }else{
+      // There should be ZMQ data for each bank.  If not, stop the run.
+      if(!eor_transition_called){
+        cm_msg(MERROR,"read_trigger_event", "Error: did not receive a ZMQ bank after %f ms.  Stopping run.", zmq_timeout_ms);
+        // gennaro
+        // cm_transition(TR_STOP, 0, NULL, 0, TR_DETACH, 0);
+        eor_transition_called = true;
+        return 0;
+      }
+    }
+  } // End of chronobox
+
   if (!enableMerging && unmergedModuleToRead < 0) {
     cm_msg(MERROR,"read_trigger_event", "Error: module to read is set to invalid value %d! Stopping run.", unmergedModuleToRead);
-    cm_transition(TR_STOP, 0, NULL, 0, TR_DETACH, 0);
+    // gennaro
+    // cm_transition(TR_STOP, 0, NULL, 0, TR_DETACH, 0);
     eor_transition_called = true;
     return 0;
   }
@@ -1065,7 +1233,8 @@ INT read_event_from_ring_bufs(char *pevent, INT off) {
 
     if (enableMerging && itdt5751->GetNumEventsInRB() == 0) {
         cm_msg(MERROR,"read_trigger_event", "Error: no events in RB for module %d.  Stopping run.", itdt5751->GetModuleID());
-        cm_transition(TR_STOP, 0, NULL, 0, TR_DETACH, 0);
+        // gennaro
+        // cm_transition(TR_STOP, 0, NULL, 0, TR_DETACH, 0);
         eor_transition_called = true;
         return 0;
     }
@@ -1170,7 +1339,7 @@ INT read_temperature(char *pevent, INT off) {
   // Read the temperature for each ADC...
   DWORD temp;
   for (itdt5751 = odt5751.begin(); itdt5751 != odt5751.end(); ++itdt5751){
-    if (!itdt5751->IsConnected() || !itdt5751->IsEnabled()) {
+    if (!itdt5751->IsConnected()) {
       continue;
     }
 

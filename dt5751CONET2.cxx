@@ -276,10 +276,18 @@ dt5751CONET2::ConnectErrorCode dt5751CONET2::Connect(int connAttemptsMax, int se
       pthread_detach(con_thread);
 
       if (sCAEN == CAENComm_Success) {
-        printf("Link#:%d Board#:%d Module_Handle[%d]:%d\n",
-                link_, board_, moduleID_, this->GetDeviceHandle());
-
-        returnCode = ConnectSuccess;
+	  // verify board type
+	  const uint32_t dt5751_board_type = 0x05;
+	  uint32_t version = 0;
+	  sCAEN = ReadReg_(DT5751_BOARD_INFO, &version);
+	  if((version & 0xFF) != dt5751_board_type) {
+	     Disconnect();
+	     returnCode = ConnectErrorBoardMismatch;
+	  } else {
+	     printf("Link#:%d Board#:%d Module_Handle[%d]:%d\n",
+	  	link_, board_, moduleID_, this->GetDeviceHandle());
+	     returnCode = ConnectSuccess;
+	  }
       }
       else {
         device_handle_ = -1;
@@ -644,7 +652,7 @@ bool dt5751CONET2::ReadEvent(void *wp)
 DWORD dt5751CONET2::PeekRBTimestamp() {
 
   DWORD *src=NULL;
-  int status = rb_get_rp(this->GetRingBufferHandle(), (void**)&src, 500);
+  int status = rb_get_rp(this->GetRingBufferHandle(), (void**)&src, 5000);
   if (status == DB_TIMEOUT) {
     cm_msg(MERROR,"FillEventBank", "Got rp timeout for module %d", this->GetModuleID());
     printf("### num events: %d\n", this->GetNumEventsInRB());
@@ -691,7 +699,7 @@ bool dt5751CONET2::FillEventBank(char * pevent, uint32_t &timestamp)
   DWORD *src=NULL;
   DWORD *dest=NULL;
 
-  int status = rb_get_rp(this->GetRingBufferHandle(), (void**)&src, 500);
+  int status = rb_get_rp(this->GetRingBufferHandle(), (void**)&src, 5000);
   if (status == DB_TIMEOUT) {
     cm_msg(MERROR,"FillEventBank", "Got rp timeout for module %d", this->GetModuleID());
     printf("### num events: %d\n", this->GetNumEventsInRB());
